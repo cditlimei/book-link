@@ -111,6 +111,13 @@ summary{color:var(--accent);font-size:15px;cursor:pointer}
 .bar i{display:block;width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:0}
 .bar span{font-size:9.5px;color:var(--muted);margin-top:4px;writing-mode:vertical-rl;letter-spacing:-.04em}
 input.file{margin-top:8px;font-size:14px;color:var(--muted)}
+.miles{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.miles>div{flex:1 1 120px;background:var(--accent-w);border-radius:10px;padding:10px 12px}
+.miles b{display:block;font-size:20px;color:var(--accent);font-variant-numeric:tabular-nums}
+.miles span{font-size:12.5px;color:var(--muted);line-height:1.35;display:block;margin-top:2px}
+.mile{font-size:13px;color:var(--warn);margin-top:4px;line-height:1.45}
+.nw{white-space:nowrap;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .warnbar{background:var(--bad-w);color:var(--bad);padding:11px 14px;font-size:14.5px;line-height:1.5;
   border-bottom:1px solid var(--line)}
 @media (min-width:700px){ .qtext{font-size:25px} .kb{max-width:420px} }
@@ -142,6 +149,8 @@ const shuf = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { cons
 const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) { const t = a % b; a = b; b = t; } return a || 1; };
 function frac(n, d) { if (d < 0) { n = -n; d = -d; } const g = gcd(n, d); return { n: n / g, d: d / g }; }
 function fstr(f) { return f.d === 1 ? '' + f.n : f.n + '/' + f.d; }
+/* 取与分母互质的分子，保证题干里的分数本身已是最简 */
+function nCop(d) { const c = []; for (let i = 1; i < d; i++) if (gcd(i, d) === 1) c.push(i); return c.length ? pick(c) : 1; }
 function divisors(n) { const r = []; for (let i = 1; i <= n; i++) if (n % i === 0) r.push(i); return r; }
 /* 负数套括号 */
 function P(x) { return x < 0 ? '(−' + (-x) + ')' : '' + x; }
@@ -183,7 +192,7 @@ const TOPICS = [
 
 /* ---------------- 小学基础 ---------------- */
 {
-  k: 'calc-order', name: '四则混合运算顺序', stage: 'P', pri: 1,
+  k: 'calc-order', name: '四则混合运算顺序', stage: 'P', pri: 3,
   ask: '让他先用手指点一遍：这道题先算哪一步？说出顺序再动笔。',
   gen() {
     const t = R(1, 3);
@@ -205,12 +214,12 @@ const TOPICS = [
   }
 },
 {
-  k: 'frac-add', name: '分数加减（通分）', stage: 'P', pri: 2,
+  k: 'frac-add', name: '分数加减（通分）', stage: 'P', pri: 1,
   ask: '问他公分母是怎么找出来的，最后有没有约到最简。',
   gen() {
     const ds = [2, 3, 4, 5, 6, 8, 9, 10, 12];
     const d1 = pick(ds), d2 = pick(ds.filter(x => x !== d1));
-    const n1 = R(1, d1 - 1), n2 = R(1, d2 - 1);
+    const n1 = nCop(d1), n2 = nCop(d2);
     const plus = Math.random() < 0.5;
     const L = d1 * d2 / gcd(d1, d2);
     const a = n1 * L / d1, b = n2 * L / d2;
@@ -221,10 +230,11 @@ const TOPICS = [
   }
 },
 {
-  k: 'frac-muldiv', name: '分数乘除', stage: 'P', pri: 2,
+  k: 'frac-muldiv', name: '分数乘除', stage: 'P', pri: 1,
   ask: '除法那步他有没有翻成乘倒数？让他指出哪个数被翻过来了。',
   gen() {
-    const a = R(1, 9), b = R(2, 10), c = R(1, 9), d = R(2, 10);
+    const b = pick([2, 3, 4, 5, 6, 7, 8, 9, 10]), d = pick([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    const a = nCop(b), c = nCop(d);
     const mul = Math.random() < 0.5;
     const f = mul ? frac(a * c, b * d) : frac(a * d, b * c);
     return { q: `计算（结果化成最简分数）：${a}/${b} ${mul ? '×' : '÷'} ${c}/${d} = ?`, ans: fstr(f), type: 'frac',
@@ -233,7 +243,7 @@ const TOPICS = [
   }
 },
 {
-  k: 'decimal', name: '小数运算与分数互化', stage: 'P', pri: 3,
+  k: 'decimal', name: '小数运算与分数互化', stage: 'P', pri: 1,
   ask: '小数点位数他是数出来的还是猜的？让他数一遍。',
   gen() {
     const t = R(1, 3);
@@ -270,7 +280,7 @@ const TOPICS = [
   }
 },
 {
-  k: 'percent', name: '百分数与折扣', stage: 'P', pri: 4,
+  k: 'percent', name: '百分数与折扣', stage: 'P', pri: 5,
   ask: '问清楚「谁是 1」——百分数题错一半都是把基准搞错。',
   gen() {
     const t = R(1, 3);
@@ -286,7 +296,7 @@ const TOPICS = [
   }
 },
 {
-  k: 'ratio', name: '比与比例', stage: 'P', pri: 4,
+  k: 'ratio', name: '比与比例', stage: 'P', pri: 5,
   ask: '让他写出「内项之积等于外项之积」，再动笔。',
   gen() {
     const t = R(1, 2);
@@ -300,7 +310,7 @@ const TOPICS = [
   }
 },
 {
-  k: 'unit', name: '单位换算', stage: 'P', pri: 5,
+  k: 'unit', name: '单位换算', stage: 'P', pri: 6,
   ask: '问他是乘还是除——大单位换小单位一定变大。',
   gen() {
     const c = pick([
@@ -315,7 +325,7 @@ const TOPICS = [
   }
 },
 {
-  k: 'area', name: '平面图形面积', stage: 'P', pri: 5,
+  k: 'area', name: '平面图形面积', stage: 'P', pri: 6,
   ask: '让他先把公式写在旁边，再往里代数。',
   gen() {
     const t = R(1, 4);
@@ -350,7 +360,7 @@ const TOPICS = [
   }
 },
 {
-  k: 'word-speed', name: '行程问题', stage: 'P', pri: 3,
+  k: 'word-speed', name: '行程问题', stage: 'P', pri: 4,
   ask: '让他画一条线段图标出两个人的位置，别直接套公式。',
   gen() {
     const t = R(1, 3);
@@ -379,7 +389,7 @@ const TOPICS = [
   }
 },
 {
-  k: 'word-sumdiff', name: '和差倍问题', stage: 'P', pri: 3,
+  k: 'word-sumdiff', name: '和差倍问题', stage: 'P', pri: 4,
   ask: '让他指出「1 倍量」是谁，用它当未知数。',
   gen() {
     const small = R(5, 30), k = R(2, 4), m = R(1, 9);
@@ -397,7 +407,7 @@ const TOPICS = [
     const t = R(1, 4);
     if (t === 1) { const a = R(2, 20) * pick([1, -1]);
       return { q: `${a} 的相反数是 ?`, ans: '' + (-a), type: 'num', sol: [`只改符号不改大小：${-a}`] }; }
-    if (t === 2) { const n = R(1, 9), d = R(2, 11), s = pick([1, -1]);
+    if (t === 2) { const d = R(2, 11), n = nCop(d), s = pick([1, -1]);
       return { q: `${s < 0 ? '−' : ''}${n}/${d} 的倒数是 ?`, ans: fstr(frac(s * d, n)), type: 'frac',
         sol: [`分子分母对调，符号不变：${fstr(frac(s * d, n))}`] }; }
     if (t === 3) { const a = R(2, 30) * pick([1, -1]);
@@ -475,6 +485,107 @@ const TOPICS = [
       sol: [`(−${a})² = ${a * a}`, `${a * a} × ${b} = ${a * a * b}`, `${c} ÷ ${c0} = ${c / c0}`, `合并 = ${real}`] };
   }
 },
+/* ---- 以下 4 个知识点来自初一实测易错清单，不是凭空补的 ----
+   性质符号与运算符号混淆（-3-5×(-2) 算成 -13）
+   括号内是算式时的去括号（(2-3)-(-4+5) 算成 8）
+   负分数加减（小学分数运算全是正数，负号一进来就崩）
+   分数/负数作底数的乘方（底数圈不对）                        */
+{
+  k: 'sign-mix', name: '性质符号 vs 运算符号', stage: 'M', pri: 1,
+  ask: '让他把中间那个「−」和数字自带的负号分开念一遍：哪个是运算，哪个是这个数本身的符号？',
+  gen() {
+    const t = R(1, 3);
+    if (t === 1) {
+      const a = R(2, 15), b = R(2, 9), c = -R(2, 9);
+      return { q: `计算：${a} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
+        sol: [`中间的「−」是减法运算，${P(c)} 的负号是这个数自带的，两个不能合成一个`,
+              `先算乘法：${b} × ${P(c)} = ${b * c}`,
+              `再减：${a} − ${P(b * c)} = ${a} + ${-b * c} = ${a - b * c}`] };
+    }
+    if (t === 2) {
+      const a = R(2, 15), c0 = R(2, 6), k = R(2, 5), b = -c0 * k;
+      return { q: `计算：${a} + ${P(b)} ÷ ${c0} = ?`, ans: '' + (a + b / c0), type: 'num',
+        sol: [`先算除法：${P(b)} ÷ ${c0} = ${b / c0}`,
+              `再算加法：${a} + ${P(b / c0)} = ${a + b / c0}`] };
+    }
+    const a = -R(2, 12), b = R(2, 9), c = -R(2, 9);
+    return { q: `计算：${P(a)} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
+      sol: [`三个符号各管各的：开头的负号属于 ${-a}，中间是减法，最后括号里的负号属于 ${-c}`,
+            `${b} × ${P(c)} = ${b * c}`,
+            `${a} − ${P(b * c)} = ${a} + ${-b * c} = ${a - b * c}`] };
+  }
+},
+{
+  k: 'paren-nest', name: '括号里是算式的去括号', stage: 'M', pri: 1,
+  ask: '让他用手指点着括号里每一项念「这项变号、这项也变号」，一项都不能漏。',
+  gen() {
+    const t = R(1, 2);
+    if (t === 1) {
+      const a = R(2, 12), b = R(2, 12), c = R(2, 9), d = R(2, 9);
+      const ans = (a - b) - (-c + d);
+      return { q: `计算：(${a} − ${b}) − (−${c} + ${d}) = ?`, ans: '' + ans, type: 'num',
+        sol: [`第一个括号先算出来：${a} − ${b} = ${a - b}`,
+              `第二个括号前面是「−」，里面两项都要变号：−(−${c} + ${d}) = +${c} − ${d}`,
+              `${a - b} + ${c} − ${d} = ${ans}`] };
+    }
+    const a = R(5, 20), b = R(2, 12), c = R(2, 9), d = R(2, 9);
+    const ans = a - (b - (c - d));
+    return { q: `计算：${a} − [${b} − (${c} − ${d})] = ?`, ans: '' + ans, type: 'num',
+      sol: [`从最里面的小括号开始：${c} − ${d} = ${c - d}`,
+            `中括号里：${b} − ${P(c - d)} = ${b - (c - d)}`,
+            `${a} − ${P(b - (c - d))} = ${ans}`] };
+  }
+},
+{
+  k: 'neg-frac', name: '负分数加减', stage: 'M', pri: 1,
+  ask: '通分那一步和小学一模一样，问他新增的难点只有一个：负号。别让他重新学通分。',
+  gen() {
+    const t = R(1, 2);
+    const ds = [2, 3, 4, 5, 6, 8, 10, 12];
+    if (t === 1) {
+      const d1 = pick(ds), d2 = pick(ds.filter(x => x !== d1));
+      const n1 = nCop(d1), n2 = nCop(d2);
+      const s1 = pick([1, -1]), s2 = pick([1, -1]);
+      const L = d1 * d2 / gcd(d1, d2);
+      const A = s1 * n1 * L / d1, B = s2 * n2 * L / d2;
+      const f = frac(A + B, L);
+      const t1 = (s1 < 0 ? '−' : '') + n1 + '/' + d1;
+      const t2 = s2 < 0 ? '(−' + n2 + '/' + d2 + ')' : n2 + '/' + d2;
+      return { q: `计算（结果化成最简分数）：${t1} + ${t2} = ?`, ans: fstr(f), type: 'frac',
+        sol: [`通分，公分母 ${L}：${t1} = ${A}/${L}，${(s2 < 0 ? '−' : '') + n2 + '/' + d2} = ${B}/${L}`,
+              `分母相同，分子直接加：${A} + ${P(B)} = ${A + B}`,
+              `${A + B}/${L} 约简 = ${fstr(f)}`] };
+    }
+    const w = R(1, 3), d1 = pick([2, 3, 4, 5, 6]), n1 = nCop(d1);
+    const d2 = pick([2, 3, 4, 6].filter(x => x !== d1)), n2 = nCop(d2);
+    const A = frac(-(w * d1 + n1), d1), B = frac(n2, d2);
+    const f = frac(A.n * B.d + B.n * A.d, A.d * B.d);
+    return { q: `计算（结果化成最简分数）：−${w} ${n1}/${d1} + ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
+      sol: [`带分数先化成假分数：−${w} ${n1}/${d1} = ${fstr(A)}`,
+            `再通分相加：${fstr(A)} + ${n2}/${d2}`,
+            `= ${fstr(f)}`] };
+  }
+},
+{
+  k: 'power-frac', name: '分数作底数的乘方', stage: 'M', pri: 2,
+  ask: '让他用手指圈出底数是哪一部分——括号在不在，答案完全不同。',
+  gen() {
+    const d = R(2, 6), n = nCop(d), e = pick([2, 3]);
+    const sup = e === 2 ? '²' : '³';
+    if (Math.random() < 0.5) {
+      const v = frac(Math.pow(n, e) * (e % 2 ? -1 : 1), Math.pow(d, e));
+      return { q: `计算：(−${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
+        sol: [`括号里整个 −${n}/${d} 是底数，分子分母都要乘方`,
+              `${e} 个负数相乘，${e % 2 ? '奇数个 → 结果为负' : '偶数个 → 结果为正'}`,
+              `= ${fstr(v)}`] };
+    }
+    const v = frac(-Math.pow(n, e), Math.pow(d, e));
+    return { q: `计算：−(${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
+      sol: [`底数只是 ${n}/${d}，负号在括号外面，等乘方算完再取相反数`,
+            `(${n}/${d})${sup} = ${fstr(frac(Math.pow(n, e), Math.pow(d, e)))}`,
+            `前面还有负号 = ${fstr(v)}`] };
+  }
+},
 {
   k: 'sci', name: '科学记数法', stage: 'M', pri: 4,
   ask: '让他数整数位数，n 就是位数减 1。',
@@ -496,7 +607,7 @@ const TOPICS = [
     if (t === 2) { const e1 = R(1, 4), e2 = R(1, 3), e3 = R(1, 2);
       return { q: `单项式 −5x^${e1}y^${e2}z^${e3} 的次数是 ?`, ans: '' + (e1 + e2 + e3), type: 'num',
         sol: [`次数 = 所有字母指数之和 = ${e1} + ${e2} + ${e3} = ${e1 + e2 + e3}`] }; }
-    const n = R(1, 5), d = R(2, 7);
+    const d = R(2, 7), n = nCop(d);
     return { q: `单项式 −(${n}/${d})xy² 的系数是 ?（填分数）`, ans: fstr(frac(-n, d)), type: 'frac',
       sol: [`系数连符号一起看：${fstr(frac(-n, d))}`] };
   }
@@ -635,6 +746,84 @@ const TOPICS = [
 
 const TMAP = {}; TOPICS.forEach(t => TMAP[t.k] = t);
 
+/* ============================================================
+   梯子题（搭桥）：先给一道他小学就会做的锚点题，紧接着给一道
+   只多了负号 / 字母的初一题，让他自己看出「方法没变」。
+   出处：小学薄弱生衔接初一的通行做法——先算 5−3，再算 5−(−3)。
+   ============================================================ */
+const BRIDGE = {
+  'rat-addsub': () => { const a = R(6, 18), b = R(2, 9);
+    return { p: { q: `${a} − ${b} = ?`, ans: '' + (a - b), type: 'num', sol: [`小学就会：${a - b}`] },
+             m: { q: `${a} − (−${b}) = ?`, ans: '' + (a + b), type: 'num',
+                  sol: [`和上面那道只差括号里的一个负号`, `减去 −${b}，等于加上 ${b}`, `${a} + ${b} = ${a + b}`] } }; },
+
+  'rat-muldiv': () => { const a = R(3, 9), b = R(3, 9);
+    return { p: { q: `${a} × ${b} = ?`, ans: '' + a * b, type: 'num', sol: [`口诀就够：${a * b}`] },
+             m: { q: `(−${a}) × ${b} = ?`, ans: '' + (-a * b), type: 'num',
+                  sol: [`数字部分和上面一样是 ${a * b}`, `只有 1 个负号，奇数个 → 结果为负`, `= ${-a * b}`] } }; },
+
+  'power': () => { const b = R(2, 5);
+    return { p: { q: `${b}³ = ?`, ans: '' + b * b * b, type: 'num', sol: [`${b}×${b}×${b} = ${b * b * b}`] },
+             m: { q: `(−${b})³ = ?`, ans: '' + (-b * b * b), type: 'num',
+                  sol: [`绝对值和上面一样是 ${b * b * b}`, `3 个负数相乘，奇数个 → 负`, `= ${-b * b * b}`] } }; },
+
+  'neg-frac': () => { const d1 = pick([2, 3, 4, 6]), d2 = pick([2, 3, 4, 6].filter(x => x !== d1));
+    const L = d1 * d2 / gcd(d1, d2);
+    return { p: { q: `1/${d1} + 1/${d2} = ?`, ans: fstr(frac(L / d1 + L / d2, L)), type: 'frac',
+                  sol: [`公分母 ${L}，通分后相加 = ${fstr(frac(L / d1 + L / d2, L))}`] },
+             m: { q: `−1/${d1} + 1/${d2} = ?`, ans: fstr(frac(-L / d1 + L / d2, L)), type: 'frac',
+                  sol: [`通分的做法和上面完全一样，公分母还是 ${L}`, `只是第一项带负号：${-L / d1}/${L} + ${L / d2}/${L}`,
+                        `= ${fstr(frac(-L / d1 + L / d2, L))}`] } }; },
+
+  'like-terms': () => { const a = R(2, 6), b = R(2, 6), n = R(3, 9);
+    return { p: { q: `${a} × ${n} + ${b} × ${n} = ?（用简便方法）`, ans: '' + (a + b) * n, type: 'num',
+                  sol: [`都有 ${n}，提出来：(${a}+${b}) × ${n} = ${(a + b) * n}`] },
+             m: { q: `化简：${a}a + ${b}a = ?（填合并后 a 前面的数）`, ans: '' + (a + b), type: 'num',
+                  sol: [`把上面那道的 ${n} 换成字母 a，做法一样`, `${a} 个 a 加 ${b} 个 a = ${a + b} 个 a`,
+                        `所以是 ${a + b}a，系数 ${a + b}`] } }; },
+
+  'remove-paren': () => { const a = R(10, 20), b = R(2, 6), c = R(2, 6);
+    return { p: { q: `${a} − (${b} + ${c}) = ?`, ans: '' + (a - b - c), type: 'num',
+                  sol: [`括号里先算：${b}+${c} = ${b + c}`, `${a} − ${b + c} = ${a - b - c}`] },
+             m: { q: `${a} − (${b} + ${c}) 去括号后等于 ${a} − ${b} ? ${c}，问号处是 + 还是 −？（填 1 表示 +，填 2 表示 −）`,
+                  ans: '2', type: 'num',
+                  sol: [`括号前是负号，里面每一项都要变号`, `${a} − ${b} − ${c}，所以问号是「−」`,
+                        `这条规则到了 ${a} − (${b}x + ${c}) 一样成立`] } }; },
+
+  'eval-expr': () => { const a = R(2, 5), b = R(1, 9), x = R(2, 5);
+    return { p: { q: `当 x = ${x} 时，${a}x + ${b} = ?`, ans: '' + (a * x + b), type: 'num',
+                  sol: [`把 x 换成 ${x}：${a}×${x} + ${b} = ${a * x + b}`] },
+             m: { q: `当 x = −${x} 时，${a}x + ${b} = ?`, ans: '' + (-a * x + b), type: 'num',
+                  sol: [`代入时把 x 用括号包起来：${a}×(−${x}) + ${b}`, `${a}×(−${x}) = ${-a * x}`,
+                        `${-a * x} + ${b} = ${-a * x + b}`] } }; },
+
+  'linear-eq': () => { const m = R(2, 7), x = R(2, 9), n = R(1, 12);
+    return { p: { q: `解方程：${m}x + ${n} = ${m * x + n}，x = ?`, ans: '' + x, type: 'num',
+                  sol: [`两边减 ${n}，再除 ${m}：x = ${x}`] },
+             m: { q: `解方程：${m}x + ${n} = ${-m * x + n}，x = ?`, ans: '' + (-x), type: 'num',
+                  sol: [`步骤和上面一题一模一样：两边减 ${n}`, `${m}x = ${-m * x}`,
+                        `两边除 ${m}：x = ${-x}（初一开始，答案可以是负数）`] } }; },
+
+  'sign-mix': () => { const a = R(5, 15), b = R(2, 6), c = R(2, 6);
+    return { p: { q: `${a} − ${b} × ${c} = ?`, ans: '' + (a - b * c), type: 'num',
+                  sol: [`先乘后减：${b}×${c} = ${b * c}，${a} − ${b * c} = ${a - b * c}`] },
+             m: { q: `${a} − ${b} × (−${c}) = ?`, ans: '' + (a + b * c), type: 'num',
+                  sol: [`顺序和上面一样，先算乘法：${b} × (−${c}) = ${-b * c}`,
+                        `${a} − (−${b * c})，减负数变加正数`, `= ${a} + ${b * c} = ${a + b * c}`] } }; }
+};
+
+/* 取一对梯子题；没有配对的知识点返回 null */
+function genBridge(k) {
+  if (!BRIDGE[k]) return null;
+  const pair = BRIDGE[k]();
+  const tag = Math.random().toString(36).slice(2, 8);
+  return [
+    Object.assign({ topic: null, tname: '搭桥 ① 这道你小学就会', ask: TMAP[k].ask, qid: 'brp_' + tag }, pair.p),
+    Object.assign({ topic: k, tname: '搭桥 ② 只多了一个负号', ask: TMAP[k].ask, qid: 'brm_' + tag }, pair.m)
+  ];
+}
+
+
 /* 生成一题，带重试防退化 */
 function genQ(k) {
   const t = TMAP[k];
@@ -654,17 +843,22 @@ function genMany(k, n) { const r = []; const seen = new Set(); let guard = 0;
   return r; }
 
 /* ---------- 口算热身 ---------- */
-function warmupQ(stage) {
+/* force: 'warmup-frac' 先练小学分数/小数手感，'warmup-neg' 再进负数。
+   出处：衔接建议「先做 5 分钟分数小数加减，再转到带负号的题」，不要一上来就负数。*/
+function warmupQ(stage, force) {
   const kinds = ['int'];
   if (stage >= 2) kinds.push('frac');
   if (stage >= 2) kinds.push('neg');
   if (stage >= 3) kinds.push('negmul', 'pow');
-  const kd = pick(kinds);
+  let kd;
+  if (force === 'frac') kd = pick(['int', 'frac']);
+  else if (force === 'neg') kd = pick(stage >= 3 ? ['neg', 'negmul', 'pow'] : ['neg']);
+  else kd = pick(kinds);
   if (kd === 'int') { const t = R(1, 3);
     if (t === 1) { const a = R(11, 89), b = R(11, 89); return { q: `${a} + ${b}`, ans: '' + (a + b) }; }
     if (t === 2) { const a = R(21, 99), b = R(11, 20); return { q: `${a} − ${b}`, ans: '' + (a - b) }; }
     const a = R(3, 12), b = R(3, 12); return { q: `${a} × ${b}`, ans: '' + a * b }; }
-  if (kd === 'frac') { const d = pick([2, 3, 4, 5, 6, 8]), n1 = R(1, d - 1), d2 = pick([2, 3, 4, 6, 8]), n2 = R(1, d2 - 1);
+  if (kd === 'frac') { const d = pick([2, 3, 4, 5, 6, 8]), n1 = nCop(d), d2 = pick([2, 3, 4, 6, 8]), n2 = nCop(d2);
     const L = d * d2 / gcd(d, d2); const f = frac(n1 * L / d + n2 * L / d2, L);
     return { q: `${n1}/${d} + ${n2}/${d2}`, ans: fstr(f) }; }
   if (kd === 'neg') { const a = R(-19, 19) || 4, b = R(-19, 19) || -5;
@@ -687,20 +881,30 @@ const BOX_GAP = [1, 2, 4, 7, 15, 30];
 const P_TOPICS = TOPICS.filter(t => t.stage === 'P').map(t => t.k);
 const M_TOPICS = TOPICS.filter(t => t.stage === 'M').map(t => t.k);
 
-/* 开学后 12 周跟课表（以学校实际进度为准，可在计划页调整） */
+/* 开学后 20 周跟课表，按北师大版（2024）七上章序 + 深圳市 2026-2027 校历排的：
+   9/1 开学，国庆 10/1–10/7，期末考不早于 2027-01-14，1/23 放寒假。
+   mile 是里程碑标记，学校进度不一样时在「计划」页逐周改。 */
 const TRACK = [
-  { w: 1, ch: '第一章 丰富的图形世界 · 第二章 有理数（数轴、相反数、绝对值）', ks: ['numline'] },
-  { w: 2, ch: '第二章 有理数的加法与减法', ks: ['rat-addsub'] },
-  { w: 3, ch: '第二章 有理数的乘法、除法与乘方', ks: ['rat-muldiv', 'power'] },
-  { w: 4, ch: '第二章 有理数混合运算 · 科学记数法', ks: ['rat-mixed', 'abs-calc', 'sci'] },
-  { w: 5, ch: '第三章 整式（单项式、多项式、同类项）', ks: ['monomial', 'like-terms'] },
-  { w: 6, ch: '第三章 整式加减 · 去括号 · 化简求值', ks: ['remove-paren', 'eval-expr'] },
-  { w: 7, ch: '期中复习（有理数 + 整式）', ks: ['rat-mixed', 'power', 'remove-paren', 'eval-expr'] },
-  { w: 8, ch: '第五章 一元一次方程（移项、合并同类项）', ks: ['linear-eq'] },
-  { w: 9, ch: '第五章 去括号、去分母解方程', ks: ['linear-eq'] },
-  { w: 10, ch: '第五章 一元一次方程的应用', ks: ['eq-word'] },
-  { w: 11, ch: '第四章 基本平面图形（线段、角）', ks: ['geom'] },
-  { w: 12, ch: '第六章 数据的收集与整理 · 期末总复习', ks: ['stat', 'linear-eq', 'rat-mixed'] }
+  { w: 1,  ch: '第一章 丰富的图形世界（立体图形、展开与折叠、三视图）', ks: ['numline'], mile: '开学第一周，本章计算少，重点是把作业习惯立起来' },
+  { w: 2,  ch: '2.1 有理数 · 2.2 数轴 · 2.3 绝对值', ks: ['numline', 'abs-calc'] },
+  { w: 3,  ch: '2.4 有理数的加法 · 2.5 有理数的减法', ks: ['rat-addsub'], mile: '整个七上最关键的一周，减法改写成加相反数必须练成条件反射' },
+  { w: 4,  ch: '有理数加减混合运算', ks: ['rat-addsub', 'paren-nest'] },
+  { w: 5,  ch: '2.6 有理数的乘法（国庆假期，进度会慢）', ks: ['rat-muldiv', 'sign-mix'], mile: '国庆 10/1–10/7，假期最容易断档，每天 15 分钟也要碰' },
+  { w: 6,  ch: '2.7 有理数的除法', ks: ['rat-muldiv', 'sign-mix'] },
+  { w: 7,  ch: '2.8 有理数的乘方 · 科学记数法', ks: ['power', 'power-frac', 'sci'], mile: '(−2)² 和 −2² 的区别，这里错了后面全是连环错' },
+  { w: 8,  ch: '2.9 有理数的混合运算 · 第二章回顾', ks: ['rat-mixed', 'neg-frac', 'sign-mix'] },
+  { w: 9,  ch: '期中复习（有理数是绝对重点）', ks: ['rat-mixed', 'power', 'sign-mix', 'paren-nest'], mile: '期中考试一般在这一两周，考的基本就是有理数运算' },
+  { w: 10, ch: '期中考试周 · 试卷分析', ks: ['rat-mixed', 'neg-frac'], mile: '拿到卷子按错因归类，别只看分数' },
+  { w: 11, ch: '3.1 代数式 · 单项式与多项式（系数、次数）', ks: ['monomial'] },
+  { w: 12, ch: '3.2 合并同类项', ks: ['like-terms'] },
+  { w: 13, ch: '3.3 整式的加减 · 去括号', ks: ['remove-paren', 'paren-nest'] },
+  { w: 14, ch: '整式化简求值 · 第三章回顾', ks: ['eval-expr', 'remove-paren'] },
+  { w: 15, ch: '第四章 基本平面图形（线段、角、平行垂直）', ks: ['geom'] },
+  { w: 16, ch: '5.1 认识方程 · 5.2 解一元一次方程（移项、合并）', ks: ['linear-eq'] },
+  { w: 17, ch: '5.3 去括号、去分母解方程', ks: ['linear-eq', 'remove-paren'] },
+  { w: 18, ch: '5.4 一元一次方程的应用', ks: ['eq-word'] },
+  { w: 19, ch: '第六章 数据的收集与整理 · 期末总复习开始', ks: ['stat', 'rat-mixed', 'linear-eq'], mile: '期末复习两周，回头把错题本清一遍比刷新题有用' },
+  { w: 20, ch: '期末复习冲刺（期末考不早于 1/14，1/23 放寒假）', ks: ['rat-mixed', 'linear-eq', 'remove-paren', 'sign-mix'], mile: '期末考试周' }
 ];
 
 /* ---------- 日期工具（全部本地时区） ---------- */
@@ -792,12 +996,12 @@ function weekInfo() {
   if (dayDiff(t, ks) > 0) return { phase: 'pre', label: '还没到启动日（' + cnDate(ks) + '）', w: 0 };
   if (dayDiff(t, ss) > 0) return { phase: 'kick', label: '开学前破冰第 ' + (dayDiff(ks, t) + 1) + ' 天', w: 0 };
   const w = Math.floor(dayDiff(ss, t) / 7) + 1;
-  const lab = w <= 12 ? '开学第 ' + w + ' 周' : '开学第 ' + w + ' 周（12 周跟课表已走完，现在按第 12 周的复习内容循环）';
-  return { phase: 'term', label: lab, w: Math.min(w, 12) };
+  const lab = w <= 20 ? '开学第 ' + w + ' 周' : '开学第 ' + w + ' 周（一学期跟课表已走完，现在按期末复习内容循环）';
+  return { phase: 'term', label: lab, w: Math.min(w, 20) };
 }
 function trackOf(w) {
   if (DB.trackOverride[w]) { const o = DB.trackOverride[w]; return { w, ch: o.ch, ks: o.ks }; }
-  return TRACK[Math.min(Math.max(w, 1), 12) - 1];
+  return TRACK[Math.min(Math.max(w, 1), 20) - 1];
 }
 
 /* ---------- 今日任务 ---------- */
@@ -820,7 +1024,10 @@ function buildToday() {
   if (wi.phase === 'term') { const tr = trackOf(wi.w); trackKs = tr.ks; trackCh = tr.ch; }
   else { trackKs = ['numline', 'rat-addsub']; trackCh = '开学预习：数轴、相反数、绝对值、有理数加减'; }
 
-  const warm = []; for (let i = 0; i < nWarm; i++) warm.push(warmupQ(wi.phase === 'term' ? (wi.w >= 3 ? 3 : 2) : 2));
+  const wst = wi.phase === 'term' ? (wi.w >= 7 ? 3 : 2) : 2;
+  const nFrac = Math.max(2, Math.round(nWarm * 0.4));
+  const warm = [];
+  for (let i = 0; i < nWarm; i++) warm.push(warmupQ(wst, i < nFrac ? 'frac' : 'neg'));
 
   const fq = [];
   const half = focus2 ? Math.ceil(nFocus / 2) : nFocus;
@@ -828,6 +1035,10 @@ function buildToday() {
   if (focus2) genMany(focus2, nFocus - half).forEach(q => fq.push(q));
 
   const tq = [];
+  /* 跟课段开头先放一对梯子题：小学锚点 → 只多一个负号的初一题 */
+  const bk = trackKs.filter(k => typeof BRIDGE !== 'undefined' && BRIDGE[k]);
+  const br = bk.length ? genBridge(pick(bk)) : null;
+  if (br) { tq.push(br[0]); tq.push(br[1]); }
   for (let i = 0; i < nTrack; i++) tq.push(genQ(trackKs[i % trackKs.length]));
 
   const rv = dueWrongs().slice(0, Math.round(6 * scale));
@@ -852,6 +1063,7 @@ function recordAnswer(part, q, input, ok) {
   log.res[part].push({ qid: q.qid, ok, input });
   if (part === 'warm') { save(); return; }
 
+  if (!q.topic) { save(); return; }   /* 梯子题的小学锚点，不计入初一掌握度 */
   bump(q.topic, ok);
 
   if (part === 'review') {
@@ -1081,12 +1293,19 @@ function viewDiag(m) {
 function viewPlan(m) {
   const wi = weekInfo();
   const c = el('div', 'card');
+  const dMid = dayDiff(today(), addDays(DB.profile.schoolStart, 9 * 7));   /* 期中约在 W10 */
+  const dFin = dayDiff(today(), '2027-01-14');                             /* 深圳规定期末不早于此日 */
   c.innerHTML = '<h2>学习计划</h2><div class="sub">' + wi.label + '。启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart
-    + '。每天三段：口算热身 → 补漏主攻 → 跟课练习，再加到期错题重做。</div>';
+    + '。每天四段：口算热身 → 补漏主攻 → 跟课练习（开头一对搭桥题）→ 到期错题重做。</div>'
+    + '<div class="miles">'
+    + '<div><b>' + (dMid > 0 ? dMid + ' 天' : '已过') + '</b><span>到期中（约 11 月初）</span></div>'
+    + '<div><b>' + (dFin > 0 ? dFin + ' 天' : '已过') + '</b><span>到期末（不早于 1/14）</span></div>'
+    + '<div><b>' + Math.max(0, Math.ceil(dFin / 7)) + ' 周</b><span>剩余可用周数</span></div>'
+    + '</div>';
   m.appendChild(c);
 
   const k = el('div', 'card');
-  k.innerHTML = '<b>8/29 – 8/31 破冰三天</b><ol class="q">'
+  k.innerHTML = '<b>8/29 – 8/31 破冰三天</b><div class="sub">他 29 号才从老家回深圳，开学前只有这三天，目标不是学完，是开学第一节课能听懂。</div><ol class="q">'
     + '<li>第 1 天：做完入学诊断（21 题），当晚家长陪着过 2 道错题</li>'
     + '<li>第 2 天：主攻诊断里最差的那个小学知识点 + 预习数轴/相反数/绝对值</li>'
     + '<li>第 3 天：昨天错题重做 + 预习有理数加减，把「减号改写成加相反数」练成肌肉记忆</li>'
@@ -1094,12 +1313,17 @@ function viewPlan(m) {
   m.appendChild(k);
 
   const t = el('div', 'card');
-  let h = '<b>开学后 12 周跟课表</b><div class="sub">以学校实际进度为准，进度不一样就点「改」。</div><table class="tb"><tr><th>周</th><th>跟课内容</th><th></th></tr>';
-  for (let w = 1; w <= 12; w++) {
+  let h = '<b>一学期 20 周跟课表</b><div class="sub">按北师大版（2024）七上章序 + 深圳市 2026–2027 校历排的。'
+    + '以学校实际进度为准，不一样就点「改」。</div><div class="scrollx"><table class="tb"><tr><th>周</th><th>日期</th><th>跟课内容</th><th></th></tr>';
+  for (let w = 1; w <= 20; w++) {
     const tr = trackOf(w);
-    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td>W' + w + '</td><td>' + esc(tr.ch) + '</td><td><button class="mini" data-w="' + w + '">改</button></td></tr>';
+    const d0 = addDays(DB.profile.schoolStart, (w - 1) * 7);
+    const dd = d0.slice(5).replace('-', '/') + '–' + addDays(d0, 6).slice(5).replace('-', '/');
+    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td>W' + w + '</td><td class="nw">' + dd + '</td><td>' + esc(tr.ch)
+      + (tr.mile ? '<div class="mile">' + esc(tr.mile) + '</div>' : '')
+      + '</td><td><button class="mini" data-w="' + w + '">改</button></td></tr>';
   }
-  h += '</table>';
+  h += '</table></div>';
   t.innerHTML = h;
   t.querySelectorAll('.mini').forEach(b => b.onclick = () => {
     const w = +b.dataset.w, tr = trackOf(w);
@@ -1116,11 +1340,14 @@ function viewPlan(m) {
   m.appendChild(t);
 
   const g = el('div', 'card');
-  g.innerHTML = '<b>阶段目标（可衡量）</b><ol class="q">'
-    + '<li>开学第 2 周末：口算热身正确率 ≥ 80%，有理数加减单独测 10 题错不超过 2 题</li>'
-    + '<li>期中前（第 7 周）：补漏队列里清掉 3 个小学知识点；括号型乘方（−2² 和 (−2)²）连续 10 题不错</li>'
-    + '<li>期末前（第 12 周）：一元一次方程含分母的题 10 题对 7 道；错题本存量降到 20 道以内</li>'
-    + '</ol><div class="sub">及格线不是目标，稳定拿到「会做的题不丢分」才是。他现在的失分大头是运算规则，不是难题。</div>';
+  g.innerHTML = '<b>阶段目标（对齐考试节点）</b><ol class="q">'
+    + '<li><b>开学第 4 周末</b>（9 月底）：有理数加减单独测 10 题错不超过 2 题；口算热身正确率 ≥ 80%</li>'
+    + '<li><b>国庆假期</b>（10/1–10/7）：一天不断，每天 15 分钟也算。断档一周开学回来就跟不上乘除</li>'
+    + '<li><b>期中前</b>（第 9 周）：(−2)² 和 −2² 连续 10 题不错；补漏队列清掉 3 个小学知识点</li>'
+    + '<li><b>第 14 周</b>（整式学完）：去括号变号 10 题对 8 道；错题本存量降到 30 道以内</li>'
+    + '<li><b>期末前</b>（1 月上旬）：含分母的一元一次方程 10 题对 7 道；错题本降到 20 道以内</li>'
+    + '</ol><div class="sub">及格线不是目标。他现在丢分的大头是运算规则，不是难题——'
+    + '把「会做的题不丢分」做到了，分数自己会上来。</div>';
   m.appendChild(g);
 }
 

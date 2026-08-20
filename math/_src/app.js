@@ -8,20 +8,30 @@ const BOX_GAP = [1, 2, 4, 7, 15, 30];
 const P_TOPICS = TOPICS.filter(t => t.stage === 'P').map(t => t.k);
 const M_TOPICS = TOPICS.filter(t => t.stage === 'M').map(t => t.k);
 
-/* 开学后 12 周跟课表（以学校实际进度为准，可在计划页调整） */
+/* 开学后 20 周跟课表，按北师大版（2024）七上章序 + 深圳市 2026-2027 校历排的：
+   9/1 开学，国庆 10/1–10/7，期末考不早于 2027-01-14，1/23 放寒假。
+   mile 是里程碑标记，学校进度不一样时在「计划」页逐周改。 */
 const TRACK = [
-  { w: 1, ch: '第一章 丰富的图形世界 · 第二章 有理数（数轴、相反数、绝对值）', ks: ['numline'] },
-  { w: 2, ch: '第二章 有理数的加法与减法', ks: ['rat-addsub'] },
-  { w: 3, ch: '第二章 有理数的乘法、除法与乘方', ks: ['rat-muldiv', 'power'] },
-  { w: 4, ch: '第二章 有理数混合运算 · 科学记数法', ks: ['rat-mixed', 'abs-calc', 'sci'] },
-  { w: 5, ch: '第三章 整式（单项式、多项式、同类项）', ks: ['monomial', 'like-terms'] },
-  { w: 6, ch: '第三章 整式加减 · 去括号 · 化简求值', ks: ['remove-paren', 'eval-expr'] },
-  { w: 7, ch: '期中复习（有理数 + 整式）', ks: ['rat-mixed', 'power', 'remove-paren', 'eval-expr'] },
-  { w: 8, ch: '第五章 一元一次方程（移项、合并同类项）', ks: ['linear-eq'] },
-  { w: 9, ch: '第五章 去括号、去分母解方程', ks: ['linear-eq'] },
-  { w: 10, ch: '第五章 一元一次方程的应用', ks: ['eq-word'] },
-  { w: 11, ch: '第四章 基本平面图形（线段、角）', ks: ['geom'] },
-  { w: 12, ch: '第六章 数据的收集与整理 · 期末总复习', ks: ['stat', 'linear-eq', 'rat-mixed'] }
+  { w: 1,  ch: '第一章 丰富的图形世界（立体图形、展开与折叠、三视图）', ks: ['numline'], mile: '开学第一周，本章计算少，重点是把作业习惯立起来' },
+  { w: 2,  ch: '2.1 有理数 · 2.2 数轴 · 2.3 绝对值', ks: ['numline', 'abs-calc'] },
+  { w: 3,  ch: '2.4 有理数的加法 · 2.5 有理数的减法', ks: ['rat-addsub'], mile: '整个七上最关键的一周，减法改写成加相反数必须练成条件反射' },
+  { w: 4,  ch: '有理数加减混合运算', ks: ['rat-addsub', 'paren-nest'] },
+  { w: 5,  ch: '2.6 有理数的乘法（国庆假期，进度会慢）', ks: ['rat-muldiv', 'sign-mix'], mile: '国庆 10/1–10/7，假期最容易断档，每天 15 分钟也要碰' },
+  { w: 6,  ch: '2.7 有理数的除法', ks: ['rat-muldiv', 'sign-mix'] },
+  { w: 7,  ch: '2.8 有理数的乘方 · 科学记数法', ks: ['power', 'power-frac', 'sci'], mile: '(−2)² 和 −2² 的区别，这里错了后面全是连环错' },
+  { w: 8,  ch: '2.9 有理数的混合运算 · 第二章回顾', ks: ['rat-mixed', 'neg-frac', 'sign-mix'] },
+  { w: 9,  ch: '期中复习（有理数是绝对重点）', ks: ['rat-mixed', 'power', 'sign-mix', 'paren-nest'], mile: '期中考试一般在这一两周，考的基本就是有理数运算' },
+  { w: 10, ch: '期中考试周 · 试卷分析', ks: ['rat-mixed', 'neg-frac'], mile: '拿到卷子按错因归类，别只看分数' },
+  { w: 11, ch: '3.1 代数式 · 单项式与多项式（系数、次数）', ks: ['monomial'] },
+  { w: 12, ch: '3.2 合并同类项', ks: ['like-terms'] },
+  { w: 13, ch: '3.3 整式的加减 · 去括号', ks: ['remove-paren', 'paren-nest'] },
+  { w: 14, ch: '整式化简求值 · 第三章回顾', ks: ['eval-expr', 'remove-paren'] },
+  { w: 15, ch: '第四章 基本平面图形（线段、角、平行垂直）', ks: ['geom'] },
+  { w: 16, ch: '5.1 认识方程 · 5.2 解一元一次方程（移项、合并）', ks: ['linear-eq'] },
+  { w: 17, ch: '5.3 去括号、去分母解方程', ks: ['linear-eq', 'remove-paren'] },
+  { w: 18, ch: '5.4 一元一次方程的应用', ks: ['eq-word'] },
+  { w: 19, ch: '第六章 数据的收集与整理 · 期末总复习开始', ks: ['stat', 'rat-mixed', 'linear-eq'], mile: '期末复习两周，回头把错题本清一遍比刷新题有用' },
+  { w: 20, ch: '期末复习冲刺（期末考不早于 1/14，1/23 放寒假）', ks: ['rat-mixed', 'linear-eq', 'remove-paren', 'sign-mix'], mile: '期末考试周' }
 ];
 
 /* ---------- 日期工具（全部本地时区） ---------- */
@@ -113,12 +123,12 @@ function weekInfo() {
   if (dayDiff(t, ks) > 0) return { phase: 'pre', label: '还没到启动日（' + cnDate(ks) + '）', w: 0 };
   if (dayDiff(t, ss) > 0) return { phase: 'kick', label: '开学前破冰第 ' + (dayDiff(ks, t) + 1) + ' 天', w: 0 };
   const w = Math.floor(dayDiff(ss, t) / 7) + 1;
-  const lab = w <= 12 ? '开学第 ' + w + ' 周' : '开学第 ' + w + ' 周（12 周跟课表已走完，现在按第 12 周的复习内容循环）';
-  return { phase: 'term', label: lab, w: Math.min(w, 12) };
+  const lab = w <= 20 ? '开学第 ' + w + ' 周' : '开学第 ' + w + ' 周（一学期跟课表已走完，现在按期末复习内容循环）';
+  return { phase: 'term', label: lab, w: Math.min(w, 20) };
 }
 function trackOf(w) {
   if (DB.trackOverride[w]) { const o = DB.trackOverride[w]; return { w, ch: o.ch, ks: o.ks }; }
-  return TRACK[Math.min(Math.max(w, 1), 12) - 1];
+  return TRACK[Math.min(Math.max(w, 1), 20) - 1];
 }
 
 /* ---------- 今日任务 ---------- */
@@ -141,7 +151,10 @@ function buildToday() {
   if (wi.phase === 'term') { const tr = trackOf(wi.w); trackKs = tr.ks; trackCh = tr.ch; }
   else { trackKs = ['numline', 'rat-addsub']; trackCh = '开学预习：数轴、相反数、绝对值、有理数加减'; }
 
-  const warm = []; for (let i = 0; i < nWarm; i++) warm.push(warmupQ(wi.phase === 'term' ? (wi.w >= 3 ? 3 : 2) : 2));
+  const wst = wi.phase === 'term' ? (wi.w >= 7 ? 3 : 2) : 2;
+  const nFrac = Math.max(2, Math.round(nWarm * 0.4));
+  const warm = [];
+  for (let i = 0; i < nWarm; i++) warm.push(warmupQ(wst, i < nFrac ? 'frac' : 'neg'));
 
   const fq = [];
   const half = focus2 ? Math.ceil(nFocus / 2) : nFocus;
@@ -149,6 +162,10 @@ function buildToday() {
   if (focus2) genMany(focus2, nFocus - half).forEach(q => fq.push(q));
 
   const tq = [];
+  /* 跟课段开头先放一对梯子题：小学锚点 → 只多一个负号的初一题 */
+  const bk = trackKs.filter(k => typeof BRIDGE !== 'undefined' && BRIDGE[k]);
+  const br = bk.length ? genBridge(pick(bk)) : null;
+  if (br) { tq.push(br[0]); tq.push(br[1]); }
   for (let i = 0; i < nTrack; i++) tq.push(genQ(trackKs[i % trackKs.length]));
 
   const rv = dueWrongs().slice(0, Math.round(6 * scale));
@@ -173,6 +190,7 @@ function recordAnswer(part, q, input, ok) {
   log.res[part].push({ qid: q.qid, ok, input });
   if (part === 'warm') { save(); return; }
 
+  if (!q.topic) { save(); return; }   /* 梯子题的小学锚点，不计入初一掌握度 */
   bump(q.topic, ok);
 
   if (part === 'review') {
@@ -402,12 +420,19 @@ function viewDiag(m) {
 function viewPlan(m) {
   const wi = weekInfo();
   const c = el('div', 'card');
+  const dMid = dayDiff(today(), addDays(DB.profile.schoolStart, 9 * 7));   /* 期中约在 W10 */
+  const dFin = dayDiff(today(), '2027-01-14');                             /* 深圳规定期末不早于此日 */
   c.innerHTML = '<h2>学习计划</h2><div class="sub">' + wi.label + '。启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart
-    + '。每天三段：口算热身 → 补漏主攻 → 跟课练习，再加到期错题重做。</div>';
+    + '。每天四段：口算热身 → 补漏主攻 → 跟课练习（开头一对搭桥题）→ 到期错题重做。</div>'
+    + '<div class="miles">'
+    + '<div><b>' + (dMid > 0 ? dMid + ' 天' : '已过') + '</b><span>到期中（约 11 月初）</span></div>'
+    + '<div><b>' + (dFin > 0 ? dFin + ' 天' : '已过') + '</b><span>到期末（不早于 1/14）</span></div>'
+    + '<div><b>' + Math.max(0, Math.ceil(dFin / 7)) + ' 周</b><span>剩余可用周数</span></div>'
+    + '</div>';
   m.appendChild(c);
 
   const k = el('div', 'card');
-  k.innerHTML = '<b>8/29 – 8/31 破冰三天</b><ol class="q">'
+  k.innerHTML = '<b>8/29 – 8/31 破冰三天</b><div class="sub">他 29 号才从老家回深圳，开学前只有这三天，目标不是学完，是开学第一节课能听懂。</div><ol class="q">'
     + '<li>第 1 天：做完入学诊断（21 题），当晚家长陪着过 2 道错题</li>'
     + '<li>第 2 天：主攻诊断里最差的那个小学知识点 + 预习数轴/相反数/绝对值</li>'
     + '<li>第 3 天：昨天错题重做 + 预习有理数加减，把「减号改写成加相反数」练成肌肉记忆</li>'
@@ -415,12 +440,17 @@ function viewPlan(m) {
   m.appendChild(k);
 
   const t = el('div', 'card');
-  let h = '<b>开学后 12 周跟课表</b><div class="sub">以学校实际进度为准，进度不一样就点「改」。</div><table class="tb"><tr><th>周</th><th>跟课内容</th><th></th></tr>';
-  for (let w = 1; w <= 12; w++) {
+  let h = '<b>一学期 20 周跟课表</b><div class="sub">按北师大版（2024）七上章序 + 深圳市 2026–2027 校历排的。'
+    + '以学校实际进度为准，不一样就点「改」。</div><div class="scrollx"><table class="tb"><tr><th>周</th><th>日期</th><th>跟课内容</th><th></th></tr>';
+  for (let w = 1; w <= 20; w++) {
     const tr = trackOf(w);
-    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td>W' + w + '</td><td>' + esc(tr.ch) + '</td><td><button class="mini" data-w="' + w + '">改</button></td></tr>';
+    const d0 = addDays(DB.profile.schoolStart, (w - 1) * 7);
+    const dd = d0.slice(5).replace('-', '/') + '–' + addDays(d0, 6).slice(5).replace('-', '/');
+    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td>W' + w + '</td><td class="nw">' + dd + '</td><td>' + esc(tr.ch)
+      + (tr.mile ? '<div class="mile">' + esc(tr.mile) + '</div>' : '')
+      + '</td><td><button class="mini" data-w="' + w + '">改</button></td></tr>';
   }
-  h += '</table>';
+  h += '</table></div>';
   t.innerHTML = h;
   t.querySelectorAll('.mini').forEach(b => b.onclick = () => {
     const w = +b.dataset.w, tr = trackOf(w);
@@ -437,11 +467,14 @@ function viewPlan(m) {
   m.appendChild(t);
 
   const g = el('div', 'card');
-  g.innerHTML = '<b>阶段目标（可衡量）</b><ol class="q">'
-    + '<li>开学第 2 周末：口算热身正确率 ≥ 80%，有理数加减单独测 10 题错不超过 2 题</li>'
-    + '<li>期中前（第 7 周）：补漏队列里清掉 3 个小学知识点；括号型乘方（−2² 和 (−2)²）连续 10 题不错</li>'
-    + '<li>期末前（第 12 周）：一元一次方程含分母的题 10 题对 7 道；错题本存量降到 20 道以内</li>'
-    + '</ol><div class="sub">及格线不是目标，稳定拿到「会做的题不丢分」才是。他现在的失分大头是运算规则，不是难题。</div>';
+  g.innerHTML = '<b>阶段目标（对齐考试节点）</b><ol class="q">'
+    + '<li><b>开学第 4 周末</b>（9 月底）：有理数加减单独测 10 题错不超过 2 题；口算热身正确率 ≥ 80%</li>'
+    + '<li><b>国庆假期</b>（10/1–10/7）：一天不断，每天 15 分钟也算。断档一周开学回来就跟不上乘除</li>'
+    + '<li><b>期中前</b>（第 9 周）：(−2)² 和 −2² 连续 10 题不错；补漏队列清掉 3 个小学知识点</li>'
+    + '<li><b>第 14 周</b>（整式学完）：去括号变号 10 题对 8 道；错题本存量降到 30 道以内</li>'
+    + '<li><b>期末前</b>（1 月上旬）：含分母的一元一次方程 10 题对 7 道；错题本降到 20 道以内</li>'
+    + '</ol><div class="sub">及格线不是目标。他现在丢分的大头是运算规则，不是难题——'
+    + '把「会做的题不丢分」做到了，分数自己会上来。</div>';
   m.appendChild(g);
 }
 
