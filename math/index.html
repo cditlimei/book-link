@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>数学补漏计划 · 初一</title>
+<style>
+:root{
+  --bg:#f4f2ee; --card:#fffefb; --ink:#23201c; --muted:#7b746a; --line:#e2ddd4;
+  --accent:#2f6f8f; --accent-w:#e8f0f4; --good:#3d7a5a; --good-w:#e6f0ea;
+  --warn:#9a7434; --warn-w:#f4eddd; --bad:#9c5050; --bad-w:#f3e5e3;
+  --r:14px;
+}
+@media (prefers-color-scheme:dark){
+:root{
+  --bg:#191817; --card:#232120; --ink:#e9e5df; --muted:#9a938a; --line:#332f2d;
+  --accent:#6ea8c4; --accent-w:#1e2b32; --good:#7bb394; --good-w:#1d2823;
+  --warn:#c9a86a; --warn-w:#2c2620; --bad:#cf8f8f; --bad-w:#2e2222;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size:17px;line-height:1.6;-webkit-text-size-adjust:100%}
+header{position:sticky;top:0;z-index:9;background:var(--bg);border-bottom:1px solid var(--line);
+  padding:10px 12px 0;padding-top:calc(10px + env(safe-area-inset-top))}
+h1{font-size:17px;margin:0 0 8px;font-weight:600;letter-spacing:.02em}
+h1 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
+nav{display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+nav::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;background:none;border:1px solid var(--line);color:var(--muted);
+  padding:7px 14px;border-radius:999px;font-size:15px;font-family:inherit;cursor:pointer}
+.tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:820px;margin:0 auto;padding:14px 12px calc(40px + env(safe-area-inset-bottom))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.card.dim{color:var(--muted)}
+.card.note{border-left:3px solid var(--accent)}
+.card.fin{opacity:.62}
+h2{font-size:19px;margin:0 0 6px;font-weight:600}
+p{margin:6px 0}
+.sub{color:var(--muted);font-size:14.5px;line-height:1.55;margin-top:4px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.prog{flex:0 0 auto;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums;padding-top:2px}
+.btn{display:inline-block;margin-top:12px;background:var(--accent);color:#fff;border:none;
+  border-radius:10px;padding:11px 20px;font-size:16px;font-family:inherit;cursor:pointer}
+.btn:disabled{opacity:.4}
+.btn.big{width:100%;padding:14px;font-size:17px}
+.btn.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
+.btn.danger{color:var(--bad)}
+.mini{background:none;border:1px solid var(--line);color:var(--muted);border-radius:7px;
+  padding:3px 9px;font-size:13px;font-family:inherit;cursor:pointer}
+.tag{display:inline-block;background:var(--accent-w);color:var(--accent);font-size:13px;
+  padding:3px 10px;border-radius:6px;margin-bottom:10px}
+.qhead{display:flex;justify-content:space-between;color:var(--muted);font-size:14px;margin-bottom:8px}
+.cnt{font-variant-numeric:tabular-nums}
+.pbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:16px}
+.pbar i{display:block;height:100%;background:var(--accent);transition:width .25s}
+.qtext{font-size:22px;line-height:1.75;margin:10px 0 18px;font-weight:500}
+.qtext sup{font-size:.62em;vertical-align:super}
+input.ans{width:100%;font-size:24px;padding:12px 14px;border:1.5px solid var(--line);
+  border-radius:10px;background:var(--bg);color:var(--ink);font-family:inherit;text-align:center}
+.kb{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.k{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:15px 0;
+  font-size:21px;font-family:inherit;color:var(--ink);cursor:pointer;-webkit-user-select:none;user-select:none}
+.k:active{background:var(--accent-w)}
+.k.fn{font-size:15px;color:var(--muted)}
+.k.go{background:var(--accent);color:#fff;border-color:var(--accent);font-size:17px}
+.opts{display:grid;gap:9px}
+.opt{text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:10px;
+  padding:14px 16px;font-size:19px;font-family:inherit;color:var(--ink);cursor:pointer}
+.opt.sel{border-color:var(--accent)}
+.fb{margin-top:14px}
+.fb.ok{border-top:1px solid var(--good);padding-top:12px}
+.fb.no{border-top:1px solid var(--bad);padding-top:12px}
+.fbhead{font-weight:600;font-size:17px}
+.fb.ok .fbhead{color:var(--good)}
+.fb.no .fbhead{color:var(--bad)}
+.right{margin-top:4px}
+.sol{margin:10px 0 0;padding-left:22px;color:var(--muted);font-size:15.5px}
+.sol li{margin:5px 0}
+.done{text-align:center;padding:22px 0}
+.done b{font-size:19px}
+.tb{width:100%;border-collapse:collapse;margin-top:10px;font-size:15px}
+.tb th{text-align:left;color:var(--muted);font-weight:500;font-size:13.5px;
+  border-bottom:1px solid var(--line);padding:6px 8px 6px 0}
+.tb td{padding:8px 8px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.tb tr.now td{background:var(--accent-w)}
+.st{color:var(--muted);font-size:12px;margin-left:6px}
+.pill{display:inline-block;font-size:12.5px;padding:2px 9px;border-radius:5px;
+  background:var(--line);color:var(--muted)}
+.pill.g{background:var(--good-w);color:var(--good)}
+.pill.w{background:var(--warn-w);color:var(--warn)}
+.pill.b{background:var(--bad-w);color:var(--bad)}
+ol.q{margin:8px 0 0;padding-left:22px}
+ol.q li{margin:6px 0}
+.wq{border-top:1px solid var(--line);padding:10px 0}
+.wqq{font-size:16.5px}
+.wqa{color:var(--muted);font-size:13.5px;margin-top:3px}
+.kv{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:9px 0;border-bottom:1px solid var(--line)}
+.kv span{color:var(--muted);font-size:14.5px;flex:0 0 auto}
+.kv input{flex:1 1 auto;max-width:200px;text-align:right;font-size:16px;padding:6px 10px;
+  border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:inherit}
+.pask{background:var(--accent-w);border-radius:10px;padding:12px 14px;margin-top:12px}
+.pask b{color:var(--accent);font-size:14px}
+details{margin-top:10px}
+summary{color:var(--accent);font-size:15px;cursor:pointer}
+.chart{display:flex;align-items:flex-end;gap:4px;height:130px;margin:14px 0 4px}
+.bar{flex:1 1 0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.bar i{display:block;width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:0}
+.bar span{font-size:9.5px;color:var(--muted);margin-top:4px;writing-mode:vertical-rl;letter-spacing:-.04em}
+input.file{margin-top:8px;font-size:14px;color:var(--muted)}
+.warnbar{background:var(--bad-w);color:var(--bad);padding:11px 14px;font-size:14.5px;line-height:1.5;
+  border-bottom:1px solid var(--line)}
+@media (min-width:700px){ .qtext{font-size:25px} .kb{max-width:420px} }
+</style>
+</head>
+<body>
+<header>
+  <h1>数学补漏计划 <small>北师大版 · 七年级上</small></h1>
+  <nav>
+    <button class="tab on" data-t="today">今日</button>
+    <button class="tab" data-t="diag">诊断</button>
+    <button class="tab" data-t="plan">计划</button>
+    <button class="tab" data-t="wrong">错题本</button>
+    <button class="tab" data-t="parent">家长</button>
+    <button class="tab" data-t="data">数据</button>
+    <button class="tab" data-t="set">设置</button>
+  </nav>
+</header>
+<main id="main"></main>
+<script>
+/* ============================================================
+   题库引擎 —— 北师大版七年级上 + 小学基础补漏
+   所有题目参数化随机生成，答案由构造保证精确
+   ============================================================ */
+
+const R = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+const pick = a => a[R(0, a.length - 1)];
+const shuf = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = R(0, i);[a[i], a[j]] = [a[j], a[i]]; } return a; };
+const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) { const t = a % b; a = b; b = t; } return a || 1; };
+function frac(n, d) { if (d < 0) { n = -n; d = -d; } const g = gcd(n, d); return { n: n / g, d: d / g }; }
+function fstr(f) { return f.d === 1 ? '' + f.n : f.n + '/' + f.d; }
+function divisors(n) { const r = []; for (let i = 1; i <= n; i++) if (n % i === 0) r.push(i); return r; }
+/* 负数套括号 */
+function P(x) { return x < 0 ? '(−' + (-x) + ')' : '' + x; }
+/* 带符号连接，如 " − 3" / " + 5" */
+function S(x) { return x < 0 ? ' − ' + (-x) : ' + ' + x; }
+/* 形如 3x − 5 的一次式 */
+function lin(cx, cc) {
+  let s = '';
+  if (cx === 0) s = '' + cc;
+  else {
+    s = (cx === 1 ? 'x' : cx === -1 ? '−x' : (cx < 0 ? '−' + (-cx) : '' + cx) + 'x');
+    if (cc !== 0) s += S(cc);
+  }
+  return s;
+}
+
+/* ---------- 答案解析：支持 整数 / 小数 / 分数 a/b / 混数 2 1/3 ---------- */
+function parseVal(s) {
+  if (s === null || s === undefined) return null;
+  s = ('' + s).trim().replace(/−/g, '-').replace(/／/g, '/').replace(/\s+/g, ' ');
+  if (!s) return null;
+  let m = s.match(/^(-?)(\d+) (\d+)\/(\d+)$/);
+  if (m) { const d = +m[4]; if (!d) return null; const v = (+m[2]) * d + (+m[3]); return frac(m[1] === '-' ? -v : v, d); }
+  m = s.match(/^(-?\d+)\/(-?\d+)$/);
+  if (m) { if (+m[2] === 0) return null; return frac(+m[1], +m[2]); }
+  m = s.match(/^-?(\d+\.?\d*|\.\d+)$/);
+  if (m) { const dec = (s.split('.')[1] || '').length; const p = Math.pow(10, dec); return frac(Math.round(parseFloat(s) * p), p); }
+  return null;
+}
+function eqVal(a, b) { const x = parseVal(a), y = parseVal(b); if (!x || !y) return false; return x.n === y.n && x.d === y.d; }
+
+/* ============================================================
+   TOPICS：每个知识点一个生成器
+   stage  : 'P' 小学基础 / 'M' 七上新课
+   pri    : 补漏优先级，越小越先补（影响初一的程度）
+   ask    : 家长陪学时该问孩子什么
+   ============================================================ */
+const TOPICS = [
+
+/* ---------------- 小学基础 ---------------- */
+{
+  k: 'calc-order', name: '四则混合运算顺序', stage: 'P', pri: 1,
+  ask: '让他先用手指点一遍：这道题先算哪一步？说出顺序再动笔。',
+  gen() {
+    const t = R(1, 3);
+    if (t === 1) {
+      const a = R(2, 9), b = R(2, 9), c = R(11, 40), d = pick([2, 3, 4, 5, 6]), N = d * R(2, 9);
+      const ans = c + a * b - N / d;
+      return { q: `${c} + ${a} × ${b} − ${N} ÷ ${d} = ?`, ans: '' + ans, type: 'num',
+        sol: [`先乘除后加减：${a}×${b}=${a * b}，${N}÷${d}=${N / d}`, `再从左到右算加减：${c}+${a * b}−${N / d} = ${ans}`] };
+    }
+    if (t === 2) {
+      const a = R(3, 12), b = R(2, 9), c = R(2, 6), d = R(2, 9);
+      const ans = (a + b) * c - d;
+      return { q: `(${a} + ${b}) × ${c} − ${d} = ?`, ans: '' + ans, type: 'num',
+        sol: [`有括号先算括号：${a}+${b}=${a + b}`, `${a + b}×${c}=${(a + b) * c}`, `再减：${(a + b) * c}−${d} = ${ans}`] };
+    }
+    const a = R(3, 12), b = R(2, 9), c = R(2, 9);
+    return { q: `用简便方法计算：${a} × ${b} + ${a} × ${c} = ?`, ans: '' + a * (b + c), type: 'num',
+      sol: [`两项都有 ${a}，提出来（乘法分配律）：${a}×(${b}+${c})`, `= ${a}×${b + c} = ${a * (b + c)}`] };
+  }
+},
+{
+  k: 'frac-add', name: '分数加减（通分）', stage: 'P', pri: 2,
+  ask: '问他公分母是怎么找出来的，最后有没有约到最简。',
+  gen() {
+    const ds = [2, 3, 4, 5, 6, 8, 9, 10, 12];
+    const d1 = pick(ds), d2 = pick(ds.filter(x => x !== d1));
+    const n1 = R(1, d1 - 1), n2 = R(1, d2 - 1);
+    const plus = Math.random() < 0.5;
+    const L = d1 * d2 / gcd(d1, d2);
+    const a = n1 * L / d1, b = n2 * L / d2;
+    const f = frac(plus ? a + b : a - b, L);
+    return { q: `计算（结果化成最简分数）：${n1}/${d1} ${plus ? '+' : '−'} ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
+      sol: [`公分母取 ${L}`, `${n1}/${d1} = ${a}/${L}，${n2}/${d2} = ${b}/${L}`,
+            `${a}/${L} ${plus ? '+' : '−'} ${b}/${L} = ${plus ? a + b : a - b}/${L} = ${fstr(f)}`] };
+  }
+},
+{
+  k: 'frac-muldiv', name: '分数乘除', stage: 'P', pri: 2,
+  ask: '除法那步他有没有翻成乘倒数？让他指出哪个数被翻过来了。',
+  gen() {
+    const a = R(1, 9), b = R(2, 10), c = R(1, 9), d = R(2, 10);
+    const mul = Math.random() < 0.5;
+    const f = mul ? frac(a * c, b * d) : frac(a * d, b * c);
+    return { q: `计算（结果化成最简分数）：${a}/${b} ${mul ? '×' : '÷'} ${c}/${d} = ?`, ans: fstr(f), type: 'frac',
+      sol: mul ? [`分子乘分子，分母乘分母：${a * c}/${b * d}`, `约简 = ${fstr(f)}`]
+               : [`除以一个分数 = 乘它的倒数：${a}/${b} × ${d}/${c}`, `= ${a * d}/${b * c} = ${fstr(f)}`] };
+  }
+},
+{
+  k: 'decimal', name: '小数运算与分数互化', stage: 'P', pri: 3,
+  ask: '小数点位数他是数出来的还是猜的？让他数一遍。',
+  gen() {
+    const t = R(1, 3);
+    if (t === 1) {
+      const x = R(11, 99) / 10, y = R(2, 9);
+      const ans = Math.round(x * y * 10) / 10;
+      return { q: `计算：${x} × ${y} = ?`, ans: '' + ans, type: 'num',
+        sol: [`先当整数算：${x * 10} × ${y} = ${x * 10 * y}`, `原来一共 1 位小数，结果点上 1 位：${ans}`] };
+    }
+    if (t === 2) {
+      const p = pick([[0.25, '1/4'], [0.75, '3/4'], [0.2, '1/5'], [0.6, '3/5'], [0.125, '1/8'], [0.35, '7/20'], [0.08, '2/25'], [0.45, '9/20']]);
+      return { q: `把 ${p[0]} 化成最简分数 = ?`, ans: p[1], type: 'frac',
+        sol: [`几位小数就以几个 0 的数作分母：${p[0]} 有 ${('' + p[0]).split('.')[1].length} 位小数，分母是 ${Math.pow(10, ('' + p[0]).split('.')[1].length)}`,
+              `${('' + p[0]).split('.')[1]}/${Math.pow(10, ('' + p[0]).split('.')[1].length)} 约到最简 = ${p[1]}`] };
+    }
+    const q0 = R(2, 9), dv = R(11, 49) / 10;
+    const dd = Math.round(dv * q0 * 10) / 10;
+    return { q: `计算：${dd} ÷ ${dv} = ?`, ans: '' + q0, type: 'num',
+      sol: [`除数变整数：两边同时乘 10 → ${dd * 10} ÷ ${dv * 10}`, `= ${q0}`] };
+  }
+},
+{
+  k: 'simple-eq', name: '简易方程（小学）', stage: 'P', pri: 2,
+  ask: '让他把答案代回原式验算一遍，这个习惯比做对更重要。',
+  gen() {
+    const t = R(1, 3), x = R(2, 12);
+    if (t === 1) { const m = R(2, 9), n = R(1, 20); return { q: `解方程：${m}x + ${n} = ${m * x + n}，x = ?`, ans: '' + x, type: 'num',
+      sol: [`两边减 ${n}：${m}x = ${m * x}`, `两边除 ${m}：x = ${x}`] }; }
+    if (t === 2) { const m = R(2, 9), n = R(1, 12); return { q: `解方程：${m}(x + ${n}) = ${m * (x + n)}，x = ?`, ans: '' + x, type: 'num',
+      sol: [`两边除 ${m}：x + ${n} = ${x + n}`, `x = ${x}`] }; }
+    const m = R(2, 9), n = R(1, 12), q0 = R(2, 9), x2 = m * q0 + n;
+    return { q: `解方程：(x − ${n}) ÷ ${m} = ${q0}，x = ?`, ans: '' + x2, type: 'num',
+      sol: [`两边乘 ${m}：x − ${n} = ${m * q0}`, `x = ${m * q0} + ${n} = ${x2}`] };
+  }
+},
+{
+  k: 'percent', name: '百分数与折扣', stage: 'P', pri: 4,
+  ask: '问清楚「谁是 1」——百分数题错一半都是把基准搞错。',
+  gen() {
+    const t = R(1, 3);
+    if (t === 1) { const p = R(5, 40) * 10, d = pick([5, 6, 7, 8, 9]);
+      return { q: `一件商品原价 ${p} 元，打 ${d} 折出售，现价是多少元？`, ans: '' + p * d / 10, type: 'num',
+        sol: [`打 ${d} 折 = 按原价的 ${d * 10}% 卖`, `${p} × ${d * 10}% = ${p * d / 10} 元`] }; }
+    if (t === 2) { const a = R(2, 40) * 10, p = pick([10, 20, 25, 50]);
+      return { q: `某数是 ${a}，增加 ${p}% 后是多少？`, ans: '' + a * (1 + p / 100), type: 'num',
+        sol: [`增加后 = 原来的 ${100 + p}%`, `${a} × ${100 + p}% = ${a * (1 + p / 100)}`] }; }
+    const b = R(2, 20) * 5, k = pick([2, 4, 5, 10]);
+    return { q: `${b} 是 ${b * k} 的百分之几？（只填数字）`, ans: '' + 100 / k, type: 'num',
+      sol: [`${b} ÷ ${b * k} = ${fstr(frac(1, k))}`, `化成百分数 = ${100 / k}%`] };
+  }
+},
+{
+  k: 'ratio', name: '比与比例', stage: 'P', pri: 4,
+  ask: '让他写出「内项之积等于外项之积」，再动笔。',
+  gen() {
+    const t = R(1, 2);
+    if (t === 1) { const a = R(2, 9), b = R(2, 9), k = R(2, 6);
+      return { q: `解比例：${a} : ${b} = ${a * k} : x，x = ?`, ans: '' + b * k, type: 'num',
+        sol: [`交叉相乘：${a}x = ${b} × ${a * k} = ${b * a * k}`, `x = ${b * k}`] }; }
+    const tot = R(3, 12) * 7, r1 = R(2, 5), r2 = R(2, 5);
+    const T = (r1 + r2) * R(3, 10);
+    return { q: `把 ${T} 按 ${r1} : ${r2} 分成两份，较大的一份是多少？`, ans: '' + T / (r1 + r2) * Math.max(r1, r2), type: 'num',
+      sol: [`一共 ${r1 + r2} 份，每份 ${T} ÷ ${r1 + r2} = ${T / (r1 + r2)}`, `较大的占 ${Math.max(r1, r2)} 份 = ${T / (r1 + r2) * Math.max(r1, r2)}`] };
+  }
+},
+{
+  k: 'unit', name: '单位换算', stage: 'P', pri: 5,
+  ask: '问他是乘还是除——大单位换小单位一定变大。',
+  gen() {
+    const c = pick([
+      () => { const a = R(2, 9) + R(1, 9) / 10; return [`${a} 千米 = ? 米`, '' + Math.round(a * 1000), `1 千米 = 1000 米，${a} × 1000 = ${Math.round(a * 1000)}`]; },
+      () => { const a = R(2, 20); return [`${a} 平方米 = ? 平方分米`, '' + a * 100, `1 平方米 = 100 平方分米（面积单位进率是 100）`]; },
+      () => { const a = R(2, 9); return [`${a} 立方米 = ? 升`, '' + a * 1000, `1 立方米 = 1000 升`]; },
+      () => { const a = R(1, 11) * 5; return [`${a} 分钟 = ? 小时（用分数表示）`, fstr(frac(a, 60)), `${a} ÷ 60 = ${fstr(frac(a, 60))} 小时`]; },
+      () => { const a = R(1, 9), b = R(1, 9) * 50; return [`${a} 吨 ${b} 千克 = ? 千克`, '' + (a * 1000 + b), `${a} 吨 = ${a * 1000} 千克，再加 ${b}`]; },
+      () => { const a = R(2, 20); return [`${a} 平方分米 = ? 平方厘米`, '' + a * 100, `进率 100`]; }
+    ])();
+    return { q: c[0], ans: c[1], type: 'frac', sol: [c[2]] };
+  }
+},
+{
+  k: 'area', name: '平面图形面积', stage: 'P', pri: 5,
+  ask: '让他先把公式写在旁边，再往里代数。',
+  gen() {
+    const t = R(1, 4);
+    if (t === 1) { const a = R(4, 20), h = R(3, 16);
+      return { q: `一个三角形的底是 ${a} cm，高是 ${h} cm，面积是多少平方厘米？`, ans: fstr(frac(a * h, 2)), type: 'frac',
+        sol: [`三角形面积 = 底 × 高 ÷ 2`, `${a} × ${h} ÷ 2 = ${fstr(frac(a * h, 2))}`] }; }
+    if (t === 2) { const a = R(3, 14), b = R(3, 14), h = R(2, 12);
+      return { q: `梯形上底 ${a} cm，下底 ${b} cm，高 ${h} cm，面积是多少平方厘米？`, ans: fstr(frac((a + b) * h, 2)), type: 'frac',
+        sol: [`梯形面积 = (上底 + 下底) × 高 ÷ 2`, `(${a}+${b}) × ${h} ÷ 2 = ${fstr(frac((a + b) * h, 2))}`] }; }
+    if (t === 3) { const a = R(4, 20), h = R(3, 15);
+      return { q: `平行四边形的底是 ${a} cm，高是 ${h} cm，面积是多少平方厘米？`, ans: '' + a * h, type: 'num',
+        sol: [`平行四边形面积 = 底 × 高 = ${a * h}`] }; }
+    const r = R(2, 10);
+    return { q: `一个圆的半径是 ${r} cm，面积是多少平方厘米？（π 取 3.14）`, ans: '' + Math.round(3.14 * r * r * 100) / 100, type: 'num',
+      sol: [`圆面积 = πr²`, `3.14 × ${r}² = 3.14 × ${r * r} = ${Math.round(3.14 * r * r * 100) / 100}`] };
+  }
+},
+{
+  k: 'volume', name: '立体图形体积与表面积', stage: 'P', pri: 6,
+  ask: '让他说清算的是「装多少」还是「包多少」。',
+  gen() {
+    const t = R(1, 3);
+    if (t === 1) { const a = R(2, 12), b = R(2, 12), c = R(2, 12);
+      return { q: `长方体长 ${a} cm、宽 ${b} cm、高 ${c} cm，体积是多少立方厘米？`, ans: '' + a * b * c, type: 'num',
+        sol: [`体积 = 长 × 宽 × 高 = ${a}×${b}×${c} = ${a * b * c}`] }; }
+    if (t === 2) { const a = R(2, 12);
+      return { q: `正方体的棱长是 ${a} cm，表面积是多少平方厘米？`, ans: '' + 6 * a * a, type: 'num',
+        sol: [`6 个面都一样：6 × ${a}² = 6 × ${a * a} = ${6 * a * a}`] }; }
+    const a = R(2, 10), b = R(2, 10), c = R(2, 10);
+    return { q: `长方体长 ${a} cm、宽 ${b} cm、高 ${c} cm，表面积是多少平方厘米？`, ans: '' + 2 * (a * b + a * c + b * c), type: 'num',
+      sol: [`表面积 = 2(长宽 + 长高 + 宽高)`, `= 2 × (${a * b}+${a * c}+${b * c}) = ${2 * (a * b + a * c + b * c)}`] };
+  }
+},
+{
+  k: 'word-speed', name: '行程问题', stage: 'P', pri: 3,
+  ask: '让他画一条线段图标出两个人的位置，别直接套公式。',
+  gen() {
+    const t = R(1, 3);
+    if (t === 1) { const va = R(3, 9), vb = R(3, 9), h = R(2, 6);
+      return { q: `甲乙两地相距 ${(va + vb) * h} 千米。甲每小时走 ${va} 千米，乙每小时走 ${vb} 千米，两人同时从两地相向出发，几小时相遇？`, ans: '' + h, type: 'num',
+        sol: [`两人每小时一共走近 ${va}+${vb} = ${va + vb} 千米`, `${(va + vb) * h} ÷ ${va + vb} = ${h} 小时`] }; }
+    if (t === 2) { const v = R(4, 15), t2 = R(2, 8);
+      return { q: `一辆车每小时行 ${v} 千米，行了 ${t2} 小时，一共行了多少千米？`, ans: '' + v * t2, type: 'num',
+        sol: [`路程 = 速度 × 时间 = ${v} × ${t2} = ${v * t2}`] }; }
+    const va = R(3, 8), t0 = pick([1, 2, 3]);
+    const diff = pick(divisors(va * t0).filter(d => d >= 2 && d <= 8)) || 2;
+    const vb = va + diff;
+    return { q: `甲以每小时 ${va} 千米的速度先出发 ${t0} 小时，乙以每小时 ${vb} 千米的速度从同一地点追赶，乙几小时追上甲？`, ans: '' + (va * t0 / diff), type: 'num',
+      sol: [`甲先走了 ${va * t0} 千米`, `乙每小时追近 ${vb}−${va} = ${diff} 千米`, `${va * t0} ÷ ${diff} = ${va * t0 / diff} 小时`] };
+  }
+},
+{
+  k: 'word-work', name: '工程问题', stage: 'P', pri: 4,
+  ask: '问他「1」代表什么——是整件工作量。',
+  gen() {
+    const a = R(3, 12), b = R(3, 12);
+    if (a === b) return this.gen();
+    const f = frac(a * b, a + b);
+    return { q: `一项工作，甲单独做 ${a} 天完成，乙单独做 ${b} 天完成。两人合作几天完成？（可填分数）`, ans: fstr(f), type: 'frac',
+      sol: [`把整件工作看作 1，甲每天做 1/${a}，乙每天做 1/${b}`, `合作每天做 1/${a} + 1/${b} = ${fstr(frac(a + b, a * b))}`, `1 ÷ ${fstr(frac(a + b, a * b))} = ${fstr(f)} 天`] };
+  }
+},
+{
+  k: 'word-sumdiff', name: '和差倍问题', stage: 'P', pri: 3,
+  ask: '让他指出「1 倍量」是谁，用它当未知数。',
+  gen() {
+    const small = R(5, 30), k = R(2, 4), m = R(1, 9);
+    const big = k * small + m;
+    return { q: `两个数的和是 ${small + big}，大数比小数的 ${k} 倍多 ${m}。小数是多少？`, ans: '' + small, type: 'num',
+      sol: [`设小数为 x，大数是 ${k}x + ${m}`, `x + ${k}x + ${m} = ${small + big}`, `${k + 1}x = ${small + big - m}，x = ${small}`] };
+  }
+},
+
+/* ---------------- 七上新课 ---------------- */
+{
+  k: 'numline', name: '相反数·倒数·绝对值·数轴', stage: 'M', pri: 1,
+  ask: '相反数和倒数他会不会混？让他各举一个例子。',
+  gen() {
+    const t = R(1, 4);
+    if (t === 1) { const a = R(2, 20) * pick([1, -1]);
+      return { q: `${a} 的相反数是 ?`, ans: '' + (-a), type: 'num', sol: [`只改符号不改大小：${-a}`] }; }
+    if (t === 2) { const n = R(1, 9), d = R(2, 11), s = pick([1, -1]);
+      return { q: `${s < 0 ? '−' : ''}${n}/${d} 的倒数是 ?`, ans: fstr(frac(s * d, n)), type: 'frac',
+        sol: [`分子分母对调，符号不变：${fstr(frac(s * d, n))}`] }; }
+    if (t === 3) { const a = R(2, 30) * pick([1, -1]);
+      return { q: `|${a < 0 ? '−' + (-a) : a}| = ?`, ans: '' + Math.abs(a), type: 'num', sol: [`绝对值是到原点的距离，永远非负：${Math.abs(a)}`] }; }
+    const a = R(-9, 9), b = R(-9, 9);
+    if (a === b) return this.gen();
+    return { q: `数轴上表示 ${P(a)} 和 ${P(b)} 的两点，相距多少个单位长度？`, ans: '' + Math.abs(a - b), type: 'num',
+      sol: [`距离 = |${a} − ${b}| = ${Math.abs(a - b)}`] };
+  }
+},
+{
+  k: 'rat-addsub', name: '有理数加减', stage: 'M', pri: 1,
+  ask: '让他把每一个减号都改写成「加相反数」再算，这一步不能省。',
+  gen() {
+    const a = R(-15, 15) || 3, b = R(-15, 15) || -4, c = R(-12, 12) || 5;
+    const ans = a + b - c;
+    return { q: `计算：${P(a)} + ${P(b)} − ${P(c)} = ?`, ans: '' + ans, type: 'num',
+      sol: [`减 ${P(c)} 就是加它的相反数 ${P(-c)}`, `${P(a)} + ${P(b)} + ${P(-c)}`, `= ${a + b} + ${P(-c)} = ${ans}`] };
+  }
+},
+{
+  k: 'rat-muldiv', name: '有理数乘除', stage: 'M', pri: 1,
+  ask: '先定符号还是先算数？让他先数负号的个数。',
+  gen() {
+    const a = R(2, 9) * pick([1, -1]), c = R(2, 6) * pick([1, -1]), k = R(2, 5);
+    const b = Math.abs(c) * k * pick([1, -1]);
+    const ans = a * b / c;
+    const negs = [a, b, c].filter(x => x < 0).length;
+    return { q: `计算：${P(a)} × ${P(b)} ÷ ${P(c)} = ?`, ans: '' + ans, type: 'num',
+      sol: [`先看符号：有 ${negs} 个负号，${negs % 2 === 0 ? '偶数个 → 结果为正' : '奇数个 → 结果为负'}`,
+            `再算绝对值：${Math.abs(a)} × ${Math.abs(b)} ÷ ${Math.abs(c)} = ${Math.abs(ans)}`, `所以 = ${ans}`] };
+  }
+},
+{
+  k: 'abs-calc', name: '绝对值化简计算', stage: 'M', pri: 2,
+  ask: '绝对值符号里的式子先算完再脱符号，问他有没有抢步。',
+  gen() {
+    const a = R(-15, -2), b = R(1, 9), c = R(1, 9), d = R(2, 15);
+    const ans = Math.abs(a) + Math.abs(b - c) - d;
+    return { q: `计算：|−${-a}| + |${b} − ${c}| − |−${d}| = ?`, ans: '' + ans, type: 'num',
+      sol: [`先把每个绝对值里面算出来：|${b}−${c}| = |${b - c}| = ${Math.abs(b - c)}`,
+            `${-a} + ${Math.abs(b - c)} − ${d} = ${ans}`] };
+  }
+},
+{
+  k: 'power', name: '有理数乘方（括号陷阱）', stage: 'M', pri: 1,
+  ask: '这是初一最大的坑：让他读出来——是「负数的平方」还是「平方的相反数」。',
+  gen() {
+    const b = R(2, 6), form = R(1, 4);
+    if (form === 1) return { q: `计算：(−${b})² = ?`, ans: '' + b * b, type: 'num',
+      sol: [`底数是 −${b}，(−${b})² = (−${b})×(−${b}) = ${b * b}`, `负负得正`] };
+    if (form === 2) return { q: `计算：−${b}² = ?`, ans: '' + (-b * b), type: 'num',
+      sol: [`底数只是 ${b}，负号在外面`, `−${b}² = −(${b}×${b}) = ${-b * b}`] };
+    if (form === 3) return { q: `计算：(−${b})³ = ?`, ans: '' + (-b * b * b), type: 'num',
+      sol: [`三个负数相乘，奇数个负号 → 结果为负`, `= ${-b * b * b}`] };
+    return { q: `计算：−(−${b})² = ?`, ans: '' + (-b * b), type: 'num',
+      sol: [`先算 (−${b})² = ${b * b}`, `外面还有一个负号：${-b * b}`] };
+  }
+},
+{
+  k: 'rat-mixed', name: '有理数混合运算', stage: 'M', pri: 2,
+  ask: '让他把整道题分成几「块」，先标出每块的结果再合并。',
+  gen() {
+    const t = R(1, 2);
+    if (t === 1) {
+      const a = R(2, 5), b = R(2, 4), d = R(1, 9);
+      const ans = -a * a - b * b + d;
+      return { q: `计算：−${a}² + (−${b})³ ÷ ${b} − (−${d}) = ?`, ans: '' + ans, type: 'num',
+        sol: [`−${a}² = ${-a * a}（负号在外）`, `(−${b})³ = ${-b * b * b}，÷ ${b} = ${-b * b}`,
+              `− (−${d}) = + ${d}`, `${-a * a} + ${P(-b * b)} + ${d} = ${ans}`] };
+    }
+    const a = R(2, 5), b = R(2, 9), c0 = R(2, 6), k = R(2, 5), c = c0 * k;
+    const real = a * a * b + c / c0;
+    return { q: `计算：(−${a})² × ${b} + ${c} ÷ ${c0} = ?`, ans: '' + real, type: 'num',
+      sol: [`(−${a})² = ${a * a}`, `${a * a} × ${b} = ${a * a * b}`, `${c} ÷ ${c0} = ${c / c0}`, `合并 = ${real}`] };
+  }
+},
+{
+  k: 'sci', name: '科学记数法', stage: 'M', pri: 4,
+  ask: '让他数整数位数，n 就是位数减 1。',
+  gen() {
+    const m = R(11, 99) / 10, k = R(4, 9);
+    const val = Math.round(m * Math.pow(10, k));
+    return { q: `把 ${val} 写成 a × 10ⁿ（1 ≤ a < 10）的形式，n = ?`, ans: '' + k, type: 'num',
+      sol: [`${val} 一共 ${k + 1} 位数`, `n = 位数 − 1 = ${k}（此时 a = ${m}）`] };
+  }
+},
+{
+  k: 'monomial', name: '单项式的系数与次数', stage: 'M', pri: 3,
+  ask: '系数带不带负号？次数要不要把所有字母的指数加起来？',
+  gen() {
+    const t = R(1, 3);
+    if (t === 1) { const c = R(2, 9) * pick([1, -1]), e1 = R(1, 4), e2 = R(1, 3);
+      return { q: `单项式 ${c < 0 ? '−' + (-c) : c}a${e1 > 1 ? '^' + e1 : ''}b${e2 > 1 ? '^' + e2 : ''} 的系数是 ?`, ans: '' + c, type: 'num',
+        sol: [`系数就是前面的数字，包含符号：${c}`] }; }
+    if (t === 2) { const e1 = R(1, 4), e2 = R(1, 3), e3 = R(1, 2);
+      return { q: `单项式 −5x^${e1}y^${e2}z^${e3} 的次数是 ?`, ans: '' + (e1 + e2 + e3), type: 'num',
+        sol: [`次数 = 所有字母指数之和 = ${e1} + ${e2} + ${e3} = ${e1 + e2 + e3}`] }; }
+    const n = R(1, 5), d = R(2, 7);
+    return { q: `单项式 −(${n}/${d})xy² 的系数是 ?（填分数）`, ans: fstr(frac(-n, d)), type: 'frac',
+      sol: [`系数连符号一起看：${fstr(frac(-n, d))}`] };
+  }
+},
+{
+  k: 'like-terms', name: '合并同类项', stage: 'M', pri: 2,
+  ask: '让他先用两种记号圈出两类项，再合并。字母部分完全一样才是同类项。',
+  gen() {
+    const a = R(2, 7), b = R(2, 7), c = R(2, 7), d = R(2, 7);
+    const A = a + c, B = -(b + d);
+    const tail = m => (m < 0 ? '− ' + (-m) : '+ ' + m) + 'xy²';
+    const right = `${A}x²y ${tail(B)}`;
+    const cand = [right, `${a - c}x²y ${tail(B)}`, `${A}x²y ${tail(-B)}`, `${A + B}x³y³`, `${a * c}x²y ${tail(B)}`];
+    const opts = [];
+    for (const o of cand) { if (opts.length < 4 && !opts.includes(o)) opts.push(o); }
+    if (!opts.includes(right)) return null;
+    return { q: `合并同类项：${a}x²y − ${b}xy² + ${c}x²y − ${d}xy² = ?`, type: 'choice', opts, ans: right,
+      sol: [`x²y 一类：${a} + ${c} = ${A}`, `xy² 一类：−${b} − ${d} = ${B}`, `结果 ${right}（x²y 和 xy² 不是同类项，不能再合并）`] };
+  }
+},
+{
+  k: 'remove-paren', name: '去括号与化简', stage: 'M', pri: 2,
+  ask: '括号前是负号时，里面每一项都要变号。让他逐项指一遍。',
+  gen() {
+    const m = R(2, 6); let n = R(2, 6); if (n === m) n = m === 6 ? 2 : m + 1;
+    const a = R(1, 6), b = R(1, 6);
+    const cx = m - n, cc = m * a + n * b;
+    const right = lin(cx, cc);
+    const cand = [right, lin(cx, m * a - n * b), lin(m + n, cc), lin(cx, a + b), lin(m - n, m * a + b), lin(n - m, cc)];
+    const opts = [];
+    for (const c of cand) { if (opts.length < 4 && !opts.includes(c)) opts.push(c); }
+    if (!opts.includes(right)) return null;
+    return { q: `化简：${m}(x + ${a}) − ${n}(x − ${b}) = ?`, type: 'choice', opts, ans: right,
+      sol: [`第一个括号：${m}x + ${m * a}`, `第二个括号前是「−${n}」，里面两项都要变号：−${n}x + ${n * b}`,
+            `合并：(${m}−${n})x + (${m * a}+${n * b}) = ${right}`] };
+  }
+},
+{
+  k: 'eval-expr', name: '整式化简求值', stage: 'M', pri: 3,
+  ask: '代负数时有没有加括号？没加括号是最常见的失分点。',
+  gen() {
+    const x = pick([-3, -2, -1, 2, 3]), a = R(2, 4), b = R(1, 6), c = R(1, 9);
+    const ans = a * x * x - b * x + c;
+    return { q: `当 x = ${P(x)} 时，求 ${a}x² − ${b}x + ${c} 的值。`, ans: '' + ans, type: 'num',
+      sol: [`代入时把 x 用括号包起来：${a}×${P(x)}² − ${b}×${P(x)} + ${c}`,
+            `${P(x)}² = ${x * x}，所以 ${a}×${x * x} = ${a * x * x}`,
+            `−${b}×${P(x)} = ${-b * x}`, `${a * x * x} ${S(-b * x)} ${S(c)} = ${ans}`] };
+  }
+},
+{
+  k: 'linear-eq', name: '解一元一次方程', stage: 'M', pri: 1,
+  ask: '每写一步问他「这一步依据是什么」：移项要变号，两边同乘同除。',
+  gen() {
+    const t = R(1, 3);
+    if (t === 1) { const x = R(-6, 9), m = R(2, 7), n = R(-9, 9);
+      return { q: `解方程：${m}x${S(n)} = ${m * x + n}，x = ?`, ans: '' + x, type: 'num',
+        sol: [`把常数移到右边（变号）：${m}x = ${m * x + n}${S(-n)} = ${m * x}`, `两边除以 ${m}：x = ${x}`] }; }
+    if (t === 2) { const x = R(-5, 8), m = R(3, 8); let n = R(2, 7); if (n === m) n = m + 1;
+      const a = R(-9, 9), b = (m - n) * x + a;
+      return { q: `解方程：${m}x${S(a)} = ${n}x${S(b)}，x = ?`, ans: '' + x, type: 'num',
+        sol: [`含 x 的移到左边，常数移到右边：${m}x − ${n}x = ${b}${S(-a)}`, `${m - n}x = ${b - a}`, `x = ${x}`] }; }
+    const b1 = pick([2, 3, 4]); let d1 = pick([2, 3, 6]); if (d1 === b1) d1 = b1 + 1;
+    const k1 = R(1, 5), k2 = R(1, 5), x = R(-4, 14);
+    const a = b1 * k1 - x, c = x - d1 * k2, e = k1 - k2;
+    return { q: `解方程：(x${S(a)})/${b1} − (x${S(c)})/${d1} = ${e}，x = ?`, ans: '' + x, type: 'num',
+      sol: [`两边同乘分母的最小公倍数 ${b1 * d1 / gcd(b1, d1)}，去分母`,
+            `注意：去分母后每个括号整体乘，别漏项`, `整理解得 x = ${x}`] };
+  }
+},
+{
+  k: 'eq-word', name: '一元一次方程应用', stage: 'M', pri: 3,
+  ask: '让他先写「设……为 x」再列式，不许跳过设未知数这一步。',
+  gen() {
+    const t = R(1, 4);
+    if (t === 1) { const x = R(3, 20), k = R(2, 5), m = R(2, 15);
+      return { q: `一个数的 ${k} 倍加上 ${m} 等于 ${k * x + m}，这个数是多少？`, ans: '' + x, type: 'num',
+        sol: [`设这个数为 x：${k}x + ${m} = ${k * x + m}`, `${k}x = ${k * x}，x = ${x}`] }; }
+    if (t === 2) { const va = R(3, 8), t0 = pick([1, 2, 3]);
+      const diff = pick(divisors(va * t0).filter(d => d >= 2 && d <= 8)) || 2;
+      return { q: `甲每小时走 ${va} 千米，先走 ${t0} 小时后，乙以每小时 ${va + diff} 千米从同地出发追。设乙用 x 小时追上，乙几小时追上甲？`, ans: '' + (va * t0 / diff), type: 'num',
+        sol: [`列方程：${va + diff}x = ${va}(x + ${t0})`, `${diff}x = ${va * t0}`, `x = ${va * t0 / diff}`] }; }
+    if (t === 3) { const a = R(2, 20) * 10, p = pick([10, 20, 25, 50]);
+      return { q: `一件商品进价 ${a} 元，售价 ${a * (1 + p / 100)} 元，利润率是多少？（只填数字，单位 %）`, ans: '' + p, type: 'num',
+        sol: [`利润 = ${a * (1 + p / 100)} − ${a} = ${a * p / 100}`, `利润率 = 利润 ÷ 进价 = ${a * p / 100} ÷ ${a} = ${p}%`] }; }
+    const x = R(2, 10), k = pick([2, 3]), S0 = R(8, 14);
+    const F = k * (S0 + x) - x;
+    return { q: `今年父亲 ${F} 岁，儿子 ${S0} 岁。几年后父亲的年龄是儿子的 ${k} 倍？`, ans: '' + x, type: 'num',
+      sol: [`设 x 年后：${F} + x = ${k}(${S0} + x)`, `${F} + x = ${k * S0} + ${k}x`, `${k - 1}x = ${F - k * S0}，x = ${x}`] };
+  }
+},
+{
+  k: 'geom', name: '线段与角的计算', stage: 'M', pri: 4,
+  ask: '让他画个草图，把已知数字标在图上再算。',
+  gen() {
+    const t = R(1, 5);
+    if (t === 1) { const a = R(5, 30);
+      return { q: `线段 AB = ${a} cm，M 是 AB 的中点，AM = ? cm（可填分数）`, ans: fstr(frac(a, 2)), type: 'frac',
+        sol: [`中点把线段平分：${a} ÷ 2 = ${fstr(frac(a, 2))}`] }; }
+    if (t === 2) { const a = R(20, 160);
+      return { q: `一个角是 ${a}°，它的补角是多少度？`, ans: '' + (180 - a), type: 'num', sol: [`补角相加等于 180°：180 − ${a} = ${180 - a}`] }; }
+    if (t === 3) { const a = R(10, 80);
+      return { q: `一个角是 ${a}°，它的余角是多少度？`, ans: '' + (90 - a), type: 'num', sol: [`余角相加等于 90°：90 − ${a} = ${90 - a}`] }; }
+    if (t === 4) { const a = R(10, 88) * 2;
+      return { q: `∠AOB = ${a}°，OC 是 ∠AOB 的平分线，∠AOC = ? 度`, ans: '' + a / 2, type: 'num', sol: [`平分线把角分成两个相等的角：${a} ÷ 2 = ${a / 2}`] }; }
+    const n = R(1, 5);
+    return { q: `${n} 点整的时候，钟表上时针和分针的夹角是多少度？`, ans: '' + 30 * n, type: 'num',
+      sol: [`表盘 12 大格，每格 30°`, `相差 ${n} 格 = ${30 * n}°`] };
+  }
+},
+{
+  k: 'stat', name: '平均数·中位数·众数', stage: 'M', pri: 5,
+  ask: '中位数要先排序，问他排没排。',
+  gen() {
+    const t = R(1, 3);
+    const n = 5;
+    let arr = Array.from({ length: n }, () => R(60, 100));
+    if (t === 1) {
+      const sum = arr.reduce((a, b) => a + b, 0);
+      arr[4] += (n - sum % n) % n;
+      const s = arr.reduce((a, b) => a + b, 0);
+      return { q: `一组数据：${arr.join('、')}。它们的平均数是 ?`, ans: fstr(frac(s, n)), type: 'frac',
+        sol: [`求和：${s}`, `${s} ÷ ${n} = ${fstr(frac(s, n))}`] };
+    }
+    if (t === 2) {
+      const sorted = arr.slice().sort((a, b) => a - b);
+      return { q: `一组数据：${arr.join('、')}。它们的中位数是 ?`, ans: '' + sorted[2], type: 'num',
+        sol: [`先从小到大排：${sorted.join('、')}`, `一共 5 个，中间第 3 个就是中位数：${sorted[2]}`] };
+    }
+    const v = R(70, 95);
+    arr = shuf([v, v, v, R(60, 69), R(96, 100)]);
+    return { q: `一组数据：${arr.join('、')}。它们的众数是 ?`, ans: '' + v, type: 'num',
+      sol: [`出现次数最多的那个数：${v}（出现 3 次）`] };
+  }
+}
+];
+
+const TMAP = {}; TOPICS.forEach(t => TMAP[t.k] = t);
+
+/* 生成一题，带重试防退化 */
+function genQ(k) {
+  const t = TMAP[k];
+  for (let i = 0; i < 12; i++) {
+    let o;
+    try { o = t.gen(); } catch (e) { continue; }
+    if (!o || o.skip) continue;
+    o.topic = k; o.tname = t.name; o.ask = t.ask;
+    o.qid = k + '_' + Math.random().toString(36).slice(2, 9);
+    if (o.type === 'choice') o.opts = shuf(o.opts);
+    return o;
+  }
+  return { topic: k, tname: t.name, ask: t.ask, qid: k + '_f', q: '（本题生成失败，跳过即可）', ans: '0', type: 'num', sol: ['—'] };
+}
+function genMany(k, n) { const r = []; const seen = new Set(); let guard = 0;
+  while (r.length < n && guard++ < n * 20) { const q = genQ(k); if (seen.has(q.q)) continue; seen.add(q.q); r.push(q); }
+  return r; }
+
+/* ---------- 口算热身 ---------- */
+function warmupQ(stage) {
+  const kinds = ['int'];
+  if (stage >= 2) kinds.push('frac');
+  if (stage >= 2) kinds.push('neg');
+  if (stage >= 3) kinds.push('negmul', 'pow');
+  const kd = pick(kinds);
+  if (kd === 'int') { const t = R(1, 3);
+    if (t === 1) { const a = R(11, 89), b = R(11, 89); return { q: `${a} + ${b}`, ans: '' + (a + b) }; }
+    if (t === 2) { const a = R(21, 99), b = R(11, 20); return { q: `${a} − ${b}`, ans: '' + (a - b) }; }
+    const a = R(3, 12), b = R(3, 12); return { q: `${a} × ${b}`, ans: '' + a * b }; }
+  if (kd === 'frac') { const d = pick([2, 3, 4, 5, 6, 8]), n1 = R(1, d - 1), d2 = pick([2, 3, 4, 6, 8]), n2 = R(1, d2 - 1);
+    const L = d * d2 / gcd(d, d2); const f = frac(n1 * L / d + n2 * L / d2, L);
+    return { q: `${n1}/${d} + ${n2}/${d2}`, ans: fstr(f) }; }
+  if (kd === 'neg') { const a = R(-19, 19) || 4, b = R(-19, 19) || -5;
+    return { q: `${P(a)} + ${P(b)}`, ans: '' + (a + b) }; }
+  if (kd === 'negmul') { const a = R(2, 12) * pick([1, -1]), b = R(2, 9) * pick([1, -1]);
+    return { q: `${P(a)} × ${P(b)}`, ans: '' + a * b }; }
+  const b = R(2, 6), f = R(1, 3);
+  if (f === 1) return { q: `(−${b})²`, ans: '' + b * b };
+  if (f === 2) return { q: `−${b}²`, ans: '' + (-b * b) };
+  return { q: `(−${b})³`, ans: '' + (-b * b * b) };
+}
+
+/* ============================================================
+   计划引擎 + 交互
+   ============================================================ */
+const KEY = 'mathplan_v1';
+const BOX_GAP = [1, 2, 4, 7, 15, 30];
+
+/* 小学基础补漏优先队列的候选 */
+const P_TOPICS = TOPICS.filter(t => t.stage === 'P').map(t => t.k);
+const M_TOPICS = TOPICS.filter(t => t.stage === 'M').map(t => t.k);
+
+/* 开学后 12 周跟课表（以学校实际进度为准，可在计划页调整） */
+const TRACK = [
+  { w: 1, ch: '第一章 丰富的图形世界 · 第二章 有理数（数轴、相反数、绝对值）', ks: ['numline'] },
+  { w: 2, ch: '第二章 有理数的加法与减法', ks: ['rat-addsub'] },
+  { w: 3, ch: '第二章 有理数的乘法、除法与乘方', ks: ['rat-muldiv', 'power'] },
+  { w: 4, ch: '第二章 有理数混合运算 · 科学记数法', ks: ['rat-mixed', 'abs-calc', 'sci'] },
+  { w: 5, ch: '第三章 整式（单项式、多项式、同类项）', ks: ['monomial', 'like-terms'] },
+  { w: 6, ch: '第三章 整式加减 · 去括号 · 化简求值', ks: ['remove-paren', 'eval-expr'] },
+  { w: 7, ch: '期中复习（有理数 + 整式）', ks: ['rat-mixed', 'power', 'remove-paren', 'eval-expr'] },
+  { w: 8, ch: '第五章 一元一次方程（移项、合并同类项）', ks: ['linear-eq'] },
+  { w: 9, ch: '第五章 去括号、去分母解方程', ks: ['linear-eq'] },
+  { w: 10, ch: '第五章 一元一次方程的应用', ks: ['eq-word'] },
+  { w: 11, ch: '第四章 基本平面图形（线段、角）', ks: ['geom'] },
+  { w: 12, ch: '第六章 数据的收集与整理 · 期末总复习', ks: ['stat', 'linear-eq', 'rat-mixed'] }
+];
+
+/* ---------- 日期工具（全部本地时区） ---------- */
+const pad = n => (n < 10 ? '0' : '') + n;
+function ds(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function today() { return ds(new Date()); }
+function parseD(s) { const p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function addDays(s, n) { const d = parseD(s); d.setDate(d.getDate() + n); return ds(d); }
+function dayDiff(a, b) { return Math.round((parseD(b) - parseD(a)) / 86400000); }
+function cnDate(s) { const d = parseD(s); return (d.getMonth() + 1) + '月' + d.getDate() + '日 周' + '日一二三四五六'[d.getDay()]; }
+
+/* ---------- 存档 ---------- */
+let DB = null;
+function fresh() {
+  return {
+    ver: 1,
+    profile: { name: '', kickoff: '2026-08-29', schoolStart: '2026-09-01', dailyMin: 25 },
+    diag: { done: false, date: '', scores: {} },
+    queue: [],
+    mastery: {},
+    wrong: [],
+    logs: {},
+    trackOverride: {}
+  };
+}
+function load() {
+  try { const s = localStorage.getItem(KEY); DB = s ? JSON.parse(s) : fresh(); }
+  catch (e) { DB = fresh(); }
+  if (!DB.ver) DB = fresh();
+  ['diag', 'mastery', 'logs', 'trackOverride'].forEach(k => { if (!DB[k]) DB[k] = {}; });
+  if (!DB.wrong) DB.wrong = [];
+  if (!DB.queue) DB.queue = [];
+  if (!DB.profile) DB.profile = fresh().profile;
+  save();
+}
+/* 存不进去时降级到内存，并在页面顶部挂一条常驻警告，避免白做一晚上 */
+let STORE_OK = true;
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(DB));
+    if (!STORE_OK) { STORE_OK = true; const w = document.getElementById('warnbar'); if (w) w.remove(); }
+  } catch (e) {
+    STORE_OK = false;
+    if (!document.getElementById('warnbar')) {
+      const b = document.createElement('div');
+      b.id = 'warnbar'; b.className = 'warnbar';
+      b.innerHTML = '这个浏览器存不住进度（隐私模式或本地文件限制）。今天做的题只在当前页面里，<b>关掉就没了</b>——练完先去「设置 → 导出进度文件」。';
+      document.body.insertBefore(b, document.body.firstChild);
+    }
+  }
+}
+
+/* ---------- 掌握度 ---------- */
+function mst(k) { const m = DB.mastery[k]; if (!m || !m.total) return null; return m.right / m.total; }
+function mstN(k) { const m = DB.mastery[k]; return m ? m.total : 0; }
+function bump(k, ok) {
+  const m = DB.mastery[k] || (DB.mastery[k] = { right: 0, total: 0, r20: [] });
+  if (!m.r20) m.r20 = [];
+  m.total++; if (ok) m.right++;
+  m.r20.push(ok ? 1 : 0); if (m.r20.length > 20) m.r20.shift();
+}
+/* 近 20 题正确率，用于判断是否出队 */
+function recent(k) { const m = DB.mastery[k]; if (!m || !m.r20 || m.r20.length < 8) return null; return m.r20.reduce((a, b) => a + b, 0) / m.r20.length; }
+
+/* ---------- 补漏队列 ---------- */
+function buildQueue() {
+  const rows = P_TOPICS.map(k => {
+    const s = DB.diag.scores[k];
+    const rate = s && s.total ? s.right / s.total : 0.5;
+    return { k, rate, pri: TMAP[k].pri };
+  });
+  rows.sort((a, b) => (a.rate - b.rate) || (a.pri - b.pri));
+  DB.queue = rows.filter(r => r.rate < 0.85).map(r => r.k);
+  if (!DB.queue.length) DB.queue = rows.slice(0, 3).map(r => r.k);
+}
+function refreshQueue() {
+  /* 近 20 题正确率 ≥ 0.85 且累计 ≥ 20 题 → 出队（毕业） */
+  DB.queue = DB.queue.filter(k => !(mstN(k) >= 20 && (recent(k) || 0) >= 0.85));
+  if (!DB.queue.length) {
+    const left = P_TOPICS.map(k => ({ k, r: mst(k) === null ? 0.5 : mst(k), p: TMAP[k].pri }))
+      .sort((a, b) => (a.r - b.r) || (a.p - b.p));
+    DB.queue = left.slice(0, 2).map(x => x.k);
+  }
+}
+
+/* ---------- 当前处于第几周 ---------- */
+function weekInfo() {
+  const t = today(), ks = DB.profile.kickoff, ss = DB.profile.schoolStart;
+  if (dayDiff(t, ks) > 0) return { phase: 'pre', label: '还没到启动日（' + cnDate(ks) + '）', w: 0 };
+  if (dayDiff(t, ss) > 0) return { phase: 'kick', label: '开学前破冰第 ' + (dayDiff(ks, t) + 1) + ' 天', w: 0 };
+  const w = Math.floor(dayDiff(ss, t) / 7) + 1;
+  const lab = w <= 12 ? '开学第 ' + w + ' 周' : '开学第 ' + w + ' 周（12 周跟课表已走完，现在按第 12 周的复习内容循环）';
+  return { phase: 'term', label: lab, w: Math.min(w, 12) };
+}
+function trackOf(w) {
+  if (DB.trackOverride[w]) { const o = DB.trackOverride[w]; return { w, ch: o.ch, ks: o.ks }; }
+  return TRACK[Math.min(Math.max(w, 1), 12) - 1];
+}
+
+/* ---------- 今日任务 ---------- */
+function dueWrongs() { const t = today(); return DB.wrong.filter(w => w.due <= t); }
+
+function buildToday() {
+  const t = today();
+  if (DB.logs[t] && DB.logs[t].qs) return DB.logs[t];
+  const wi = weekInfo();
+  const min = DB.profile.dailyMin;
+  const scale = min <= 15 ? 0.6 : min >= 40 ? 1.4 : 1;
+  const nWarm = Math.round(10 * scale), nFocus = Math.round(6 * scale), nTrack = Math.round(6 * scale);
+
+  refreshQueue();
+  const focusK = DB.queue[0] || P_TOPICS[0];
+  const focus2 = DB.queue[1];
+
+  /* 破冰期：还没开学，跟课部分改成有理数预习 */
+  let trackKs, trackCh;
+  if (wi.phase === 'term') { const tr = trackOf(wi.w); trackKs = tr.ks; trackCh = tr.ch; }
+  else { trackKs = ['numline', 'rat-addsub']; trackCh = '开学预习：数轴、相反数、绝对值、有理数加减'; }
+
+  const warm = []; for (let i = 0; i < nWarm; i++) warm.push(warmupQ(wi.phase === 'term' ? (wi.w >= 3 ? 3 : 2) : 2));
+
+  const fq = [];
+  const half = focus2 ? Math.ceil(nFocus / 2) : nFocus;
+  genMany(focusK, half).forEach(q => fq.push(q));
+  if (focus2) genMany(focus2, nFocus - half).forEach(q => fq.push(q));
+
+  const tq = [];
+  for (let i = 0; i < nTrack; i++) tq.push(genQ(trackKs[i % trackKs.length]));
+
+  const rv = dueWrongs().slice(0, Math.round(6 * scale));
+
+  const log = {
+    date: t, week: wi.w, phase: wi.phase, trackCh, focusK, focus2,
+    qs: { warm, focus: fq, track: tq, review: rv },
+    res: { warm: [], focus: [], track: [], review: [] },
+    wrongToday: [], startedAt: Date.now(), done: false
+  };
+  DB.logs[t] = log; save();
+  return log;
+}
+
+/* ---------- 判定与记账 ---------- */
+function judge(q, input) {
+  if (q.type === 'choice') return input === q.ans;
+  return eqVal(input, q.ans);
+}
+function recordAnswer(part, q, input, ok) {
+  const log = DB.logs[today()];
+  log.res[part].push({ qid: q.qid, ok, input });
+  if (part === 'warm') { save(); return; }
+
+  bump(q.topic, ok);
+
+  if (part === 'review') {
+    const w = DB.wrong.find(x => x.qid === q.qid);
+    if (w) {
+      w.times = (w.times || 0) + 1;
+      if (ok) {
+        w.box = Math.min((w.box || 0) + 1, BOX_GAP.length - 1);
+        w.due = addDays(today(), BOX_GAP[w.box]);
+        if (w.box >= 3) { DB.wrong = DB.wrong.filter(x => x.qid !== w.qid); }
+      } else { w.box = 0; w.due = addDays(today(), 1); }
+    }
+  } else if (!ok) {
+    const rec = {
+      qid: q.qid, topic: q.topic, tname: q.tname, ask: q.ask, q: q.q, ans: q.ans,
+      type: q.type, opts: q.opts || null, sol: q.sol, box: 0,
+      due: addDays(today(), 1), addedAt: today(), times: 0
+    };
+    DB.wrong.push(rec);
+    log.wrongToday.push(rec);
+  }
+  save();
+}
+
+/* ---------- 诊断 ---------- */
+function buildDiag() {
+  const list = [];
+  P_TOPICS.forEach(k => list.push(genQ(k)));
+  ['calc-order', 'frac-add', 'frac-muldiv', 'simple-eq', 'word-speed'].forEach(k => list.push(genQ(k)));
+  ['numline', 'rat-addsub', 'power'].forEach(k => list.push(genQ(k)));
+  return list;
+}
+function finishDiag(qs, res) {
+  const sc = {};
+  qs.forEach((q, i) => {
+    const s = sc[q.topic] || (sc[q.topic] = { right: 0, total: 0 });
+    s.total++; if (res[i]) s.right++;
+  });
+  DB.diag = { done: true, date: today(), scores: sc };
+  Object.keys(sc).forEach(k => { const m = DB.mastery[k] || (DB.mastery[k] = { right: 0, total: 0, r20: [] });
+    m.total += sc[k].total; m.right += sc[k].right; });
+  buildQueue();
+  /* 诊断错题直接进错题本 */
+  qs.forEach((q, i) => { if (!res[i]) DB.wrong.push({
+    qid: q.qid, topic: q.topic, tname: q.tname, ask: q.ask, q: q.q, ans: q.ans,
+    type: q.type, opts: q.opts || null, sol: q.sol, box: 0, due: addDays(today(), 1), addedAt: today(), times: 0 }); });
+  delete DB.logs[today()];
+  save();
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+function sup(s) { return ('' + s).replace(/\^(-?\d+)/g, '<sup>$1</sup>'); }
+function esc(s) { return ('' + s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+let TAB = 'today';
+function go(tab) { TAB = tab; render(); window.scrollTo(0, 0); }
+
+function render() {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
+  const m = $('#main'); m.innerHTML = '';
+  if (TAB === 'today') viewToday(m);
+  else if (TAB === 'diag') viewDiag(m);
+  else if (TAB === 'plan') viewPlan(m);
+  else if (TAB === 'wrong') viewWrong(m);
+  else if (TAB === 'parent') viewParent(m);
+  else if (TAB === 'data') viewData(m);
+  else if (TAB === 'set') viewSet(m);
+}
+
+/* ---------- 通用：做题器 ---------- */
+function runner(host, qs, opt) {
+  /* opt: {title, onDone(res), onEach(q,ok,input,i), showSol} */
+  let i = 0; const res = [];
+  const box = el('div', 'card');
+  host.appendChild(box);
+  const bar = el('div', 'pbar'); const fill = el('i'); bar.appendChild(fill);
+  const head = el('div', 'qhead');
+  box.appendChild(head); box.appendChild(bar);
+  const body = el('div'); box.appendChild(body);
+
+  function step() {
+    if (i >= qs.length) { box.innerHTML = ''; box.appendChild(el('div', 'done', '<b>这一组做完了</b><div class="sub">正确 ' + res.filter(Boolean).length + ' / ' + qs.length + '</div>')); if (opt.onDone) opt.onDone(res); return; }
+    const q = qs[i];
+    head.innerHTML = '<span>' + opt.title + '</span><span class="cnt">' + (i + 1) + ' / ' + qs.length + '</span>';
+    fill.style.width = (i / qs.length * 100) + '%';
+    body.innerHTML = '';
+    if (q.tname) body.appendChild(el('div', 'tag', q.tname));
+    body.appendChild(el('div', 'qtext', sup(esc(q.q))));
+
+    let cur = '';
+    const fb = el('div', 'fb');
+
+    function submit(val) {
+      const ok = judge(q, val);
+      res[i] = ok;
+      if (opt.onEach) opt.onEach(q, ok, val, i);
+      fb.className = 'fb ' + (ok ? 'ok' : 'no');
+      let h = '<div class="fbhead">' + (ok ? '✓ 对了' : '✗ 不对') + '</div>';
+      if (!ok) h += '<div class="right">正确答案：<b>' + sup(esc(q.ans)) + '</b></div>';
+      if (opt.showSol !== false && q.sol) h += '<ol class="sol">' + q.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol>';
+      h += '<button class="btn next">下一题 →</button>';
+      fb.innerHTML = h;
+      fb.querySelector('.next').onclick = () => { i++; step(); };
+      body.querySelectorAll('button,input').forEach(b => b.disabled = true);
+      fb.querySelector('.next').disabled = false;
+      fb.scrollIntoView({ block: 'nearest' });
+    }
+
+    if (q.type === 'choice') {
+      const wrap = el('div', 'opts');
+      q.opts.forEach(o => { const b = el('button', 'opt', sup(esc(o))); b.onclick = () => { wrap.querySelectorAll('.opt').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); submit(o); }; wrap.appendChild(b); });
+      body.appendChild(wrap);
+    } else {
+      const inp = el('input', 'ans'); inp.setAttribute('inputmode', 'none'); inp.readOnly = true;
+      inp.placeholder = '答案（分数写成 3/4）';
+      body.appendChild(inp);
+      const kb = el('div', 'kb');
+      const keys = ['7', '8', '9', '/', '4', '5', '6', '-', '1', '2', '3', '.', '0', '⌫', '清空', '确定'];
+      keys.forEach(k => {
+        const b = el('button', 'k' + (k === '确定' ? ' go' : (k === '⌫' || k === '清空' ? ' fn' : '')), k);
+        b.onclick = () => {
+          if (k === '⌫') cur = cur.slice(0, -1);
+          else if (k === '清空') cur = '';
+          else if (k === '确定') { if (!cur.trim()) return; submit(cur); return; }
+          else cur += k;
+          inp.value = cur;
+        };
+        kb.appendChild(b);
+      });
+      body.appendChild(kb);
+      const skip = el('button', 'btn ghost', '不会，看解析');
+      skip.onclick = () => submit('###');
+      body.appendChild(skip);
+    }
+    body.appendChild(fb);
+  }
+  step();
+}
+
+/* ---------- 今日 ---------- */
+function viewToday(m) {
+  if (!DB.diag.done) {
+    m.appendChild(el('div', 'card hero', '<h2>先做一次入学诊断</h2><p>21 道题，覆盖小学 13 个知识点 + 初一 3 个前置点，大约 20 分钟。做完才知道漏在哪，计划才有意义。中间可以停，成绩会存在这台设备上。</p><button class="btn big" onclick="go(\'diag\')">开始诊断 →</button>'));
+    return;
+  }
+  const wi = weekInfo();
+  const log = buildToday();
+  const parts = [
+    { k: 'warm', name: '① 口算热身', sub: '限时不限对，练手速', qs: log.qs.warm },
+    { k: 'focus', name: '② 补漏主攻', sub: TMAP[log.focusK].name + (log.focus2 ? ' + ' + TMAP[log.focus2].name : ''), qs: log.qs.focus },
+    { k: 'track', name: '③ 跟课练习', sub: log.trackCh, qs: log.qs.track },
+    { k: 'review', name: '④ 错题重做', sub: log.qs.review.length ? '到期错题 ' + log.qs.review.length + ' 道' : '今天没有到期错题', qs: log.qs.review }
+  ];
+  const hdr = el('div', 'card');
+  hdr.innerHTML = '<div class="row"><div><h2>' + cnDate(today()) + '</h2><div class="sub">' + wi.label + ' · 本周跟课：' + esc(log.trackCh) + '</div></div></div>';
+  m.appendChild(hdr);
+
+  parts.forEach(p => {
+    const doneN = log.res[p.k].length, totN = p.qs.length;
+    const c = el('div', 'card task' + (totN === 0 ? ' dim' : (doneN >= totN ? ' fin' : '')));
+    const rightN = log.res[p.k].filter(r => r.ok).length;
+    c.innerHTML = '<div class="row"><div><b>' + p.name + '</b><div class="sub">' + esc(p.sub) + '</div></div>'
+      + '<div class="prog">' + (totN === 0 ? '—' : doneN + '/' + totN + (doneN >= totN ? ' ✓ 对 ' + rightN : '')) + '</div></div>';
+    if (totN > 0 && doneN < totN) {
+      const b = el('button', 'btn', doneN ? '继续做' : '开始');
+      b.onclick = () => {
+        m.innerHTML = '';
+        const back = el('button', 'btn ghost', '← 回今日'); back.onclick = () => go('today'); m.appendChild(back);
+        runner(m, p.qs.slice(doneN), {
+          title: p.name,
+          onEach: (q, ok, val) => recordAnswer(p.k, q, val, ok),
+          onDone: () => { const b2 = el('button', 'btn big', '回到今日任务'); b2.onclick = () => go('today'); m.appendChild(b2); }
+        });
+      };
+      c.appendChild(b);
+    }
+    m.appendChild(c);
+  });
+
+  if (log.wrongToday.length) {
+    const c = el('div', 'card note');
+    c.innerHTML = '<b>今天错了 ' + log.wrongToday.length + ' 道</b><div class="sub">去「家长」页拿今晚讲哪 2 道</div>';
+    const b = el('button', 'btn', '看家长清单'); b.onclick = () => go('parent'); c.appendChild(b);
+    m.appendChild(c);
+  }
+}
+
+/* ---------- 诊断 ---------- */
+let DIAGQS = null, DIAGRES = null;
+function viewDiag(m) {
+  if (DB.diag.done && !DIAGQS) {
+    const c = el('div', 'card');
+    let h = '<h2>诊断结果 · ' + DB.diag.date + '</h2><table class="tb"><tr><th>知识点</th><th>正确</th><th>判断</th></tr>';
+    const rows = Object.keys(DB.diag.scores).map(k => { const s = DB.diag.scores[k]; return { k, r: s.right / s.total, s }; }).sort((a, b) => a.r - b.r);
+    rows.forEach(r => {
+      const lv = r.r >= 0.85 ? ['稳', 'g'] : r.r >= 0.5 ? ['夹生', 'w'] : ['要补', 'b'];
+      h += '<tr><td>' + TMAP[r.k].name + '<span class="st">' + (TMAP[r.k].stage === 'P' ? '小学' : '七上') + '</span></td><td>' + r.s.right + '/' + r.s.total + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
+    });
+    h += '</table>';
+    c.innerHTML = h;
+    m.appendChild(c);
+    const c2 = el('div', 'card');
+    c2.innerHTML = '<b>当前补漏队列</b><div class="sub">按「影响初一的程度 × 掌握度」排序，做到近 20 题正确率 85% 自动毕业出队</div><ol class="q">'
+      + DB.queue.map(k => '<li>' + TMAP[k].name + '</li>').join('') + '</ol>';
+    m.appendChild(c2);
+    const b = el('button', 'btn ghost', '重做诊断（会清空队列，保留错题本）');
+    b.onclick = () => { if (confirm('重做诊断？')) { DIAGQS = buildDiag(); DIAGRES = []; render(); } };
+    m.appendChild(b);
+    return;
+  }
+  if (!DIAGQS) { DIAGQS = buildDiag(); DIAGRES = []; }
+  runner(m, DIAGQS, {
+    title: '入学诊断', showSol: true,
+    onEach: (q, ok, v, i) => { DIAGRES[i] = ok; },
+    onDone: res => {
+      finishDiag(DIAGQS, res); DIAGQS = null;
+      const b = el('button', 'btn big', '看结果和计划'); b.onclick = () => { go('diag'); }; m.appendChild(b);
+    }
+  });
+}
+
+/* ---------- 计划 ---------- */
+function viewPlan(m) {
+  const wi = weekInfo();
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>学习计划</h2><div class="sub">' + wi.label + '。启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart
+    + '。每天三段：口算热身 → 补漏主攻 → 跟课练习，再加到期错题重做。</div>';
+  m.appendChild(c);
+
+  const k = el('div', 'card');
+  k.innerHTML = '<b>8/29 – 8/31 破冰三天</b><ol class="q">'
+    + '<li>第 1 天：做完入学诊断（21 题），当晚家长陪着过 2 道错题</li>'
+    + '<li>第 2 天：主攻诊断里最差的那个小学知识点 + 预习数轴/相反数/绝对值</li>'
+    + '<li>第 3 天：昨天错题重做 + 预习有理数加减，把「减号改写成加相反数」练成肌肉记忆</li>'
+    + '</ol><div class="sub">目的不是学完，是开学第一节课能听懂，先把「我能听懂」这个感觉拿回来。</div>';
+  m.appendChild(k);
+
+  const t = el('div', 'card');
+  let h = '<b>开学后 12 周跟课表</b><div class="sub">以学校实际进度为准，进度不一样就点「改」。</div><table class="tb"><tr><th>周</th><th>跟课内容</th><th></th></tr>';
+  for (let w = 1; w <= 12; w++) {
+    const tr = trackOf(w);
+    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td>W' + w + '</td><td>' + esc(tr.ch) + '</td><td><button class="mini" data-w="' + w + '">改</button></td></tr>';
+  }
+  h += '</table>';
+  t.innerHTML = h;
+  t.querySelectorAll('.mini').forEach(b => b.onclick = () => {
+    const w = +b.dataset.w, tr = trackOf(w);
+    const ch = prompt('第 ' + w + ' 周学校在讲什么？（只改显示文字）', tr.ch);
+    if (ch === null) return;
+    const opts = M_TOPICS.map((x, i) => (i + 1) + '=' + TMAP[x].name).join('  ');
+    const pickStr = prompt('这周练哪些知识点？填编号，逗号分隔\n' + opts, tr.ks.map(x => M_TOPICS.indexOf(x) + 1).join(','));
+    if (pickStr === null) return;
+    const ks = pickStr.split(/[,，\s]+/).map(x => M_TOPICS[+x - 1]).filter(Boolean);
+    DB.trackOverride[w] = { ch, ks: ks.length ? ks : tr.ks };
+    delete DB.logs[today()];
+    save(); render();
+  });
+  m.appendChild(t);
+
+  const g = el('div', 'card');
+  g.innerHTML = '<b>阶段目标（可衡量）</b><ol class="q">'
+    + '<li>开学第 2 周末：口算热身正确率 ≥ 80%，有理数加减单独测 10 题错不超过 2 题</li>'
+    + '<li>期中前（第 7 周）：补漏队列里清掉 3 个小学知识点；括号型乘方（−2² 和 (−2)²）连续 10 题不错</li>'
+    + '<li>期末前（第 12 周）：一元一次方程含分母的题 10 题对 7 道；错题本存量降到 20 道以内</li>'
+    + '</ol><div class="sub">及格线不是目标，稳定拿到「会做的题不丢分」才是。他现在的失分大头是运算规则，不是难题。</div>';
+  m.appendChild(g);
+}
+
+/* ---------- 错题本 ---------- */
+function viewWrong(m) {
+  const t = today();
+  const due = DB.wrong.filter(w => w.due <= t);
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>错题本</h2><div class="sub">共 ' + DB.wrong.length + ' 道，今天到期 ' + due.length + ' 道。答对一次隔 1 天再考，连续对 3 轮就毕业移出。</div>';
+  m.appendChild(c);
+  if (due.length) {
+    const b = el('button', 'btn big', '重做今天到期的 ' + due.length + ' 道');
+    b.onclick = () => {
+      m.innerHTML = '';
+      const back = el('button', 'btn ghost', '← 返回'); back.onclick = () => go('wrong'); m.appendChild(back);
+      buildToday();
+      runner(m, due, { title: '错题重做', onEach: (q, ok, v) => recordAnswer('review', q, v, ok), onDone: () => { const b2 = el('button', 'btn big', '完成'); b2.onclick = () => go('wrong'); m.appendChild(b2); } });
+    };
+    m.appendChild(b);
+  }
+  const grp = {};
+  DB.wrong.forEach(w => (grp[w.topic] = grp[w.topic] || []).push(w));
+  Object.keys(grp).sort((a, b) => grp[b].length - grp[a].length).forEach(k => {
+    const c2 = el('div', 'card');
+    let h = '<b>' + TMAP[k].name + '</b> <span class="pill b">' + grp[k].length + ' 道</span>';
+    grp[k].forEach(w => { h += '<div class="wq"><div class="wqq">' + sup(esc(w.q)) + '</div><div class="wqa">答案 ' + sup(esc(w.ans)) + ' · 下次重考 ' + w.due + '</div></div>'; });
+    c2.innerHTML = h;
+    m.appendChild(c2);
+  });
+  if (!DB.wrong.length) m.appendChild(el('div', 'card dim', '错题本是空的。'));
+}
+
+/* ---------- 家长 ---------- */
+function viewParent(m) {
+  const t = today();
+  const log = DB.logs[t];
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>今晚这 10 分钟怎么用</h2><div class="sub">别通篇讲。挑下面 2 道，让他讲给你听，你只负责问问题。</div>';
+  m.appendChild(c);
+
+  let wt = (log && log.wrongToday) ? log.wrongToday.slice() : [];
+  if (!wt.length) wt = DB.wrong.filter(w => w.addedAt === t);
+  if (!wt.length) {
+    m.appendChild(el('div', 'card dim', '今天还没有错题记录。等他做完今日任务再来看。'));
+  } else {
+    const cnt = {}; wt.forEach(w => cnt[w.topic] = (cnt[w.topic] || 0) + 1);
+    wt.sort((a, b) => cnt[b.topic] - cnt[a.topic]);
+    const seen = new Set(); const chosen = [];
+    wt.forEach(w => { if (chosen.length < 2 && !seen.has(w.topic)) { seen.add(w.topic); chosen.push(w); } });
+    if (chosen.length < 2 && wt.length > 1) chosen.push(wt.find(w => !chosen.includes(w)));
+    chosen.filter(Boolean).forEach((w, i) => {
+      const c2 = el('div', 'card');
+      c2.innerHTML = '<div class="tag">第 ' + (i + 1) + ' 道 · ' + TMAP[w.topic].name + '</div>'
+        + '<div class="qtext">' + sup(esc(w.q)) + '</div>'
+        + '<div class="kv"><span>正确答案</span><b>' + sup(esc(w.ans)) + '</b></div>'
+        + '<div class="pask"><b>你问这句</b><div>' + esc(w.ask) + '</div></div>'
+        + '<details><summary>讲解思路（他讲不出来你再看）</summary><ol class="sol">' + w.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol></details>';
+      m.appendChild(c2);
+    });
+  }
+
+  const tip = el('div', 'card note');
+  tip.innerHTML = '<b>三条底线</b><ol class="q">'
+    + '<li>不说「这么简单都不会」。他现在的问题是小学没打牢，不是不聪明。</li>'
+    + '<li>只讲 2 道。讲多了他记不住，也会把 10 分钟拖成 40 分钟然后崩。</li>'
+    + '<li>让他讲、你听。他能把步骤说顺就算过关，说不出来的地方才是真漏洞。</li></ol>';
+  m.appendChild(tip);
+
+  const w7 = weekReport();
+  const wr = el('div', 'card');
+  wr.innerHTML = '<b>最近 7 天</b><div class="sub">练了 ' + w7.days + ' 天，共 ' + w7.total + ' 题，正确率 ' + w7.rate + '%。'
+    + (w7.days < 4 ? '天数偏少——先保住每天都碰一下，比某天做很多有用。' : '节奏没问题，保持。') + '</div>';
+  m.appendChild(wr);
+}
+function weekReport() {
+  let total = 0, right = 0, days = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(today(), -i), l = DB.logs[d];
+    if (!l) continue;
+    let n = 0;
+    ['warm', 'focus', 'track', 'review'].forEach(p => { (l.res[p] || []).forEach(r => { n++; total++; if (r.ok) right++; }); });
+    if (n) days++;
+  }
+  return { total, right, days, rate: total ? Math.round(right / total * 100) : 0 };
+}
+
+/* ---------- 数据 ---------- */
+function viewData(m) {
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>最近 14 天</h2>';
+  const rows = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = addDays(today(), -i), l = DB.logs[d];
+    let n = 0, r = 0;
+    if (l) ['warm', 'focus', 'track', 'review'].forEach(p => (l.res[p] || []).forEach(x => { n++; if (x.ok) r++; }));
+    rows.push({ d, n, r });
+  }
+  let h = '<div class="chart">';
+  rows.forEach(x => {
+    const pct = x.n ? Math.round(x.r / x.n * 100) : 0;
+    h += '<div class="bar" title="' + x.d + ' ' + x.r + '/' + x.n + '"><i style="height:' + (x.n ? Math.max(pct, 4) : 0) + '%"></i><span>' + x.d.slice(5).replace('-', '/') + '</span></div>';
+  });
+  h += '</div><div class="sub">柱高 = 当天正确率，没柱子 = 那天没练。</div>';
+  c.innerHTML += h;
+  m.appendChild(c);
+
+  const c2 = el('div', 'card');
+  let h2 = '<b>各知识点掌握度</b><div class="sub">按累计做题正确率，做满 8 题才显示判断</div><table class="tb"><tr><th>知识点</th><th>题数</th><th>正确率</th><th></th></tr>';
+  TOPICS.forEach(t => {
+    const n = mstN(t.k); if (!n) return;
+    const r = Math.round(mst(t.k) * 100);
+    const lv = n < 8 ? ['样本少', ''] : r >= 85 ? ['稳', 'g'] : r >= 60 ? ['夹生', 'w'] : ['要补', 'b'];
+    h2 += '<tr><td>' + t.name + '<span class="st">' + (t.stage === 'P' ? '小学' : '七上') + '</span></td><td>' + n + '</td><td>' + r + '%</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
+  });
+  h2 += '</table>';
+  c2.innerHTML = h2;
+  m.appendChild(c2);
+}
+
+/* ---------- 设置 ---------- */
+function viewSet(m) {
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>设置</h2>'
+    + '<div class="kv"><span>启动日</span><input id="s-kick" value="' + DB.profile.kickoff + '"></div>'
+    + '<div class="kv"><span>开学日</span><input id="s-ss" value="' + DB.profile.schoolStart + '"></div>'
+    + '<div class="kv"><span>每天分钟</span><input id="s-min" value="' + DB.profile.dailyMin + '"></div>';
+  const b = el('button', 'btn', '保存');
+  b.onclick = () => {
+    DB.profile.kickoff = $('#s-kick').value.trim();
+    DB.profile.schoolStart = $('#s-ss').value.trim();
+    DB.profile.dailyMin = Math.max(10, Math.min(90, +$('#s-min').value || 25));
+    delete DB.logs[today()];
+    save(); alert('已保存，今日任务会按新时长重新生成'); go('today');
+  };
+  c.appendChild(b);
+  m.appendChild(c);
+
+  const c2 = el('div', 'card');
+  c2.innerHTML = '<b>进度备份</b><div class="sub">数据只存在这台设备的浏览器里。换设备、清缓存前先导出。</div>';
+  const b1 = el('button', 'btn', '导出进度文件');
+  b1.onclick = () => {
+    const blob = new Blob([JSON.stringify(DB)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'math-progress-' + today() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  const b2 = el('button', 'btn ghost', '复制进度到剪贴板');
+  b2.onclick = () => { const s = JSON.stringify(DB); navigator.clipboard ? navigator.clipboard.writeText(s).then(() => alert('已复制')) : prompt('手动复制：', s); };
+  const inp = el('input', 'file'); inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.ver) throw new Error('格式不对'); DB = d; save(); alert('已导入'); go('today'); } catch (err) { alert('导入失败：' + err.message); } };
+    r.readAsText(f); };
+  c2.appendChild(b1); c2.appendChild(b2);
+  c2.appendChild(el('div', 'sub', '导入备份：'));
+  c2.appendChild(inp);
+  m.appendChild(c2);
+
+  const c3 = el('div', 'card');
+  const b3 = el('button', 'btn ghost danger', '清空全部数据');
+  b3.onclick = () => { if (confirm('全部清空，不可恢复。确定？')) { localStorage.removeItem(KEY); load(); go('today'); } };
+  c3.appendChild(b3);
+  m.appendChild(c3);
+}
+
+/* ---------- 启动 ---------- */
+load();
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => go(b.dataset.t));
+render();
+
+</script>
+</body>
+</html>
