@@ -43,6 +43,26 @@ function parseVal(s) {
 function eqVal(a, b) { const x = parseVal(a), y = parseVal(b); if (!x || !y) return false; return x.n === y.n && x.d === y.d; }
 
 /* ============================================================
+   难度自适应：目标把正确率压在 85% 附近
+   依据 Wilson et al. 2019《The Eighty Five Percent Rule for optimal
+   learning》(Nat Commun 10:4646) —— 太简单和太难都学得慢，85% 最快。
+   注：原研究是感知决策/机器学习任务，搬到做题上是工程近似，不是照搬结论。
+   LV=1 数字小、形态最简；LV=2 常规；LV=3 数字大、形态复杂。
+   ============================================================ */
+let LV = 2;
+function setLv(v) { LV = (v === 1 || v === 3) ? v : 2; }
+/* 按难度缩放上限 */
+function lvR(a, b) { const k = LV === 1 ? 0.55 : LV === 3 ? 1.5 : 1; return R(a, Math.max(a + 1, Math.round(b * k))); }
+/* 按难度选形态数：LV1 只用前 1 种，LV2 前 n-1 种，LV3 全部 */
+function lvT(n) { if (LV === 1) return 1; if (LV === 3) return R(1, n); return R(1, Math.max(1, n - 1)); }
+
+/* 生活化情境词池：把「甲乙两人」「某商品」换成他的世界 */
+const NM = ['小宇', '阿哲', '表哥', '同桌', '小凯'];
+const PL = ['地铁站', '篮球场', '图书馆', '学校', '小区门口'];
+const IT = ['一杯奶茶', '一双球鞋', '一本漫画', '一个篮球', '一包薯片', '一副耳机', '一个键盘', '一个水杯'];
+const nm2 = () => { const a = pick(NM); return [a, pick(NM.filter(x => x !== a))]; };
+
+/* ============================================================
    TOPICS：每个知识点一个生成器
    stage  : 'P' 小学基础 / 'M' 七上新课
    pri    : 补漏优先级，越小越先补（影响初一的程度）
@@ -55,9 +75,9 @@ const TOPICS = [
   k: 'calc-order', name: '四则混合运算顺序', stage: 'P', pri: 3,
   ask: '让他先用手指点一遍：这道题先算哪一步？说出顺序再动笔。',
   gen() {
-    const t = R(1, 3);
+    const t = lvT(3);
     if (t === 1) {
-      const a = R(2, 9), b = R(2, 9), c = R(11, 40), d = pick([2, 3, 4, 5, 6]), N = d * R(2, 9);
+      const a = R(2, LV === 1 ? 6 : 9), b = R(2, LV === 1 ? 6 : 9), c = lvR(11, 40), d = pick([2, 3, 4, 5, 6]), N = d * R(2, 9);
       const ans = c + a * b - N / d;
       return { q: `${c} + ${a} × ${b} − ${N} ÷ ${d} = ?`, ans: '' + ans, type: 'num',
         sol: [`先乘除后加减：${a}×${b}=${a * b}，${N}÷${d}=${N / d}`, `再从左到右算加减：${c}+${a * b}−${N / d} = ${ans}`] };
@@ -77,7 +97,7 @@ const TOPICS = [
   k: 'frac-add', name: '分数加减（通分）', stage: 'P', pri: 1,
   ask: '问他公分母是怎么找出来的，最后有没有约到最简。',
   gen() {
-    const ds = [2, 3, 4, 5, 6, 8, 9, 10, 12];
+    const ds = LV === 1 ? [2, 3, 4, 6] : LV === 3 ? [2, 3, 4, 5, 6, 7, 8, 9, 10, 12] : [2, 3, 4, 5, 6, 8, 9, 10, 12];
     const d1 = pick(ds), d2 = pick(ds.filter(x => x !== d1));
     const n1 = nCop(d1), n2 = nCop(d2);
     const plus = Math.random() < 0.5;
@@ -93,7 +113,8 @@ const TOPICS = [
   k: 'frac-muldiv', name: '分数乘除', stage: 'P', pri: 1,
   ask: '除法那步他有没有翻成乘倒数？让他指出哪个数被翻过来了。',
   gen() {
-    const b = pick([2, 3, 4, 5, 6, 7, 8, 9, 10]), d = pick([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    const dp = LV === 1 ? [2, 3, 4, 5] : [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const b = pick(dp), d = pick(dp);
     const a = nCop(b), c = nCop(d);
     const mul = Math.random() < 0.5;
     const f = mul ? frac(a * c, b * d) : frac(a * d, b * c);
@@ -145,7 +166,7 @@ const TOPICS = [
   gen() {
     const t = R(1, 3);
     if (t === 1) { const p = R(5, 40) * 10, d = pick([5, 6, 7, 8, 9]);
-      return { q: `一件商品原价 ${p} 元，打 ${d} 折出售，现价是多少元？`, ans: '' + p * d / 10, type: 'num',
+      return { q: `${pick(IT)}原价 ${p} 元，打 ${d} 折，现在多少钱？`, ans: '' + p * d / 10, type: 'num',
         sol: [`打 ${d} 折 = 按原价的 ${d * 10}% 卖`, `${p} × ${d * 10}% = ${p * d / 10} 元`] }; }
     if (t === 2) { const a = R(2, 40) * 10, p = pick([10, 20, 25, 50]);
       return { q: `某数是 ${a}，增加 ${p}% 后是多少？`, ans: '' + a * (1 + p / 100), type: 'num',
@@ -225,15 +246,17 @@ const TOPICS = [
   gen() {
     const t = R(1, 3);
     if (t === 1) { const va = R(3, 9), vb = R(3, 9), h = R(2, 6);
-      return { q: `甲乙两地相距 ${(va + vb) * h} 千米。甲每小时走 ${va} 千米，乙每小时走 ${vb} 千米，两人同时从两地相向出发，几小时相遇？`, ans: '' + h, type: 'num',
+      const N = nm2(), P0 = pick(PL);
+      return { q: `${N[0]}家和${N[1]}家相距 ${(va + vb) * h} 千米。两人约好在中间碰头一起去${P0}，${N[0]}每小时走 ${va} 千米，${N[1]}每小时走 ${vb} 千米，同时出发相向而行，几小时碰上？`, ans: '' + h, type: 'num',
         sol: [`两人每小时一共走近 ${va}+${vb} = ${va + vb} 千米`, `${(va + vb) * h} ÷ ${va + vb} = ${h} 小时`] }; }
     if (t === 2) { const v = R(4, 15), t2 = R(2, 8);
-      return { q: `一辆车每小时行 ${v} 千米，行了 ${t2} 小时，一共行了多少千米？`, ans: '' + v * t2, type: 'num',
+      return { q: `一辆车每小时行 ${v} 千米，从深圳出发开了 ${t2} 小时，一共开了多少千米？`, ans: '' + v * t2, type: 'num',
         sol: [`路程 = 速度 × 时间 = ${v} × ${t2} = ${v * t2}`] }; }
     const va = R(3, 8), t0 = pick([1, 2, 3]);
     const diff = pick(divisors(va * t0).filter(d => d >= 2 && d <= 8)) || 2;
     const vb = va + diff;
-    return { q: `甲以每小时 ${va} 千米的速度先出发 ${t0} 小时，乙以每小时 ${vb} 千米的速度从同一地点追赶，乙几小时追上甲？`, ans: '' + (va * t0 / diff), type: 'num',
+    const N2 = nm2();
+    return { q: `${N2[0]}以每小时 ${va} 千米先走了 ${t0} 小时，${N2[1]}发现有东西要给他，以每小时 ${vb} 千米从同一地点去追，${N2[1]}几小时追上${N2[0]}？`, ans: '' + (va * t0 / diff), type: 'num',
       sol: [`甲先走了 ${va * t0} 千米`, `乙每小时追近 ${vb}−${va} = ${diff} 千米`, `${va * t0} ÷ ${diff} = ${va * t0 / diff} 小时`] };
   }
 },
@@ -244,7 +267,8 @@ const TOPICS = [
     const a = R(3, 12), b = R(3, 12);
     if (a === b) return this.gen();
     const f = frac(a * b, a + b);
-    return { q: `一项工作，甲单独做 ${a} 天完成，乙单独做 ${b} 天完成。两人合作几天完成？（可填分数）`, ans: fstr(f), type: 'frac',
+    const N3 = nm2();
+    return { q: `一份大扫除任务，${N3[0]}单独做要 ${a} 天，${N3[1]}单独做要 ${b} 天。两人一起做，几天做完？（可填分数）`, ans: fstr(f), type: 'frac',
       sol: [`把整件工作看作 1，甲每天做 1/${a}，乙每天做 1/${b}`, `合作每天做 1/${a} + 1/${b} = ${fstr(frac(a + b, a * b))}`, `1 ÷ ${fstr(frac(a + b, a * b))} = ${fstr(f)} 天`] };
   }
 },
@@ -254,7 +278,8 @@ const TOPICS = [
   gen() {
     const small = R(5, 30), k = R(2, 4), m = R(1, 9);
     const big = k * small + m;
-    return { q: `两个数的和是 ${small + big}，大数比小数的 ${k} 倍多 ${m}。小数是多少？`, ans: '' + small, type: 'num',
+    const I0 = pick(IT);
+    return { q: `两个人一共收集了 ${small + big} 张${pick(['球星卡', '游戏卡', '贴纸'])}，多的那个人比少的那个人的 ${k} 倍还多 ${m} 张。少的那个人有多少张？`, ans: '' + small, type: 'num',
       sol: [`设小数为 x，大数是 ${k}x + ${m}`, `x + ${k}x + ${m} = ${small + big}`, `${k + 1}x = ${small + big - m}，x = ${small}`] };
   }
 },
@@ -282,7 +307,8 @@ const TOPICS = [
   k: 'rat-addsub', name: '有理数加减', stage: 'M', pri: 1,
   ask: '让他把每一个减号都改写成「加相反数」再算，这一步不能省。',
   gen() {
-    const a = R(-15, 15) || 3, b = R(-15, 15) || -4, c = R(-12, 12) || 5;
+    const M = LV === 1 ? 9 : LV === 3 ? 30 : 15;
+    const a = R(-M, M) || 3, b = R(-M, M) || -4, c = R(-M, M) || 5;
     const ans = a + b - c;
     return { q: `计算：${P(a)} + ${P(b)} − ${P(c)} = ?`, ans: '' + ans, type: 'num',
       sol: [`减 ${P(c)} 就是加它的相反数 ${P(-c)}`, `${P(a)} + ${P(b)} + ${P(-c)}`, `= ${a + b} + ${P(-c)} = ${ans}`] };
@@ -292,7 +318,7 @@ const TOPICS = [
   k: 'rat-muldiv', name: '有理数乘除', stage: 'M', pri: 1,
   ask: '先定符号还是先算数？让他先数负号的个数。',
   gen() {
-    const a = R(2, 9) * pick([1, -1]), c = R(2, 6) * pick([1, -1]), k = R(2, 5);
+    const a = lvR(2, 9) * pick([1, -1]), c = R(2, LV === 1 ? 4 : 6) * pick([1, -1]), k = R(2, LV === 1 ? 3 : 5);
     const b = Math.abs(c) * k * pick([1, -1]);
     const ans = a * b / c;
     const negs = [a, b, c].filter(x => x < 0).length;
@@ -316,7 +342,7 @@ const TOPICS = [
   k: 'power', name: '有理数乘方（括号陷阱）', stage: 'M', pri: 1,
   ask: '这是初一最大的坑：让他读出来——是「负数的平方」还是「平方的相反数」。',
   gen() {
-    const b = R(2, 6), form = R(1, 4);
+    const b = R(2, LV === 1 ? 4 : 6), form = LV === 1 ? R(1, 2) : R(1, 4);
     if (form === 1) return { q: `计算：(−${b})² = ?`, ans: '' + b * b, type: 'num',
       sol: [`底数是 −${b}，(−${b})² = (−${b})×(−${b}) = ${b * b}`, `负负得正`] };
     if (form === 2) return { q: `计算：−${b}² = ?`, ans: '' + (-b * b), type: 'num',
@@ -331,9 +357,9 @@ const TOPICS = [
   k: 'rat-mixed', name: '有理数混合运算', stage: 'M', pri: 2,
   ask: '让他把整道题分成几「块」，先标出每块的结果再合并。',
   gen() {
-    const t = R(1, 2);
+    const t = lvT(2);
     if (t === 1) {
-      const a = R(2, 5), b = R(2, 4), d = R(1, 9);
+      const a = R(2, LV === 1 ? 3 : 5), b = R(2, 4), d = R(1, 9);
       const ans = -a * a - b * b + d;
       return { q: `计算：−${a}² + (−${b})³ ÷ ${b} − (−${d}) = ?`, ans: '' + ans, type: 'num',
         sol: [`−${a}² = ${-a * a}（负号在外）`, `(−${b})³ = ${-b * b * b}，÷ ${b} = ${-b * b}`,
@@ -354,9 +380,9 @@ const TOPICS = [
   k: 'sign-mix', name: '性质符号 vs 运算符号', stage: 'M', pri: 1,
   ask: '让他把中间那个「−」和数字自带的负号分开念一遍：哪个是运算，哪个是这个数本身的符号？',
   gen() {
-    const t = R(1, 3);
+    const t = lvT(3);
     if (t === 1) {
-      const a = R(2, 15), b = R(2, 9), c = -R(2, 9);
+      const a = lvR(2, 15), b = R(2, LV === 1 ? 6 : 9), c = -R(2, LV === 1 ? 6 : 9);
       return { q: `计算：${a} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
         sol: [`中间的「−」是减法运算，${P(c)} 的负号是这个数自带的，两个不能合成一个`,
               `先算乘法：${b} × ${P(c)} = ${b * c}`,
@@ -379,9 +405,9 @@ const TOPICS = [
   k: 'paren-nest', name: '括号里是算式的去括号', stage: 'M', pri: 1,
   ask: '让他用手指点着括号里每一项念「这项变号、这项也变号」，一项都不能漏。',
   gen() {
-    const t = R(1, 2);
+    const t = lvT(2);
     if (t === 1) {
-      const a = R(2, 12), b = R(2, 12), c = R(2, 9), d = R(2, 9);
+      const a = lvR(2, 12), b = lvR(2, 12), c = R(2, 9), d = R(2, 9);
       const ans = (a - b) - (-c + d);
       return { q: `计算：(${a} − ${b}) − (−${c} + ${d}) = ?`, ans: '' + ans, type: 'num',
         sol: [`第一个括号先算出来：${a} − ${b} = ${a - b}`,
@@ -400,8 +426,8 @@ const TOPICS = [
   k: 'neg-frac', name: '负分数加减', stage: 'M', pri: 1,
   ask: '通分那一步和小学一模一样，问他新增的难点只有一个：负号。别让他重新学通分。',
   gen() {
-    const t = R(1, 2);
-    const ds = [2, 3, 4, 5, 6, 8, 10, 12];
+    const t = lvT(2);
+    const ds = LV === 1 ? [2, 3, 4, 6] : [2, 3, 4, 5, 6, 8, 10, 12];
     if (t === 1) {
       const d1 = pick(ds), d2 = pick(ds.filter(x => x !== d1));
       const n1 = nCop(d1), n2 = nCop(d2);
@@ -509,7 +535,7 @@ const TOPICS = [
   k: 'eval-expr', name: '整式化简求值', stage: 'M', pri: 3,
   ask: '代负数时有没有加括号？没加括号是最常见的失分点。',
   gen() {
-    const x = pick([-3, -2, -1, 2, 3]), a = R(2, 4), b = R(1, 6), c = R(1, 9);
+    const x = LV === 1 ? pick([-2, -1, 2]) : pick([-4, -3, -2, -1, 2, 3, 4]), a = R(2, 4), b = R(1, 6), c = R(1, 9);
     const ans = a * x * x - b * x + c;
     return { q: `当 x = ${P(x)} 时，求 ${a}x² − ${b}x + ${c} 的值。`, ans: '' + ans, type: 'num',
       sol: [`代入时把 x 用括号包起来：${a}×${P(x)}² − ${b}×${P(x)} + ${c}`,
@@ -521,8 +547,8 @@ const TOPICS = [
   k: 'linear-eq', name: '解一元一次方程', stage: 'M', pri: 1,
   ask: '每写一步问他「这一步依据是什么」：移项要变号，两边同乘同除。',
   gen() {
-    const t = R(1, 3);
-    if (t === 1) { const x = R(-6, 9), m = R(2, 7), n = R(-9, 9);
+    const t = lvT(3);
+    if (t === 1) { const x = LV === 1 ? R(1, 8) : R(-6, 9), m = R(2, LV === 1 ? 5 : 7), n = R(-9, 9);
       return { q: `解方程：${m}x${S(n)} = ${m * x + n}，x = ?`, ans: '' + x, type: 'num',
         sol: [`把常数移到右边（变号）：${m}x = ${m * x + n}${S(-n)} = ${m * x}`, `两边除以 ${m}：x = ${x}`] }; }
     if (t === 2) { const x = R(-5, 8), m = R(3, 8); let n = R(2, 7); if (n === m) n = m + 1;
@@ -547,10 +573,11 @@ const TOPICS = [
         sol: [`设这个数为 x：${k}x + ${m} = ${k * x + m}`, `${k}x = ${k * x}，x = ${x}`] }; }
     if (t === 2) { const va = R(3, 8), t0 = pick([1, 2, 3]);
       const diff = pick(divisors(va * t0).filter(d => d >= 2 && d <= 8)) || 2;
-      return { q: `甲每小时走 ${va} 千米，先走 ${t0} 小时后，乙以每小时 ${va + diff} 千米从同地出发追。设乙用 x 小时追上，乙几小时追上甲？`, ans: '' + (va * t0 / diff), type: 'num',
+      const N4 = nm2();
+      return { q: `${N4[0]}每小时走 ${va} 千米，先走 ${t0} 小时；${N4[1]}每小时走 ${va + diff} 千米从同地出发追。设${N4[1]}用 x 小时追上，列方程求 x。`, ans: '' + (va * t0 / diff), type: 'num',
         sol: [`列方程：${va + diff}x = ${va}(x + ${t0})`, `${diff}x = ${va * t0}`, `x = ${va * t0 / diff}`] }; }
     if (t === 3) { const a = R(2, 20) * 10, p = pick([10, 20, 25, 50]);
-      return { q: `一件商品进价 ${a} 元，售价 ${a * (1 + p / 100)} 元，利润率是多少？（只填数字，单位 %）`, ans: '' + p, type: 'num',
+      return { q: `${pick(IT)}进价 ${a} 元，卖 ${a * (1 + p / 100)} 元，利润率是多少？（只填数字，单位 %）`, ans: '' + p, type: 'num',
         sol: [`利润 = ${a * (1 + p / 100)} − ${a} = ${a * p / 100}`, `利润率 = 利润 ÷ 进价 = ${a * p / 100} ÷ ${a} = ${p}%`] }; }
     const x = R(2, 10), k = pick([2, 3]), S0 = R(8, 14);
     const F = k * (S0 + x) - x;
@@ -588,17 +615,17 @@ const TOPICS = [
       const sum = arr.reduce((a, b) => a + b, 0);
       arr[4] += (n - sum % n) % n;
       const s = arr.reduce((a, b) => a + b, 0);
-      return { q: `一组数据：${arr.join('、')}。它们的平均数是 ?`, ans: fstr(frac(s, n)), type: 'frac',
+      return { q: `最近 5 次${pick(['数学小测', '英语听写', '体育测试'])}的成绩：${arr.join('、')}。平均分是多少？`, ans: fstr(frac(s, n)), type: 'frac',
         sol: [`求和：${s}`, `${s} ÷ ${n} = ${fstr(frac(s, n))}`] };
     }
     if (t === 2) {
       const sorted = arr.slice().sort((a, b) => a - b);
-      return { q: `一组数据：${arr.join('、')}。它们的中位数是 ?`, ans: '' + sorted[2], type: 'num',
+      return { q: `全班随机抽 5 个人的${pick(['数学成绩', '身高（cm）', '每周运动分钟数'])}：${arr.join('、')}。中位数是多少？`, ans: '' + sorted[2], type: 'num',
         sol: [`先从小到大排：${sorted.join('、')}`, `一共 5 个，中间第 3 个就是中位数：${sorted[2]}`] };
     }
     const v = R(70, 95);
     arr = shuf([v, v, v, R(60, 69), R(96, 100)]);
-    return { q: `一组数据：${arr.join('、')}。它们的众数是 ?`, ans: '' + v, type: 'num',
+    return { q: `班里 5 个同学的${pick(['数学成绩', '鞋码', '每天睡眠小时数'])}：${arr.join('、')}。众数是多少？`, ans: '' + v, type: 'num',
       sol: [`出现次数最多的那个数：${v}（出现 3 次）`] };
   }
 }
@@ -685,8 +712,9 @@ function genBridge(k) {
 
 
 /* 生成一题，带重试防退化 */
-function genQ(k) {
+function genQ(k, lv) {
   const t = TMAP[k];
+  setLv(lv);
   for (let i = 0; i < 12; i++) {
     let o;
     try { o = t.gen(); } catch (e) { continue; }
@@ -698,8 +726,8 @@ function genQ(k) {
   }
   return { topic: k, tname: t.name, ask: t.ask, qid: k + '_f', q: '（本题生成失败，跳过即可）', ans: '0', type: 'num', sol: ['—'] };
 }
-function genMany(k, n) { const r = []; const seen = new Set(); let guard = 0;
-  while (r.length < n && guard++ < n * 20) { const q = genQ(k); if (seen.has(q.q)) continue; seen.add(q.q); r.push(q); }
+function genMany(k, n, lv) { const r = []; const seen = new Set(); let guard = 0;
+  while (r.length < n && guard++ < n * 20) { const q = genQ(k, lv); if (seen.has(q.q)) continue; seen.add(q.q); r.push(q); }
   return r; }
 
 /* ---------- 口算热身 ---------- */
@@ -729,4 +757,70 @@ function warmupQ(stage, force) {
   if (f === 1) return { q: `(−${b})²`, ans: '' + b * b };
   if (f === 2) return { q: `−${b}²`, ans: '' + (-b * b) };
   return { q: `(−${b})³`, ans: '' + (-b * b * b) };
+}
+
+/* ============================================================
+   数学史彩蛋：每天最多弹 2 条，和当天练的知识点挂钩。
+   目的不是好玩，是让他知道这些规则不是老师瞎编的、是人想出来的。
+   （游戏化 meta 分析：有效的是自主感与关联感，不是徽章积分。）
+   ============================================================ */
+const FACTS = [
+{ id: 'f01', ks: ['numline', 'rat-addsub'], t: '负数是中国人最先用的',
+  b: '《九章算术》两千年前就在用正负数，比印度早约 700 年，比欧洲早 1700 年。刘徽还规定：红色小棍摆的是正数，黑色的是负数——和现在说的「赤字」刚好相反。' },
+{ id: 'f02', ks: ['rat-addsub', 'sign-mix'], t: '你今天练的规则，两千年前就写下来了',
+  b: '《九章算术》「正负术」原文八个字：同名相除，异名相益。翻译过来就是你刚练的那句——减去一个数，等于加上它的相反数。' },
+{ id: 'f03', ks: ['rat-muldiv', 'power'], t: '欧洲人曾管负数叫「荒谬的数」',
+  b: '17 世纪以前，欧洲数学家拒绝承认负数，管它叫「假数」「荒谬的数」，理由是「哪有比什么都没有还少的东西」。中国人早一千多年就不纠结这个了。' },
+{ id: 'f04', ks: ['linear-eq', 'eq-word'], t: 'algebra 的原意是「把它接回去」',
+  b: '公元 820 年，巴格达的花拉子米写了本书叫 al-jabr，意思是「还原、重新接好」。这个词后来变成英文 algebra。你解方程时把项从一边移到另一边、把式子重新接好——那个动作就是 al-jabr 本身。' },
+{ id: 'f05', ks: ['linear-eq'], t: 'algorithm（算法）是一个人的名字',
+  b: '花拉子米 al-Khwarizmi 的名字被翻成拉丁文后变成了 algorithm。今天所有电脑程序都在用这个词，源头是一千两百年前一个写方程的人。' },
+{ id: 'f06', ks: ['linear-eq', 'eval-expr', 'simple-eq'], t: '等号只有 468 岁',
+  b: '1557 年威尔士人 Robert Recorde 第一次用「=」表示相等，理由很朴素：没有两样东西能比两条平行线更相等。同一本书也是第一本用英文写「+」和「−」的书。' },
+{ id: 'f07', ks: ['frac-add', 'frac-muldiv'], t: '古埃及人不会写 3/4',
+  b: '古埃及只承认分子是 1 的分数。要表示 3/4，他们得写成 1/2 + 1/4。你随手就能写的 3/4，在那时候是个技术难题。' },
+{ id: 'f08', ks: ['power', 'sci'], t: '阿基米德数过宇宙里的沙子',
+  b: '两千多年前阿基米德写《数沙者》，为了算「整个宇宙能装多少粒沙」，他不得不发明一套表示超大数的办法——那就是科学记数法的祖先。' },
+{ id: 'f09', ks: ['sci', 'power'], t: '一张纸折 42 次能到月球',
+  b: '纸厚 0.1 毫米，每折一次翻一倍。2⁴² × 0.1 毫米 ≈ 44 万公里，比地球到月球还远。乘方涨得快到反直觉，这就是为什么大数非要写成 10ⁿ。' },
+{ id: 'f10', ks: ['area', 'geom', 'volume'], t: '祖冲之的圆周率领先世界九百年',
+  b: '1500 年前祖冲之算出 3.1415926 < π < 3.1415927，精确到小数第 7 位。欧洲要到 16 世纪才追上这个精度。' },
+{ id: 'f11', ks: ['geom'], t: '圆是 360 度，得怪巴比伦人',
+  b: '巴比伦人用 60 进制数数（60 好分），于是一圈定 360 度、1 小时 60 分、1 分 60 秒。四千年前的习惯，你今天还在用。' },
+{ id: 'f12', ks: ['numline', 'abs-calc'], t: '0 是最晚出生的数字',
+  b: '1、2、3 谁都会数，但「什么都没有」也算一个数——这个念头直到公元 5 世纪才在印度定下来，欧洲又花了近千年才接受它。' },
+{ id: 'f13', ks: ['like-terms', 'monomial'], t: 'x 为什么代表未知数',
+  b: '花拉子米管未知数叫「某物」，阿拉伯语 shay’。传到西班牙写成 xay，慢慢缩成一个 x。笛卡尔后来定了规矩：已知数用 a b c，未知数用 x y z。' },
+{ id: 'f14', ks: ['stat'], t: '平均数是天文学家发明的',
+  b: '测星星位置每次都有误差。天文学家发现把多次测量取平均，误差会互相抵消。平均数最早不是用来算成绩的，是用来对付误差的。' },
+{ id: 'f15', ks: ['eq-word', 'word-sumdiff'], t: '四千年前的应用题',
+  b: '古埃及莱因德纸草书里有这么一道：「某数加上它的七分之一等于 19，求某数。」和你今天做的方程应用题几乎一模一样。' },
+{ id: 'f16', ks: ['rat-mixed', 'sign-mix', 'rat-muldiv'], t: '负负得正不是规定，是被逼出来的',
+  b: '如果 (−1)×(−1) 等于 −1，乘法分配律立刻自相矛盾：(−1)×(1−1) 会算出两个不同答案。数学家不是随便定的，是因为只有负负得正，其他规则才不打架。' },
+{ id: 'f17', ks: ['power-frac', 'power'], t: '棋盘上的麦子',
+  b: '传说发明国际象棋的人只要一个赏赐：第一格 1 粒麦，每格翻倍。到第 64 格是 2⁶³ 粒，全世界几千年的收成都不够。这就是乘方。' },
+{ id: 'f18', ks: ['calc-order', 'paren-nest'], t: '先乘后加是约定，不是天理',
+  b: '运算顺序是数学家为了少写括号约的规矩。没有这个约定，3+4×5 就得写成 3+(4×5) 才不含糊。你背的规则，本质是一份省事的合同。' },
+{ id: 'f19', ks: ['percent', 'ratio'], t: '百分号是写快了缩出来的',
+  b: '意大利商人写 per cento（每一百），写快了缩成 per c̸o，再快就成了 %。两个小圈加一道斜线，意思就是「分母是 100」。' },
+{ id: 'f21', ks: ['unit'], t: '「米」原本是地球的尺寸',
+  b: '1791 年法国人定义 1 米 = 从北极到赤道距离的千万分之一。后来发现测量有偏差，但米这个长度就这么定下来了。你换算的每一个单位背后都有一场吵架。' },
+{ id: 'f22', ks: ['word-speed', 'word-work'], t: '追及问题救过命',
+  b: '二战时英国靠「追及」这类计算推算德国潜艇位置：知道对方速度和自己速度，算出多久能拦上。学校里的行程题，原型是真实的航海和作战问题。' },
+{ id: 'f23', ks: ['remove-paren', 'like-terms'], t: '括号是印刷厂逼出来的',
+  b: '16 世纪之前数学家用一条横线盖住整个式子表示「这些是一体的」，印刷时特别难排。于是改用了 ( ) 这种一行就能打完的写法，沿用至今。' },
+{ id: 'f24', ks: ['neg-frac', 'frac-add'], t: '分数线的横杠有名字',
+  b: '那条横线叫 vinculum，拉丁语「捆绳」的意思——它的作用就是把上下两部分捆成一个整体。所以分数线天然带括号功能，这也是为什么 (a+b)/2 不用再加括号。' },
+{ id: 'f20', ks: ['decimal', 'neg-frac'], t: '小数点差点长成别的样子',
+  b: '16 世纪欧洲的小数写法五花八门：有人用竖线，有人用逗号，有人在整数部分下面划横线。今天英美用点、欧洲大陆用逗号，就是那场混战留下的。' }
+];
+/* 挑一条：优先和今天知识点相关且没看过的 */
+function pickFact(ks, seen) {
+  seen = seen || [];
+  const rel = FACTS.filter(f => f.ks.some(k => ks.indexOf(k) >= 0) && seen.indexOf(f.id) < 0);
+  if (rel.length) return pick(rel);
+  const any = FACTS.filter(f => seen.indexOf(f.id) < 0);
+  if (any.length) return pick(any);
+  const rel2 = FACTS.filter(f => f.ks.some(k => ks.indexOf(k) >= 0));
+  return rel2.length ? pick(rel2) : pick(FACTS);
 }

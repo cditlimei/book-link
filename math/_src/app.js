@@ -54,7 +54,9 @@ function fresh() {
     mastery: {},
     wrong: [],
     logs: {},
-    trackOverride: {}
+    trackOverride: {},
+    facts: [],
+    boss: {}
   };
 }
 function load() {
@@ -64,6 +66,8 @@ function load() {
   ['diag', 'mastery', 'logs', 'trackOverride'].forEach(k => { if (!DB[k]) DB[k] = {}; });
   if (!DB.wrong) DB.wrong = [];
   if (!DB.queue) DB.queue = [];
+  if (!DB.facts) DB.facts = [];
+  if (!DB.boss) DB.boss = {};
   if (!DB.profile) DB.profile = fresh().profile;
   save();
 }
@@ -92,6 +96,16 @@ function bump(k, ok) {
   if (!m.r20) m.r20 = [];
   m.total++; if (ok) m.right++;
   m.r20.push(ok ? 1 : 0); if (m.r20.length > 20) m.r20.shift();
+}
+/* 按近况选难度档：>90% 升到 3 档，<60% 降到 1 档，中间维持 2 档。
+   目标把正确率稳在 85% 附近（Wilson et al. 2019 的最优学习区）。*/
+function pickLv(k) {
+  const m = DB.mastery[k];
+  if (!m || !m.r20 || m.r20.length < 6) return 2;
+  const r = m.r20.slice(-10).reduce((a, b) => a + b, 0) / Math.min(10, m.r20.length);
+  if (r >= 0.9) return 3;
+  if (r < 0.6) return 1;
+  return 2;
 }
 /* 近 20 题正确率，用于判断是否出队 */
 function recent(k) { const m = DB.mastery[k]; if (!m || !m.r20 || m.r20.length < 8) return null; return m.r20.reduce((a, b) => a + b, 0) / m.r20.length; }
@@ -158,24 +172,50 @@ function buildToday() {
 
   const fq = [];
   const half = focus2 ? Math.ceil(nFocus / 2) : nFocus;
-  genMany(focusK, half).forEach(q => fq.push(q));
-  if (focus2) genMany(focus2, nFocus - half).forEach(q => fq.push(q));
+  genMany(focusK, half, pickLv(focusK)).forEach(q => fq.push(q));
+  if (focus2) genMany(focus2, nFocus - half, pickLv(focus2)).forEach(q => fq.push(q));
 
   const tq = [];
   /* 跟课段开头先放一对梯子题：小学锚点 → 只多一个负号的初一题 */
   const bk = trackKs.filter(k => typeof BRIDGE !== 'undefined' && BRIDGE[k]);
   const br = bk.length ? genBridge(pick(bk)) : null;
   if (br) { tq.push(br[0]); tq.push(br[1]); }
-  for (let i = 0; i < nTrack; i++) tq.push(genQ(trackKs[i % trackKs.length]));
+  for (let i = 0; i < nTrack; i++) { const kk = trackKs[i % trackKs.length]; tq.push(genQ(kk, pickLv(kk))); }
 
   const rv = dueWrongs().slice(0, Math.round(6 * scale));
 
+  /* 开工前拍一张掌握度快照，晚上用来算「今天变强了什么」 */
+  const snap = {};
+  Object.keys(DB.mastery).forEach(k => { const m = DB.mastery[k]; snap[k] = { right: m.right, total: m.total }; });
+
   const log = {
     date: t, week: wi.w, phase: wi.phase, trackCh, focusK, focus2,
+    lv: { focus: pickLv(focusK), track: pickLv(trackKs[0]) },
     qs: { warm, focus: fq, track: tq, review: rv },
     res: { warm: [], focus: [], track: [], review: [] },
-    wrongToday: [], startedAt: Date.now(), done: false
+    wrongToday: [], snap: snap, factsToday: [], mini: false,
+    wrongCountAtStart: DB.wrong.length, startedAt: Date.now(), done: false
   };
+  DB.logs[t] = log; save();
+  return log;
+}
+
+/* 状态不好的日子：5 题保命版。断档一天比做半小时崩掉更伤，
+   参照她英语计划里那条经验——落课不补课、改时段。 */
+function buildMini() {
+  const t = today();
+  refreshQueue();
+  const fk = DB.queue[0] || P_TOPICS[0];
+  const rv = dueWrongs().slice(0, 3);
+  const need = 5 - rv.length;
+  const log = {
+    date: t, week: weekInfo().w, phase: weekInfo().phase, trackCh: '迷你模式', focusK: fk, focus2: null,
+    qs: { warm: [], focus: genMany(fk, need, 1), track: [], review: rv },
+    res: { warm: [], focus: [], track: [], review: [] },
+    wrongToday: [], snap: {}, factsToday: [], mini: true,
+    wrongCountAtStart: DB.wrong.length, startedAt: Date.now(), done: false
+  };
+  Object.keys(DB.mastery).forEach(k => { const m = DB.mastery[k]; log.snap[k] = { right: m.right, total: m.total }; });
   DB.logs[t] = log; save();
   return log;
 }
@@ -241,6 +281,40 @@ function finishDiag(qs, res) {
   save();
 }
 
+/* 今天变强了什么：只跟他自己的过去比，不跟及格线比。
+   数学自我效能感是焦虑影响成绩的中介，所以每天必须让他看见「我在变好」。*/
+function gains() {
+  const log = DB.logs[today()];
+  if (!log) return [];
+  const out = [];
+  Object.keys(DB.mastery).forEach(k => {
+    const now = DB.mastery[k], was = log.snap[k];
+    if (!now || !now.total) return;
+    const addN = now.total - (was ? was.total : 0);
+    if (addN <= 0) return;
+    const addR = now.right - (was ? was.right : 0);
+    if (!was || !was.total) {
+      if (addR > 0) out.push({ big: addR + '/' + addN, txt: '第一次练「' + TMAP[k].name + '」就做对 ' + addR + ' 道' });
+      return;
+    }
+    const before = was.right / was.total, after = now.right / now.total;
+    if (after - before >= 0.02) out.push({ big: '+' + Math.round((after - before) * 100) + '%', txt: TMAP[k].name + ' 从 ' + Math.round(before * 100) + '% 提到 ' + Math.round(after * 100) + '%' });
+    else if (addR === addN && addN >= 2) out.push({ big: addN + '/' + addN, txt: TMAP[k].name + ' 今天全对' });
+  });
+  const gradN = (log.wrongCountAtStart || 0) + (log.wrongToday || []).length - DB.wrong.length;
+  if (gradN > 0) out.push({ big: gradN + ' 道', txt: '错题毕业，从错题本里划掉了' });
+  const rv = (log.res.review || []);
+  if (rv.length && rv.filter(r => r.ok).length) out.push({ big: rv.filter(r => r.ok).length + '/' + rv.length, txt: '之前错过的题，今天做对了' });
+  out.sort((a, b) => (b.txt.indexOf('第一次') >= 0 ? 1 : 0) - (a.txt.indexOf('第一次') >= 0 ? 1 : 0));
+  return out.slice(0, 4);
+}
+/* 该知识点当前连对数，用于给真实的反馈而不是空话 */
+function streakOf(k) {
+  const m = DB.mastery[k]; if (!m || !m.r20) return 0;
+  let n = 0; for (let i = m.r20.length - 1; i >= 0; i--) { if (m.r20[i]) n++; else break; }
+  return n;
+}
+
 /* ============================================================
    UI
    ============================================================ */
@@ -276,7 +350,24 @@ function runner(host, qs, opt) {
   const body = el('div'); box.appendChild(body);
 
   function step() {
-    if (i >= qs.length) { box.innerHTML = ''; box.appendChild(el('div', 'done', '<b>这一组做完了</b><div class="sub">正确 ' + res.filter(Boolean).length + ' / ' + qs.length + '</div>')); if (opt.onDone) opt.onDone(res); return; }
+    if (i >= qs.length) {
+      box.innerHTML = '';
+      box.appendChild(el('div', 'done', '<b>这一组做完了</b><div class="sub">正确 ' + res.filter(Boolean).length + ' / ' + qs.length + '</div>'));
+      if (opt.fact !== false) {
+        const lg = DB.logs[today()];
+        if (lg && (lg.factsToday || []).length < 2) {
+          const ks = qs.map(x => x.topic).filter(Boolean);
+          const f = pickFact(ks, DB.facts);
+          if (f) {
+            DB.facts.push(f.id); if (DB.facts.length > 200) DB.facts.shift();
+            lg.factsToday.push(f.id); save();
+            box.appendChild(el('div', 'fact', '<div class="ftag">数学冷知识 · 解锁</div><b>' + esc(f.t) + '</b><p>' + esc(f.b) + '</p>'));
+          }
+        }
+      }
+      if (opt.onDone) opt.onDone(res);
+      return;
+    }
     const q = qs[i];
     head.innerHTML = '<span>' + opt.title + '</span><span class="cnt">' + (i + 1) + ' / ' + qs.length + '</span>';
     fill.style.width = (i / qs.length * 100) + '%';
@@ -292,7 +383,14 @@ function runner(host, qs, opt) {
       res[i] = ok;
       if (opt.onEach) opt.onEach(q, ok, val, i);
       fb.className = 'fb ' + (ok ? 'ok' : 'no');
-      let h = '<div class="fbhead">' + (ok ? '✓ 对了' : '✗ 不对') + '</div>';
+      let head;
+      if (ok) {
+        const st = q.topic ? streakOf(q.topic) : 0;
+        head = '✓ 对了' + (st >= 3 ? ' · 这个知识点连对 ' + st + ' 题了' : '');
+      } else {
+        head = '✗ 这次不对 —— 已经放进错题本，明天再考你一次';
+      }
+      let h = '<div class="fbhead">' + head + '</div>';
       if (!ok) h += '<div class="right">正确答案：<b>' + sup(esc(q.ans)) + '</b></div>';
       if (opt.showSol !== false && q.sol) h += '<ol class="sol">' + q.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol>';
       h += '<button class="btn next">下一题 →</button>';
@@ -349,8 +447,21 @@ function viewToday(m) {
     { k: 'review', name: '④ 错题重做', sub: log.qs.review.length ? '到期错题 ' + log.qs.review.length + ' 道' : '今天没有到期错题', qs: log.qs.review }
   ];
   const hdr = el('div', 'card');
-  hdr.innerHTML = '<div class="row"><div><h2>' + cnDate(today()) + '</h2><div class="sub">' + wi.label + ' · 本周跟课：' + esc(log.trackCh) + '</div></div></div>';
+  const lvTxt = log.mini ? '迷你模式' : ({ 1: '题目已自动调简单一档', 2: '', 3: '题目已自动调难一档' })[log.lv ? log.lv.focus : 2] || '';
+  hdr.innerHTML = '<div class="row"><div><h2>' + cnDate(today()) + '</h2><div class="sub">' + wi.label + ' · 本周跟课：' + esc(log.trackCh)
+    + (lvTxt ? '<br><span class="lvtag">' + lvTxt + '</span>' : '') + '</div></div></div>';
   m.appendChild(hdr);
+
+  /* 今天变强了什么——放在最上面，先看到进步再看到任务 */
+  const gs = gains();
+  const anyDone = ['warm', 'focus', 'track', 'review'].some(k => (log.res[k] || []).length);
+  if (gs.length) {
+    const gc = el('div', 'card gain');
+    gc.innerHTML = '<b>今天你变强了这些</b>' + gs.map(g => '<div class="grow"><i>' + esc(g.big) + '</i><span>' + esc(g.txt) + '</span></div>').join('');
+    m.appendChild(gc);
+  } else if (anyDone) {
+    m.appendChild(el('div', 'card gain', '<b>今天守住了</b><div class="sub">没有退步。基础题稳住不掉，本来就是这个阶段该拿到的东西。</div>'));
+  }
 
   parts.forEach(p => {
     const doneN = log.res[p.k].length, totN = p.qs.length;
@@ -373,6 +484,46 @@ function viewToday(m) {
     }
     m.appendChild(c);
   });
+
+  /* 本周挑战：3 道最难档的题，攻下来解锁一条彩蛋。用内容当奖励，不用积分 */
+  if (!log.mini && wi.phase === 'term') {
+    const bkey = 'W' + wi.w;
+    const doneB = DB.boss[bkey];
+    const bc = el('div', 'card boss' + (doneB ? ' fin' : ''));
+    bc.innerHTML = '<div class="row"><div><b>本周挑战 · ' + bkey + '</b><div class="sub">'
+      + (doneB ? '这周的挑战已经攻下来了，下周一有新的。' : '3 道本周内容里最难档的题。不计入正确率，做不出来不影响任何东西。') + '</div></div></div>';
+    if (!doneB) {
+      const bb = el('button', 'btn', '来一把');
+      bb.onclick = () => {
+        const tr = trackOf(wi.w);
+        const bqs = tr.ks.slice(0, 3).concat(tr.ks, tr.ks).slice(0, 3).map(k => genQ(k, 3));
+        m.innerHTML = '';
+        const back = el('button', 'btn ghost', '← 回今日'); back.onclick = () => go('today'); m.appendChild(back);
+        runner(m, bqs, {
+          title: '本周挑战', fact: false,
+          onDone: res => {
+            DB.boss[bkey] = { date: today(), right: res.filter(Boolean).length };
+            const f = pickFact(tr.ks, DB.facts);
+            if (f) { DB.facts.push(f.id); m.appendChild(el('div', 'card fact', '<div class="ftag">挑战奖励 · 解锁一条冷知识</div><b>' + esc(f.t) + '</b><p>' + esc(f.b) + '</p>')); }
+            save();
+            const b2 = el('button', 'btn big', '回到今日任务'); b2.onclick = () => go('today'); m.appendChild(b2);
+          }
+        });
+      };
+      bc.appendChild(bb);
+    }
+    m.appendChild(bc);
+  }
+
+  /* 状态不好的日子：不硬撑，也不断档 */
+  if (!log.mini && !anyDone) {
+    const mc = el('div', 'card');
+    mc.innerHTML = '<b>今天状态不好？</b><div class="sub">换成 5 题的迷你版。断一天比硬撑到崩掉更难补回来。</div>';
+    const mb = el('button', 'btn ghost', '换成 5 题');
+    mb.onclick = () => { if (confirm('今天改成 5 题迷你版？')) { buildMini(); go('today'); } };
+    mc.appendChild(mb);
+    m.appendChild(mc);
+  }
 
   if (log.wrongToday.length) {
     const c = el('div', 'card note');
@@ -540,7 +691,9 @@ function viewParent(m) {
   tip.innerHTML = '<b>三条底线</b><ol class="q">'
     + '<li>不说「这么简单都不会」。他现在的问题是小学没打牢，不是不聪明。</li>'
     + '<li>只讲 2 道。讲多了他记不住，也会把 10 分钟拖成 40 分钟然后崩。</li>'
-    + '<li>让他讲、你听。他能把步骤说顺就算过关，说不出来的地方才是真漏洞。</li></ol>';
+    + '<li>让他讲、你听。他能把步骤说顺就算过关，说不出来的地方才是真漏洞。</li>'
+    + '<li>表扬要落在具体动作上：「你这次符号定对了」「你先算括号了」。别说「你真聪明」——'
+    + '夸天赋会让他下次遇到难题就认定「我不是这块料」，夸具体做对的步骤才顶用。</li></ol>';
   m.appendChild(tip);
 
   const w7 = weekReport();
