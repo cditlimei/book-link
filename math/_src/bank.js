@@ -14,6 +14,8 @@ function nCop(d) { const c = []; for (let i = 1; i < d; i++) if (gcd(i, d) === 1
 function divisors(n) { const r = []; for (let i = 1; i <= n; i++) if (n % i === 0) r.push(i); return r; }
 /* 负数套括号 */
 function P(x) { return x < 0 ? '(−' + (-x) + ')' : '' + x; }
+/* 裸数字用数学负号，别让题干里冒出半角 -3 */
+function N(x) { return x < 0 ? '−' + (-x) : '' + x; }
 /* 带符号连接，如 " − 3" / " + 5" */
 function S(x) { return x < 0 ? ' − ' + (-x) : ' + ' + x; }
 /* 形如 3x − 5 的一次式 */
@@ -104,7 +106,7 @@ const TOPICS = [
     const L = d1 * d2 / gcd(d1, d2);
     const a = n1 * L / d1, b = n2 * L / d2;
     const f = frac(plus ? a + b : a - b, L);
-    return { q: `计算（结果化成最简分数）：${n1}/${d1} ${plus ? '+' : '−'} ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
+    return { q: `${n1}/${d1} ${plus ? '+' : '−'} ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
       sol: [`公分母取 ${L}`, `${n1}/${d1} = ${a}/${L}，${n2}/${d2} = ${b}/${L}`,
             `${a}/${L} ${plus ? '+' : '−'} ${b}/${L} = ${plus ? a + b : a - b}/${L} = ${fstr(f)}`] };
   }
@@ -118,7 +120,7 @@ const TOPICS = [
     const a = nCop(b), c = nCop(d);
     const mul = Math.random() < 0.5;
     const f = mul ? frac(a * c, b * d) : frac(a * d, b * c);
-    return { q: `计算（结果化成最简分数）：${a}/${b} ${mul ? '×' : '÷'} ${c}/${d} = ?`, ans: fstr(f), type: 'frac',
+    return { q: `${a}/${b} ${mul ? '×' : '÷'} ${c}/${d} = ?`, ans: fstr(f), type: 'frac',
       sol: mul ? [`分子乘分子，分母乘分母：${a * c}/${b * d}`, `约简 = ${fstr(f)}`]
                : [`除以一个分数 = 乘它的倒数：${a}/${b} × ${d}/${c}`, `= ${a * d}/${b * c} = ${fstr(f)}`] };
   }
@@ -131,7 +133,7 @@ const TOPICS = [
     if (t === 1) {
       const x = R(11, 99) / 10, y = R(2, 9);
       const ans = Math.round(x * y * 10) / 10;
-      return { q: `计算：${x} × ${y} = ?`, ans: '' + ans, type: 'num',
+      return { q: `${x} × ${y} = ?`, ans: '' + ans, type: 'num',
         sol: [`先当整数算：${x * 10} × ${y} = ${x * 10 * y}`, `原来一共 1 位小数，结果点上 1 位：${ans}`] };
     }
     if (t === 2) {
@@ -142,7 +144,7 @@ const TOPICS = [
     }
     const q0 = R(2, 9), dv = R(11, 49) / 10;
     const dd = Math.round(dv * q0 * 10) / 10;
-    return { q: `计算：${dd} ÷ ${dv} = ?`, ans: '' + q0, type: 'num',
+    return { q: `${dd} ÷ ${dv} = ?`, ans: '' + q0, type: 'num',
       sol: [`除数变整数：两边同时乘 10 → ${dd * 10} ÷ ${dv * 10}`, `= ${q0}`] };
   }
 },
@@ -291,7 +293,7 @@ const TOPICS = [
   gen() {
     const t = R(1, 4);
     if (t === 1) { const a = R(2, 20) * pick([1, -1]);
-      return { q: `${a} 的相反数是 ?`, ans: '' + (-a), type: 'num', sol: [`只改符号不改大小：${-a}`] }; }
+      return { q: `${N(a)} 的相反数是 ?`, ans: '' + (-a), type: 'num', sol: [`只改符号不改大小：${N(-a)}`] }; }
     if (t === 2) { const d = R(2, 11), n = nCop(d), s = pick([1, -1]);
       return { q: `${s < 0 ? '−' : ''}${n}/${d} 的倒数是 ?`, ans: fstr(frac(s * d, n)), type: 'frac',
         sol: [`分子分母对调，符号不变：${fstr(frac(s * d, n))}`] }; }
@@ -310,7 +312,7 @@ const TOPICS = [
     const M = LV === 1 ? 9 : LV === 3 ? 30 : 15;
     const a = R(-M, M) || 3, b = R(-M, M) || -4, c = R(-M, M) || 5;
     const ans = a + b - c;
-    return { q: `计算：${P(a)} + ${P(b)} − ${P(c)} = ?`, ans: '' + ans, type: 'num',
+    return { q: `${P(a)} + ${P(b)} − ${P(c)} = ?`, ans: '' + ans, type: 'num',
       sol: [`减 ${P(c)} 就是加它的相反数 ${P(-c)}`, `${P(a)} + ${P(b)} + ${P(-c)}`, `= ${a + b} + ${P(-c)} = ${ans}`] };
   }
 },
@@ -322,7 +324,7 @@ const TOPICS = [
     const b = Math.abs(c) * k * pick([1, -1]);
     const ans = a * b / c;
     const negs = [a, b, c].filter(x => x < 0).length;
-    return { q: `计算：${P(a)} × ${P(b)} ÷ ${P(c)} = ?`, ans: '' + ans, type: 'num',
+    return { q: `${P(a)} × ${P(b)} ÷ ${P(c)} = ?`, ans: '' + ans, type: 'num',
       sol: [`先看符号：有 ${negs} 个负号，${negs % 2 === 0 ? '偶数个 → 结果为正' : '奇数个 → 结果为负'}`,
             `再算绝对值：${Math.abs(a)} × ${Math.abs(b)} ÷ ${Math.abs(c)} = ${Math.abs(ans)}`, `所以 = ${ans}`] };
   }
@@ -333,7 +335,7 @@ const TOPICS = [
   gen() {
     const a = R(-15, -2), b = R(1, 9), c = R(1, 9), d = R(2, 15);
     const ans = Math.abs(a) + Math.abs(b - c) - d;
-    return { q: `计算：|−${-a}| + |${b} − ${c}| − |−${d}| = ?`, ans: '' + ans, type: 'num',
+    return { q: `|−${-a}| + |${b} − ${c}| − |−${d}| = ?`, ans: '' + ans, type: 'num',
       sol: [`先把每个绝对值里面算出来：|${b}−${c}| = |${b - c}| = ${Math.abs(b - c)}`,
             `${-a} + ${Math.abs(b - c)} − ${d} = ${ans}`] };
   }
@@ -343,13 +345,13 @@ const TOPICS = [
   ask: '这是初一最大的坑：让他读出来——是「负数的平方」还是「平方的相反数」。',
   gen() {
     const b = R(2, LV === 1 ? 4 : 6), form = LV === 1 ? R(1, 2) : R(1, 4);
-    if (form === 1) return { q: `计算：(−${b})² = ?`, ans: '' + b * b, type: 'num',
+    if (form === 1) return { q: `(−${b})² = ?`, ans: '' + b * b, type: 'num',
       sol: [`底数是 −${b}，(−${b})² = (−${b})×(−${b}) = ${b * b}`, `负负得正`] };
-    if (form === 2) return { q: `计算：−${b}² = ?`, ans: '' + (-b * b), type: 'num',
+    if (form === 2) return { q: `−${b}² = ?`, ans: '' + (-b * b), type: 'num',
       sol: [`底数只是 ${b}，负号在外面`, `−${b}² = −(${b}×${b}) = ${-b * b}`] };
-    if (form === 3) return { q: `计算：(−${b})³ = ?`, ans: '' + (-b * b * b), type: 'num',
+    if (form === 3) return { q: `(−${b})³ = ?`, ans: '' + (-b * b * b), type: 'num',
       sol: [`三个负数相乘，奇数个负号 → 结果为负`, `= ${-b * b * b}`] };
-    return { q: `计算：−(−${b})² = ?`, ans: '' + (-b * b), type: 'num',
+    return { q: `−(−${b})² = ?`, ans: '' + (-b * b), type: 'num',
       sol: [`先算 (−${b})² = ${b * b}`, `外面还有一个负号：${-b * b}`] };
   }
 },
@@ -361,13 +363,13 @@ const TOPICS = [
     if (t === 1) {
       const a = R(2, LV === 1 ? 3 : 5), b = R(2, 4), d = R(1, 9);
       const ans = -a * a - b * b + d;
-      return { q: `计算：−${a}² + (−${b})³ ÷ ${b} − (−${d}) = ?`, ans: '' + ans, type: 'num',
+      return { q: `−${a}² + (−${b})³ ÷ ${b} − (−${d}) = ?`, ans: '' + ans, type: 'num',
         sol: [`−${a}² = ${-a * a}（负号在外）`, `(−${b})³ = ${-b * b * b}，÷ ${b} = ${-b * b}`,
               `− (−${d}) = + ${d}`, `${-a * a} + ${P(-b * b)} + ${d} = ${ans}`] };
     }
     const a = R(2, 5), b = R(2, 9), c0 = R(2, 6), k = R(2, 5), c = c0 * k;
     const real = a * a * b + c / c0;
-    return { q: `计算：(−${a})² × ${b} + ${c} ÷ ${c0} = ?`, ans: '' + real, type: 'num',
+    return { q: `(−${a})² × ${b} + ${c} ÷ ${c0} = ?`, ans: '' + real, type: 'num',
       sol: [`(−${a})² = ${a * a}`, `${a * a} × ${b} = ${a * a * b}`, `${c} ÷ ${c0} = ${c / c0}`, `合并 = ${real}`] };
   }
 },
@@ -383,19 +385,19 @@ const TOPICS = [
     const t = lvT(3);
     if (t === 1) {
       const a = lvR(2, 15), b = R(2, LV === 1 ? 6 : 9), c = -R(2, LV === 1 ? 6 : 9);
-      return { q: `计算：${a} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
+      return { q: `${a} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
         sol: [`中间的「−」是减法运算，${P(c)} 的负号是这个数自带的，两个不能合成一个`,
               `先算乘法：${b} × ${P(c)} = ${b * c}`,
               `再减：${a} − ${P(b * c)} = ${a} + ${-b * c} = ${a - b * c}`] };
     }
     if (t === 2) {
       const a = R(2, 15), c0 = R(2, 6), k = R(2, 5), b = -c0 * k;
-      return { q: `计算：${a} + ${P(b)} ÷ ${c0} = ?`, ans: '' + (a + b / c0), type: 'num',
+      return { q: `${a} + ${P(b)} ÷ ${c0} = ?`, ans: '' + (a + b / c0), type: 'num',
         sol: [`先算除法：${P(b)} ÷ ${c0} = ${b / c0}`,
               `再算加法：${a} + ${P(b / c0)} = ${a + b / c0}`] };
     }
     const a = -R(2, 12), b = R(2, 9), c = -R(2, 9);
-    return { q: `计算：${P(a)} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
+    return { q: `${P(a)} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
       sol: [`三个符号各管各的：开头的负号属于 ${-a}，中间是减法，最后括号里的负号属于 ${-c}`,
             `${b} × ${P(c)} = ${b * c}`,
             `${a} − ${P(b * c)} = ${a} + ${-b * c} = ${a - b * c}`] };
@@ -409,14 +411,14 @@ const TOPICS = [
     if (t === 1) {
       const a = lvR(2, 12), b = lvR(2, 12), c = R(2, 9), d = R(2, 9);
       const ans = (a - b) - (-c + d);
-      return { q: `计算：(${a} − ${b}) − (−${c} + ${d}) = ?`, ans: '' + ans, type: 'num',
+      return { q: `(${a} − ${b}) − (−${c} + ${d}) = ?`, ans: '' + ans, type: 'num',
         sol: [`第一个括号先算出来：${a} − ${b} = ${a - b}`,
               `第二个括号前面是「−」，里面两项都要变号：−(−${c} + ${d}) = +${c} − ${d}`,
               `${a - b} + ${c} − ${d} = ${ans}`] };
     }
     const a = R(5, 20), b = R(2, 12), c = R(2, 9), d = R(2, 9);
     const ans = a - (b - (c - d));
-    return { q: `计算：${a} − [${b} − (${c} − ${d})] = ?`, ans: '' + ans, type: 'num',
+    return { q: `${a} − [${b} − (${c} − ${d})] = ?`, ans: '' + ans, type: 'num',
       sol: [`从最里面的小括号开始：${c} − ${d} = ${c - d}`,
             `中括号里：${b} − ${P(c - d)} = ${b - (c - d)}`,
             `${a} − ${P(b - (c - d))} = ${ans}`] };
@@ -437,7 +439,7 @@ const TOPICS = [
       const f = frac(A + B, L);
       const t1 = (s1 < 0 ? '−' : '') + n1 + '/' + d1;
       const t2 = s2 < 0 ? '(−' + n2 + '/' + d2 + ')' : n2 + '/' + d2;
-      return { q: `计算（结果化成最简分数）：${t1} + ${t2} = ?`, ans: fstr(f), type: 'frac',
+      return { q: `${t1} + ${t2} = ?`, ans: fstr(f), type: 'frac',
         sol: [`通分，公分母 ${L}：${t1} = ${A}/${L}，${(s2 < 0 ? '−' : '') + n2 + '/' + d2} = ${B}/${L}`,
               `分母相同，分子直接加：${A} + ${P(B)} = ${A + B}`,
               `${A + B}/${L} 约简 = ${fstr(f)}`] };
@@ -446,7 +448,7 @@ const TOPICS = [
     const d2 = pick([2, 3, 4, 6].filter(x => x !== d1)), n2 = nCop(d2);
     const A = frac(-(w * d1 + n1), d1), B = frac(n2, d2);
     const f = frac(A.n * B.d + B.n * A.d, A.d * B.d);
-    return { q: `计算（结果化成最简分数）：−${w} ${n1}/${d1} + ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
+    return { q: `−${w} ${n1}/${d1} + ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
       sol: [`带分数先化成假分数：−${w} ${n1}/${d1} = ${fstr(A)}`,
             `再通分相加：${fstr(A)} + ${n2}/${d2}`,
             `= ${fstr(f)}`] };
@@ -460,13 +462,13 @@ const TOPICS = [
     const sup = e === 2 ? '²' : '³';
     if (Math.random() < 0.5) {
       const v = frac(Math.pow(n, e) * (e % 2 ? -1 : 1), Math.pow(d, e));
-      return { q: `计算：(−${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
+      return { q: `(−${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
         sol: [`括号里整个 −${n}/${d} 是底数，分子分母都要乘方`,
               `${e} 个负数相乘，${e % 2 ? '奇数个 → 结果为负' : '偶数个 → 结果为正'}`,
               `= ${fstr(v)}`] };
     }
     const v = frac(-Math.pow(n, e), Math.pow(d, e));
-    return { q: `计算：−(${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
+    return { q: `−(${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
       sol: [`底数只是 ${n}/${d}，负号在括号外面，等乘方算完再取相反数`,
             `(${n}/${d})${sup} = ${fstr(frac(Math.pow(n, e), Math.pow(d, e)))}`,
             `前面还有负号 = ${fstr(v)}`] };
@@ -549,8 +551,8 @@ const TOPICS = [
   gen() {
     const t = lvT(3);
     if (t === 1) { const x = LV === 1 ? R(1, 8) : R(-6, 9), m = R(2, LV === 1 ? 5 : 7), n = R(-9, 9);
-      return { q: `解方程：${m}x${S(n)} = ${m * x + n}，x = ?`, ans: '' + x, type: 'num',
-        sol: [`把常数移到右边（变号）：${m}x = ${m * x + n}${S(-n)} = ${m * x}`, `两边除以 ${m}：x = ${x}`] }; }
+      return { q: `解方程：${m}x${S(n)} = ${N(m * x + n)}，x = ?`, ans: '' + x, type: 'num',
+        sol: [`把常数移到右边（变号）：${m}x = ${N(m * x + n)}${S(-n)} = ${N(m * x)}`, `两边除以 ${m}：x = ${N(x)}`] }; }
     if (t === 2) { const x = R(-5, 8), m = R(3, 8); let n = R(2, 7); if (n === m) n = m + 1;
       const a = R(-9, 9), b = (m - n) * x + a;
       return { q: `解方程：${m}x${S(a)} = ${n}x${S(b)}，x = ?`, ans: '' + x, type: 'num',
@@ -558,7 +560,7 @@ const TOPICS = [
     const b1 = pick([2, 3, 4]); let d1 = pick([2, 3, 6]); if (d1 === b1) d1 = b1 + 1;
     const k1 = R(1, 5), k2 = R(1, 5), x = R(-4, 14);
     const a = b1 * k1 - x, c = x - d1 * k2, e = k1 - k2;
-    return { q: `解方程：(x${S(a)})/${b1} − (x${S(c)})/${d1} = ${e}，x = ?`, ans: '' + x, type: 'num',
+    return { q: `解方程：(x${S(a)})/${b1} − (x${S(c)})/${d1} = ${N(e)}，x = ?`, ans: '' + x, type: 'num',
       sol: [`两边同乘分母的最小公倍数 ${b1 * d1 / gcd(b1, d1)}，去分母`,
             `注意：去分母后每个括号整体乘，别漏项`, `整理解得 x = ${x}`] };
   }
@@ -639,39 +641,39 @@ const TMAP = {}; TOPICS.forEach(t => TMAP[t.k] = t);
    出处：小学薄弱生衔接初一的通行做法——先算 5−3，再算 5−(−3)。
    ============================================================ */
 const BRIDGE = {
-  'rat-addsub': () => { const a = R(6, 18), b = R(2, 9);
-    return { p: { q: `${a} − ${b} = ?`, ans: '' + (a - b), type: 'num', sol: [`小学就会：${a - b}`] },
+  'rat-addsub': () => { const a = R(8, 18), b = R(2, a - 3);   /* 必须 a>b，锚点题得是他真会做的 */
+    return { p: { q: `${a} − ${b} = ?`, ans: '' + (a - b), type: 'num', sol: [`这道你小学就做过：${a - b}`, `记住这个数，下一题只多一个负号`] },
              m: { q: `${a} − (−${b}) = ?`, ans: '' + (a + b), type: 'num',
                   sol: [`和上面那道只差括号里的一个负号`, `减去 −${b}，等于加上 ${b}`, `${a} + ${b} = ${a + b}`] } }; },
 
   'rat-muldiv': () => { const a = R(3, 9), b = R(3, 9);
-    return { p: { q: `${a} × ${b} = ?`, ans: '' + a * b, type: 'num', sol: [`口诀就够：${a * b}`] },
+    return { p: { q: `${a} × ${b} = ?`, ans: '' + a * b, type: 'num', sol: [`乘法口诀就够：${a * b}`, `下一题的数字一样，只是前面多个负号`] },
              m: { q: `(−${a}) × ${b} = ?`, ans: '' + (-a * b), type: 'num',
                   sol: [`数字部分和上面一样是 ${a * b}`, `只有 1 个负号，奇数个 → 结果为负`, `= ${-a * b}`] } }; },
 
   'power': () => { const b = R(2, 5);
-    return { p: { q: `${b}³ = ?`, ans: '' + b * b * b, type: 'num', sol: [`${b}×${b}×${b} = ${b * b * b}`] },
+    return { p: { q: `${b}³ = ?`, ans: '' + b * b * b, type: 'num', sol: [`${b}×${b}×${b} = ${b * b * b}`, `下一题把底数换成 −${b}，看看结果会怎样`] },
              m: { q: `(−${b})³ = ?`, ans: '' + (-b * b * b), type: 'num',
                   sol: [`绝对值和上面一样是 ${b * b * b}`, `3 个负数相乘，奇数个 → 负`, `= ${-b * b * b}`] } }; },
 
   'neg-frac': () => { const d1 = pick([2, 3, 4, 6]), d2 = pick([2, 3, 4, 6].filter(x => x !== d1));
     const L = d1 * d2 / gcd(d1, d2);
     return { p: { q: `1/${d1} + 1/${d2} = ?`, ans: fstr(frac(L / d1 + L / d2, L)), type: 'frac',
-                  sol: [`公分母 ${L}，通分后相加 = ${fstr(frac(L / d1 + L / d2, L))}`] },
+                  sol: [`公分母 ${L}，通分后相加 = ${fstr(frac(L / d1 + L / d2, L))}`, `下一题通分的做法一字不改，只是第一项带负号`] },
              m: { q: `−1/${d1} + 1/${d2} = ?`, ans: fstr(frac(-L / d1 + L / d2, L)), type: 'frac',
                   sol: [`通分的做法和上面完全一样，公分母还是 ${L}`, `只是第一项带负号：${-L / d1}/${L} + ${L / d2}/${L}`,
                         `= ${fstr(frac(-L / d1 + L / d2, L))}`] } }; },
 
   'like-terms': () => { const a = R(2, 6), b = R(2, 6), n = R(3, 9);
     return { p: { q: `${a} × ${n} + ${b} × ${n} = ?（用简便方法）`, ans: '' + (a + b) * n, type: 'num',
-                  sol: [`都有 ${n}，提出来：(${a}+${b}) × ${n} = ${(a + b) * n}`] },
+                  sol: [`都有 ${n}，提出来：(${a}+${b}) × ${n} = ${(a + b) * n}`, `下一题把 ${n} 换成字母 a，做法完全一样`] },
              m: { q: `化简：${a}a + ${b}a = ?（填合并后 a 前面的数）`, ans: '' + (a + b), type: 'num',
                   sol: [`把上面那道的 ${n} 换成字母 a，做法一样`, `${a} 个 a 加 ${b} 个 a = ${a + b} 个 a`,
                         `所以是 ${a + b}a，系数 ${a + b}`] } }; },
 
-  'remove-paren': () => { const a = R(10, 20), b = R(2, 6), c = R(2, 6);
+  'remove-paren': () => { const b = R(2, 6), c = R(2, 6), a = R(b + c + 2, 24);
     return { p: { q: `${a} − (${b} + ${c}) = ?`, ans: '' + (a - b - c), type: 'num',
-                  sol: [`括号里先算：${b}+${c} = ${b + c}`, `${a} − ${b + c} = ${a - b - c}`] },
+                  sol: [`括号里先算：${b}+${c} = ${b + c}`, `${a} − ${b + c} = ${a - b - c}`, `下一题不许先算括号，直接去括号看符号`] },
              m: { q: `${a} − (${b} + ${c}) 去括号后等于 ${a} − ${b} ? ${c}，问号处是 + 还是 −？（填 1 表示 +，填 2 表示 −）`,
                   ans: '2', type: 'num',
                   sol: [`括号前是负号，里面每一项都要变号`, `${a} − ${b} − ${c}，所以问号是「−」`,
@@ -679,21 +681,21 @@ const BRIDGE = {
 
   'eval-expr': () => { const a = R(2, 5), b = R(1, 9), x = R(2, 5);
     return { p: { q: `当 x = ${x} 时，${a}x + ${b} = ?`, ans: '' + (a * x + b), type: 'num',
-                  sol: [`把 x 换成 ${x}：${a}×${x} + ${b} = ${a * x + b}`] },
+                  sol: [`把 x 换成 ${x}：${a}×${x} + ${b} = ${a * x + b}`, `下一题 x 变成负数，代入时记得加括号`] },
              m: { q: `当 x = −${x} 时，${a}x + ${b} = ?`, ans: '' + (-a * x + b), type: 'num',
                   sol: [`代入时把 x 用括号包起来：${a}×(−${x}) + ${b}`, `${a}×(−${x}) = ${-a * x}`,
                         `${-a * x} + ${b} = ${-a * x + b}`] } }; },
 
   'linear-eq': () => { const m = R(2, 7), x = R(2, 9), n = R(1, 12);
     return { p: { q: `解方程：${m}x + ${n} = ${m * x + n}，x = ?`, ans: '' + x, type: 'num',
-                  sol: [`两边减 ${n}，再除 ${m}：x = ${x}`] },
-             m: { q: `解方程：${m}x + ${n} = ${-m * x + n}，x = ?`, ans: '' + (-x), type: 'num',
-                  sol: [`步骤和上面一题一模一样：两边减 ${n}`, `${m}x = ${-m * x}`,
-                        `两边除 ${m}：x = ${-x}（初一开始，答案可以是负数）`] } }; },
+                  sol: [`两边减 ${n}，再除 ${m}：x = ${x}`, `下一题步骤一字不改，只是答案会是负数`] },
+             m: { q: `解方程：${m}x + ${n} = ${N(-m * x + n)}，x = ?`, ans: '' + (-x), type: 'num',
+                  sol: [`步骤和上面一题一模一样：两边减 ${n}`, `${m}x = ${N(-m * x)}`,
+                        `两边除 ${m}：x = ${N(-x)}（初一开始，答案可以是负数）`] } }; },
 
-  'sign-mix': () => { const a = R(5, 15), b = R(2, 6), c = R(2, 6);
+  'sign-mix': () => { const b = R(2, 6), c = R(2, 6), a = R(b * c + 1, b * c + 16);
     return { p: { q: `${a} − ${b} × ${c} = ?`, ans: '' + (a - b * c), type: 'num',
-                  sol: [`先乘后减：${b}×${c} = ${b * c}，${a} − ${b * c} = ${a - b * c}`] },
+                  sol: [`先乘后减：${b}×${c} = ${b * c}，${a} − ${b * c} = ${a - b * c}`, `下一题只把 ${c} 换成 −${c}，顺序不变`] },
              m: { q: `${a} − ${b} × (−${c}) = ?`, ans: '' + (a + b * c), type: 'num',
                   sol: [`顺序和上面一样，先算乘法：${b} × (−${c}) = ${-b * c}`,
                         `${a} − (−${b * c})，减负数变加正数`, `= ${a} + ${b * c} = ${a + b * c}`] } }; }

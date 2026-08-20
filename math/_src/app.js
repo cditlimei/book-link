@@ -411,72 +411,140 @@ function copyBrief(host) {
   } else showBrief(host, txt);
 }
 function showBrief(host, txt) {
-  const old = host.querySelector('.briefbox'); if (old) old.remove();
-  const ta = el('textarea', 'briefbox'); ta.value = txt || buildBrief(); ta.rows = 16; ta.readOnly = true;
+  const old = host.querySelector('.brief'); if (old) old.remove();
+  const ta = el('textarea', 'brief'); ta.value = txt || buildBrief(); ta.rows = 16; ta.readOnly = true;
   host.appendChild(ta);
   ta.focus(); ta.select();
   host.appendChild(el('div', 'sub', '自动复制没成功。长按上面的框全选复制，粘给 Claude。'));
 }
 
+
 /* ============================================================
-   UI
+   界面层
+   两套视图，分得很干净：
+     孩子看到 今天 / 重练 / 收藏 —— 只有正向信息和行动
+     家长区在右上角，放诊断分档、20 周计划、今晚讲哪 2 题、
+     进度摘要、设置、清空。可选 4 位 PIN。
+   孩子不该看到「你要补 6 项」的清单，也不该能把每天分钟数
+   调成 10 或者一键清空自己的记录。
    ============================================================ */
 const $ = s => document.querySelector(s);
-const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
-function sup(s) { return ('' + s).replace(/\^(-?\d+)/g, '<sup>$1</sup>'); }
+const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h !== undefined) e.innerHTML = h; return e; };
 function esc(s) { return ('' + s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
-
-let TAB = 'today';
-function go(tab) { TAB = tab; render(); window.scrollTo(0, 0); }
-
-function render() {
-  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
-  const m = $('#main'); m.innerHTML = '';
-  if (TAB === 'today') viewToday(m);
-  else if (TAB === 'diag') viewDiag(m);
-  else if (TAB === 'plan') viewPlan(m);
-  else if (TAB === 'wrong') viewWrong(m);
-  else if (TAB === 'parent') viewParent(m);
-  else if (TAB === 'data') viewData(m);
-  else if (TAB === 'set') viewSet(m);
+/* 所有要显示的数学文本都过这里：上标 + 半角负号统一成数学负号。
+   生成器里散落的 -7/60、= -12 混着题干的 −，看着很脏。
+   判定走 parseVal，两种负号都吃，所以这层纯显示、不影响对错。 */
+function sup(s) {
+  return ('' + s)
+    .replace(/\^(-?\d+)/g, '<sup>$1</sup>')
+    .replace(/(^|[\s=(（+×÷,，：|])-(\d)/g, '$1−$2');
+}
+function ans(s) { return sup(esc(s)); }
+/* 题干形态：纯表达式给大等宽，长文字题给正常行文，中间态压字号。
+   一行放不下会折成「= ?」孤零零一行，很难看，所以按长度分三档。 */
+function qClass(q) {
+  q = q || '';
+  const cn = q.replace(/[\s\d+\-−×÷=?()（）。，、：/²³|]/g, '').length;
+  if (cn > 8) return 'q long';
+  return q.length > 16 ? 'q mid' : 'q';
 }
 
-/* ---------- 通用：做题器 ---------- */
-function runner(host, qs, opt) {
-  /* opt: {title, onDone(res), onEach(q,ok,input,i), showSol} */
+const KID_TABS = [
+  { k: 'today', ic: '◉', n: '今天' },
+  { k: 'redo', ic: '◐', n: '重练' },
+  { k: 'coll', ic: '◇', n: '收藏' }
+];
+const P_TABS = [
+  { k: 'p-plan', n: '计划' }, { k: 'p-diag', n: '诊断' }, { k: 'p-tonight', n: '今晚' },
+  { k: 'p-data', n: '数据' }, { k: 'p-set', n: '设置' }
+];
+
+let VIEW = 'today';
+let PARENT_OK = false;        /* 本次会话是否已通过 PIN */
+function isParent(v) { return (v || VIEW).indexOf('p-') === 0; }
+
+function go(v) {
+  if (isParent(v) && DB.profile.pin && !PARENT_OK) { VIEW = 'p-lock'; render(); return; }
+  VIEW = v; render();
+  window.scrollTo(0, 0);
+}
+
+function render() {
+  document.body.classList.toggle('parent', isParent() || VIEW === 'p-lock');
+  const main = $('#main'); main.innerHTML = ''; main.className = '';
+  renderTop();
+  renderTabs();
+  const V = {
+    today: viewToday, redo: viewRedo, coll: viewColl,
+    'p-lock': viewLock, 'p-plan': viewPlan, 'p-diag': viewDiag,
+    'p-tonight': viewTonight, 'p-data': viewData, 'p-set': viewSet
+  };
+  (V[VIEW] || viewToday)(main);
+}
+
+function renderTop() {
+  const t = $('#top');
+  if (isParent() || VIEW === 'p-lock') {
+    t.innerHTML = '<div><span class="d">家长区</span><span class="w">孩子看到的是另一套界面</span></div>';
+    const b = el('button', 'pbtn', '回孩子视图'); b.onclick = () => { go('today'); }; t.appendChild(b);
+    return;
+  }
+  const wi = weekInfo();
+  const dd = parseD(today());
+  t.innerHTML = '<div><span class="d">' + (dd.getMonth() + 1) + '<i>月</i>' + dd.getDate() + '<i>日</i></span>'
+    + '<span class="w">' + '周' + '日一二三四五六'[dd.getDay()] + ' · ' + esc(wi.label) + '</span></div>';
+  const b = el('button', 'pbtn', '家长'); b.onclick = () => go('p-plan'); t.appendChild(b);
+}
+
+function renderTabs() {
+  const n = $('#tabs'); n.innerHTML = ''; n.className = 'tabs';
+  if (VIEW === 'doing' || VIEW === 'p-lock') { n.className = 'tabs hide'; return; }
+  const list = isParent() ? P_TABS : KID_TABS;
+  list.forEach(t => {
+    const b = el('button', VIEW === t.k ? 'on' : '', (t.ic ? '<b>' + t.ic + '</b>' : '') + t.n);
+    b.onclick = () => go(t.k); n.appendChild(b);
+  });
+}
+
+/* ============================================================
+   做题
+   题目居中放大、键盘钉在拇指区、答对答错都给强反馈
+   ============================================================ */
+function runner(qs, opt) {
+  VIEW = 'doing'; renderTabs();
+  const main = $('#main'); main.innerHTML = ''; main.className = 'full';
+  document.body.classList.remove('parent');
+  $('#top').innerHTML = '';
+  const bk = el('button', 'pbtn', '× 退出'); bk.onclick = () => go(opt.backTo || 'today');
+  $('#top').innerHTML = '<div><span class="d">' + esc(opt.title) + '</span></div>';
+  $('#top').appendChild(bk);
+
   let i = 0; const res = [];
-  const box = el('div', 'card');
-  host.appendChild(box);
-  const bar = el('div', 'pbar'); const fill = el('i'); bar.appendChild(fill);
-  const head = el('div', 'qhead');
-  box.appendChild(head); box.appendChild(bar);
-  const body = el('div'); box.appendChild(body);
+  const wrap = el('div', 'qwrap'); main.appendChild(wrap);
+  const dots = el('div', 'dots'); wrap.appendChild(dots);
+  const body = el('div', 'qbody'); wrap.appendChild(body);
+  const padSlot = el('div'); wrap.appendChild(padSlot);
+
+  function paintDots(judged) {
+    dots.innerHTML = '';
+    qs.forEach((q, n) => {
+      let c = '';
+      if (n < i || (n === i && judged !== undefined)) c = res[n] ? 'ok' : 'no';
+      else if (n === i) c = 'cur';
+      dots.appendChild(el('i', c));
+    });
+    if (judged !== undefined && dots.children[i]) dots.children[i].classList.add('pulse');
+  }
 
   function step() {
-    if (i >= qs.length) {
-      box.innerHTML = '';
-      box.appendChild(el('div', 'done', '<b>这一组做完了</b><div class="sub">正确 ' + res.filter(Boolean).length + ' / ' + qs.length + '</div>'));
-      if (opt.fact !== false) {
-        const lg = DB.logs[today()];
-        if (lg && (lg.factsToday || []).length < 2) {
-          const ks = qs.map(x => x.topic).filter(Boolean);
-          const f = pickFact(ks, DB.facts);
-          if (f) {
-            DB.facts.push(f.id); if (DB.facts.length > 200) DB.facts.shift();
-            lg.factsToday.push(f.id); save();
-            box.appendChild(el('div', 'fact', '<div class="ftag">数学冷知识 · 解锁</div><b>' + esc(f.t) + '</b><p>' + esc(f.b) + '</p>'));
-          }
-        }
-      }
-      if (opt.onDone) opt.onDone(res);
-      return;
-    }
+    if (i >= qs.length) return finish();
     const q = qs[i];
-    head.innerHTML = '<span>' + opt.title + '</span><span class="cnt">' + (i + 1) + ' / ' + qs.length + '</span>';
-    fill.style.width = (i / qs.length * 100) + '%';
-    body.innerHTML = '';
-    if (q.tname) body.appendChild(el('div', 'tag', q.tname));
-    body.appendChild(el('div', 'qtext', sup(esc(q.q))));
+    paintDots();
+    body.innerHTML = ''; padSlot.innerHTML = '';
+    body.className = 'qbody fadein';
+
+    if (q.tname) body.appendChild(el('div', 'tag' + (q.bridge === 'p' ? '' : (q.topic ? ' plain' : '')), esc(q.tname)));
+    body.appendChild(el('div', qClass(q.q), sup(esc(q.q))));
 
     let cur = '';
     const fb = el('div', 'fb');
@@ -485,131 +553,182 @@ function runner(host, qs, opt) {
       const ok = judge(q, val);
       res[i] = ok;
       if (opt.onEach) opt.onEach(q, ok, val, i);
-      fb.className = 'fb ' + (ok ? 'ok' : 'no');
-      let head;
+      paintDots(ok);
+      fb.className = 'fb ' + (ok ? 'ok' : 'no') + ' fadein';
+      let h;
       if (ok) {
         const st = q.topic ? streakOf(q.topic) : 0;
-        head = '✓ 对了' + (st >= 3 ? ' · 这个知识点连对 ' + st + ' 题了' : '');
+        h = '<div class="h"><span class="mk">✓</span>' + (st >= 3 ? '连对 ' + st + ' 题' : '对了') + '</div>';
       } else {
-        head = '✗ 这次不对 —— 已经放进错题本，明天再考你一次';
+        h = '<div class="h"><span class="mk">→</span>进错题本了，明天再考你一次</div>'
+          + '<div class="ra">答案 <b>' + ans(q.ans) + '</b></div>';
       }
-      let h = '<div class="fbhead">' + head + '</div>';
-      if (!ok) h += '<div class="right">正确答案：<b>' + sup(esc(q.ans)) + '</b></div>';
-      if (opt.showSol !== false && q.sol) h += '<ol class="sol">' + q.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol>';
-      h += '<button class="btn next">下一题 →</button>';
+      if (opt.showSol !== false && q.sol) h += '<ol class="sol">' + q.sol.map(x => '<li>' + sup(esc(x)) + '</li>').join('') + '</ol>';
       fb.innerHTML = h;
-      fb.querySelector('.next').onclick = () => { i++; step(); };
-      body.querySelectorAll('button,input').forEach(b => b.disabled = true);
-      fb.querySelector('.next').disabled = false;
-      fb.scrollIntoView({ block: 'nearest' });
+      const nx = el('button', 'go', i + 1 >= qs.length ? '这组做完了 →' : '下一题 →');
+      nx.onclick = () => { i++; step(); };
+      fb.appendChild(nx);
+      padSlot.innerHTML = '';
+      const hn = body.querySelector('.hint'); if (hn) hn.remove();
+      const sl = body.querySelector('.slot'); if (sl && !ok) sl.style.borderColor = 'var(--signal)';
+      body.querySelectorAll('.opt').forEach(b => b.disabled = true);
+      body.appendChild(fb);
+      nx.scrollIntoView({ block: 'nearest' });
     }
 
     if (q.type === 'choice') {
-      const wrap = el('div', 'opts');
-      q.opts.forEach(o => { const b = el('button', 'opt', sup(esc(o))); b.onclick = () => { wrap.querySelectorAll('.opt').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); submit(o); }; wrap.appendChild(b); });
-      body.appendChild(wrap);
+      const w = el('div', 'opts');
+      q.opts.forEach(o => { const b = el('button', 'opt', sup(esc(o))); b.onclick = () => submit(o); w.appendChild(b); });
+      body.appendChild(w);
     } else {
-      const inp = el('input', 'ans'); inp.setAttribute('inputmode', 'none'); inp.readOnly = true;
-      inp.placeholder = '答案（分数写成 3/4）';
-      body.appendChild(inp);
-      const kb = el('div', 'kb');
-      const keys = ['7', '8', '9', '/', '4', '5', '6', '-', '1', '2', '3', '.', '0', '⌫', '清空', '确定'];
-      keys.forEach(k => {
-        const b = el('button', 'k' + (k === '确定' ? ' go' : (k === '⌫' || k === '清空' ? ' fn' : '')), k);
+      const slot = el('div', 'slot', '<span class="caret"></span>');
+      body.appendChild(slot);
+      body.appendChild(el('div', 'hint', q.type === 'frac' ? '分数写成 3/4，约到最简；负号用 −' : '用下面的键盘输入'));
+      const pad = el('div', 'pad');
+      [['7'], ['8'], ['9'], ['/'], ['4'], ['5'], ['6'], ['−'], ['1'], ['2'], ['3'], ['.'],
+       ['0'], ['删', 'fn'], ['清空', 'fn'], ['确定', 'ok']].forEach(k => {
+        const b = el('button', k[1] || '', k[0]);
         b.onclick = () => {
-          if (k === '⌫') cur = cur.slice(0, -1);
-          else if (k === '清空') cur = '';
-          else if (k === '确定') { if (!cur.trim()) return; submit(cur); return; }
-          else cur += k;
-          inp.value = cur;
+          if (k[0] === '删') cur = cur.slice(0, -1);
+          else if (k[0] === '清空') cur = '';
+          else if (k[0] === '确定') { if (cur.trim()) submit(cur); return; }
+          else cur += (k[0] === '−' ? '-' : k[0]);
+          slot.className = 'slot' + (cur ? ' has' : '');
+          slot.innerHTML = cur ? esc(cur.replace(/-/g, '−')) : '<span class="caret"></span>';
         };
-        kb.appendChild(b);
+        pad.appendChild(b);
       });
-      body.appendChild(kb);
-      const skip = el('button', 'btn ghost', '不会，看解析');
-      skip.onclick = () => submit('###');
-      body.appendChild(skip);
+      padSlot.appendChild(pad);
+      const sk = el('button', 'skip', '不会做，直接看解析');
+      sk.onclick = () => submit('###');
+      padSlot.appendChild(sk);
     }
-    body.appendChild(fb);
+  }
+
+  function finish() {
+    body.innerHTML = ''; padSlot.innerHTML = ''; paintDots();
+    const n = res.filter(Boolean).length;
+    const c = el('div', 'card fadein');
+    c.innerHTML = '<div class="eyebrow">这一组做完了</div><h2 class="mono" style="font-size:30px">' + n + ' / ' + qs.length + '</div>';
+    body.appendChild(c);
+    if (opt.fact !== false) {
+      const lg = DB.logs[today()];
+      if (lg && (lg.factsToday || []).length < 2) {
+        const f = pickFact(qs.map(x => x.topic).filter(Boolean), DB.facts);
+        if (f) {
+          DB.facts.push(f.id); if (DB.facts.length > 300) DB.facts.shift();
+          lg.factsToday.push(f.id); save();
+          body.appendChild(factCard(f, '解锁一张收藏卡'));
+        }
+      }
+    }
+    if (opt.onDone) opt.onDone(res, body);
+    const b = el('button', 'go', '回到今天');
+    b.onclick = () => go(opt.backTo || 'today');
+    body.appendChild(b);
   }
   step();
 }
+function factCard(f, label) {
+  return el('div', 'fdetail fadein', '<div class="eyebrow">' + esc(label) + '</div><h3>' + esc(f.t) + '</h3><p>' + esc(f.b) + '</p>');
+}
 
-/* ---------- 今日 ---------- */
+/* ============================================================
+   孩子视图 · 今天
+   ============================================================ */
+const SEG = [
+  { k: 'warm', n: '热身', full: '口算热身' },
+  { k: 'focus', n: '补漏', full: '补漏主攻' },
+  { k: 'track', n: '跟课', full: '跟课练习' },
+  { k: 'review', n: '重练', full: '错题重练' }
+];
+
 function viewToday(m) {
-  if (!DB.diag.done) {
-    m.appendChild(el('div', 'card hero', '<h2>先做一次入学诊断</h2><p>21 道题，覆盖小学 13 个知识点 + 初一 3 个前置点，大约 20 分钟。做完才知道漏在哪，计划才有意义。中间可以停，成绩会存在这台设备上。</p><button class="btn big" onclick="go(\'diag\')">开始诊断 →</button>'));
-    return;
-  }
+  if (!DB.diag.done) return viewFirst(m);
   const wi = weekInfo();
   const log = buildToday();
-  const parts = [
-    { k: 'warm', name: '① 口算热身', sub: '限时不限对，练手速', qs: log.qs.warm },
-    { k: 'focus', name: '② 补漏主攻', sub: TMAP[log.focusK].name + (log.focus2 ? ' + ' + TMAP[log.focus2].name : ''), qs: log.qs.focus },
-    { k: 'track', name: '③ 跟课练习', sub: log.trackCh, qs: log.qs.track },
-    { k: 'review', name: '④ 错题重做', sub: log.qs.review.length ? '到期错题 ' + log.qs.review.length + ' 道' : '今天没有到期错题', qs: log.qs.review }
-  ];
-  const hdr = el('div', 'card');
-  const lvTxt = log.mini ? '迷你模式' : ({ 1: '题目已自动调简单一档', 2: '', 3: '题目已自动调难一档' })[log.lv ? log.lv.focus : 2] || '';
-  hdr.innerHTML = '<div class="row"><div><h2>' + cnDate(today()) + '</h2><div class="sub">' + wi.label + ' · 本周跟课：' + esc(log.trackCh)
-    + (lvTxt ? '<br><span class="lvtag">' + lvTxt + '</span>' : '') + '</div></div></div>';
-  m.appendChild(hdr);
 
-  /* 今天变强了什么——放在最上面，先看到进步再看到任务 */
-  const gs = gains();
-  const anyDone = ['warm', 'focus', 'track', 'review'].some(k => (log.res[k] || []).length);
-  if (gs.length) {
-    const gc = el('div', 'card gain');
-    gc.innerHTML = '<b>今天你变强了这些</b>' + gs.map(g => '<div class="grow"><i>' + esc(g.big) + '</i><span>' + esc(g.txt) + '</span></div>').join('');
-    m.appendChild(gc);
-  } else if (anyDone) {
-    m.appendChild(el('div', 'card gain', '<b>今天守住了</b><div class="sub">没有退步。基础题稳住不掉，本来就是这个阶段该拿到的东西。</div>'));
+  /* 本周在哪一站 */
+  if (wi.phase === 'term') {
+    const c = el('div', 'weekbar');
+    let h = '<div class="route mini">';
+    for (let w = 1; w <= 20; w++) h += '<div class="stop ' + (w < wi.w ? 'done' : w === wi.w ? 'now' : '') + '"><i></i></div>';
+    h += '</div><div class="wt">学校在讲 · ' + esc(log.trackCh) + '</div>';
+    c.innerHTML = h;
+    m.appendChild(c);
   }
 
-  parts.forEach(p => {
-    const doneN = log.res[p.k].length, totN = p.qs.length;
-    const c = el('div', 'card task' + (totN === 0 ? ' dim' : (doneN >= totN ? ' fin' : '')));
-    const rightN = log.res[p.k].filter(r => r.ok).length;
-    c.innerHTML = '<div class="row"><div><b>' + p.name + '</b><div class="sub">' + esc(p.sub) + '</div></div>'
-      + '<div class="prog">' + (totN === 0 ? '—' : doneN + '/' + totN + (doneN >= totN ? ' ✓ 对 ' + rightN : '')) + '</div></div>';
-    if (totN > 0 && doneN < totN) {
-      const b = el('button', 'btn', doneN ? '继续做' : '开始');
-      b.onclick = () => {
-        m.innerHTML = '';
-        const back = el('button', 'btn ghost', '← 回今日'); back.onclick = () => go('today'); m.appendChild(back);
-        runner(m, p.qs.slice(doneN), {
-          title: p.name,
-          onEach: (q, ok, val) => recordAnswer(p.k, q, val, ok),
-          onDone: () => { const b2 = el('button', 'btn big', '回到今日任务'); b2.onclick = () => go('today'); m.appendChild(b2); }
-        });
-      };
-      c.appendChild(b);
-    }
-    m.appendChild(c);
+  /* 今天四站 */
+  const segs = SEG.map(s => ({ s, qs: log.qs[s.k] || [], done: (log.res[s.k] || []).length }));
+  const live = segs.filter(x => x.qs.length);
+  const curIdx = live.findIndex(x => x.done < x.qs.length);
+  const c2 = el('div', 'card');
+  let h2 = '<div class="eyebrow">今天' + '零一二三四五'[live.length] + '站</div><div class="route">';
+  live.forEach((x, n) => {
+    const st = x.done >= x.qs.length ? 'done' : (n === curIdx ? 'now' : '');
+    const right = (log.res[x.s.k] || []).filter(r => r.ok).length;
+    h2 += '<div class="stop ' + st + '"><i></i><b>' + x.s.n + '</b><em>'
+      + (x.done >= x.qs.length ? '对 ' + right : x.done + '/' + x.qs.length) + '</em></div>';
   });
+  h2 += '</div>';
+  c2.innerHTML = h2;
+  m.appendChild(c2);
 
-  /* 本周挑战：3 道最难档的题，攻下来解锁一条彩蛋。用内容当奖励，不用积分 */
+  /* 当前站 = 唯一的行动 */
+  if (curIdx >= 0) {
+    const x = live[curIdx];
+    const left = x.qs.length - x.done;
+    const nc = el('div', 'nowcard');
+    const detail = x.s.k === 'focus' ? TMAP[log.focusK].name + (log.focus2 ? ' + ' + TMAP[log.focus2].name : '')
+      : x.s.k === 'track' ? log.trackCh
+      : x.s.k === 'review' ? '之前做错的题，回来再考一次'
+      : '先用小学题热手，再进负数';
+    nc.innerHTML = '<div class="k">现在这一站</div><h2>' + x.s.full + '</h2>'
+      + '<div class="sub">' + esc(detail) + '</div>'
+      + '<div class="meta">' + left + ' 道 · 约 ' + Math.max(2, Math.round(left * 0.7)) + ' 分钟</div>';
+    const b = el('button', 'go', x.done ? '接着做' : '开始');
+    b.onclick = () => runner(x.qs.slice(x.done), {
+      title: x.s.full, backTo: 'today',
+      onEach: (q, ok, v) => recordAnswer(x.s.k, q, v, ok)
+    });
+    nc.appendChild(b);
+    m.appendChild(nc);
+  } else {
+    m.appendChild(el('div', 'card', '<div class="eyebrow">今天的四站都过了</div><div class="sub">'
+      + '明天这个时候再来。想多练可以去「重练」翻错题，或者去「收藏」看还差几张卡。</div>'));
+  }
+
+  /* 进步 */
+  const gs = gains();
+  const anyDone = live.some(x => x.done);
+  if (gs.length) {
+    const g = el('div', 'gains');
+    g.innerHTML = '<div class="eyebrow">今天你变强了</div>'
+      + gs.map(x => '<div class="grow"><i>' + esc(x.big) + '</i><span>' + esc(x.txt) + '</span></div>').join('');
+    m.appendChild(g);
+  } else if (anyDone) {
+    m.appendChild(el('div', 'gains', '<div class="eyebrow">今天守住了</div>'
+      + '<div class="sub">没有退步。基础题稳住不掉，本来就是这个阶段该拿到的东西。</div>'));
+  }
+
+  /* 本周挑战 */
   if (!log.mini && wi.phase === 'term') {
-    const bkey = 'W' + wi.w;
-    const doneB = DB.boss[bkey];
-    const bc = el('div', 'card boss' + (doneB ? ' fin' : ''));
-    bc.innerHTML = '<div class="row"><div><b>本周挑战 · ' + bkey + '</b><div class="sub">'
-      + (doneB ? '这周的挑战已经攻下来了，下周一有新的。' : '3 道本周内容里最难档的题。不计入正确率，做不出来不影响任何东西。') + '</div></div></div>';
+    const bkey = 'W' + wi.w, doneB = DB.boss[bkey];
+    const bc = el('div', 'card');
+    bc.innerHTML = '<div class="eyebrow">本周挑战 · ' + bkey + '</div>'
+      + '<div class="sub">' + (doneB ? '这周的攻下来了，下周一有新的。' : '3 道本周内容里最难的。不算正确率，做不出来不影响任何东西。') + '</div>';
     if (!doneB) {
-      const bb = el('button', 'btn', '来一把');
+      const bb = el('button', 'go sec', '来一把');
       bb.onclick = () => {
         const tr = trackOf(wi.w);
-        const bqs = tr.ks.slice(0, 3).concat(tr.ks, tr.ks).slice(0, 3).map(k => genQ(k, 3));
-        m.innerHTML = '';
-        const back = el('button', 'btn ghost', '← 回今日'); back.onclick = () => go('today'); m.appendChild(back);
-        runner(m, bqs, {
-          title: '本周挑战', fact: false,
-          onDone: res => {
+        const ks = tr.ks.concat(tr.ks, tr.ks).slice(0, 3);
+        runner(ks.map(k => genQ(k, 3)), {
+          title: '本周挑战', backTo: 'today', fact: false,
+          onDone: (res, host) => {
             DB.boss[bkey] = { date: today(), right: res.filter(Boolean).length };
             const f = pickFact(tr.ks, DB.facts);
-            if (f) { DB.facts.push(f.id); m.appendChild(el('div', 'card fact', '<div class="ftag">挑战奖励 · 解锁一条冷知识</div><b>' + esc(f.t) + '</b><p>' + esc(f.b) + '</p>')); }
+            if (f) { DB.facts.push(f.id); host.appendChild(factCard(f, '挑战奖励 · 解锁一张卡')); }
             save();
-            const b2 = el('button', 'btn big', '回到今日任务'); b2.onclick = () => go('today'); m.appendChild(b2);
           }
         });
       };
@@ -618,293 +737,401 @@ function viewToday(m) {
     m.appendChild(bc);
   }
 
-  /* 状态不好的日子：不硬撑，也不断档 */
+  /* 状态不好 */
   if (!log.mini && !anyDone) {
     const mc = el('div', 'card');
-    mc.innerHTML = '<b>今天状态不好？</b><div class="sub">换成 5 题的迷你版。断一天比硬撑到崩掉更难补回来。</div>';
-    const mb = el('button', 'btn ghost', '换成 5 题');
-    mb.onclick = () => { if (confirm('今天改成 5 题迷你版？')) { buildMini(); go('today'); } };
+    mc.innerHTML = '<div class="eyebrow">今天不太想做</div><div class="sub">换成 5 题的迷你版。'
+      + '断一天比硬撑到崩掉更难补回来。</div>';
+    const mb = el('button', 'go sec', '换成 5 题');
+    mb.onclick = () => { buildMini(); go('today'); };
     mc.appendChild(mb);
     m.appendChild(mc);
   }
-
-  if (log.wrongToday.length) {
-    const c = el('div', 'card note');
-    c.innerHTML = '<b>今天错了 ' + log.wrongToday.length + ' 道</b><div class="sub">去「家长」页拿今晚讲哪 2 道</div>';
-    const b = el('button', 'btn', '看家长清单'); b.onclick = () => go('parent'); c.appendChild(b);
-    m.appendChild(c);
-  }
 }
 
-/* ---------- 诊断 ---------- */
-let DIAGQS = null, DIAGRES = null;
-function viewDiag(m) {
-  if (DB.diag.done && !DIAGQS) {
-    const c = el('div', 'card');
-    let h = '<h2>诊断结果 · ' + DB.diag.date + '</h2><table class="tb"><tr><th>知识点</th><th>正确</th><th>判断</th></tr>';
-    const rows = Object.keys(DB.diag.scores).map(k => { const s = DB.diag.scores[k]; return { k, r: s.right / s.total, s }; }).sort((a, b) => a.r - b.r);
-    rows.forEach(r => {
-      const lv = r.s.total < 2 ? ['只测 1 题', ''] : r.r >= 0.85 ? ['稳', 'g'] : r.r >= 0.5 ? ['夹生', 'w'] : ['要补', 'b'];
-      h += '<tr><td>' + TMAP[r.k].name + '<span class="st">' + (TMAP[r.k].stage === 'P' ? '小学' : '七上') + '</span></td><td>' + r.s.right + '/' + r.s.total + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
-    });
-    h += '</table>';
-    c.innerHTML = h;
-    m.appendChild(c);
-    const c2 = el('div', 'card');
-    c2.innerHTML = '<b>当前补漏队列</b><div class="sub">按「影响初一的程度 × 掌握度」排序，做到近 20 题正确率 85% 自动毕业出队</div><ol class="q">'
-      + DB.queue.map(k => '<li>' + TMAP[k].name + '</li>').join('') + '</ol>';
-    m.appendChild(c2);
-    const c3 = el('div', 'card note');
-    c3.innerHTML = '<b>把结果发给 Claude</b><div class="sub">这个页面没有后端，成绩只存在这台设备上，外面读不到。'
-      + '点下面按钮复制一段摘要（不含姓名学校），粘到对话里，他就能判断补漏顺序要不要重排、难度合不合适。</div>';
-    const cb = el('button', 'btn', '复制进度摘要');
-    cb.onclick = () => copyBrief(c3);
-    const cb2 = el('button', 'btn ghost', '直接看这段文字');
-    cb2.onclick = () => showBrief(c3);
-    c3.appendChild(cb); c3.appendChild(cb2);
-    m.appendChild(c3);
-
-    const b = el('button', 'btn ghost', '重做诊断（会清空队列，保留错题本）');
-    b.onclick = () => { if (confirm('重做诊断？')) { DIAGQS = buildDiag(); DIAGRES = []; render(); } };
-    m.appendChild(b);
-    return;
-  }
-  if (!DIAGQS) { DIAGQS = buildDiag(); DIAGRES = []; }
-  runner(m, DIAGQS, {
-    title: '入学诊断', showSol: true,
-    onEach: (q, ok, v, i) => { DIAGRES[i] = ok; },
-    onDone: res => {
+/* 第一次打开 */
+function viewFirst(m) {
+  const c = el('div', 'card');
+  c.innerHTML = '<div class="eyebrow">开始之前</div>'
+    + '<h2 style="font-size:24px;line-height:1.4">先摸清底子在哪，<br>再决定每天练什么</h2>'
+    + '<div class="sub" style="margin-top:12px">21 道题，小学 13 个知识点加初一 3 个前置点，大约 20 分钟。'
+    + '做完才知道该补哪里。中间可以停，进度存在这台设备上。</div>';
+  const b = el('button', 'go', '开始 21 题');
+  b.onclick = () => startDiag();
+  c.appendChild(b);
+  m.appendChild(c);
+  m.appendChild(el('div', 'card', '<div class="eyebrow">这个 app 怎么用</div>'
+    + '<div class="route" style="margin:6px 0 14px">'
+    + '<div class="stop done"><i></i><b>热身</b></div><div class="stop done"><i></i><b>补漏</b></div>'
+    + '<div class="stop now"><i></i><b>跟课</b></div><div class="stop"><i></i><b>重练</b></div></div>'
+    + '<div class="sub">每天四站，一站一站过。做错的题会自己排到后面的日子再考你一次，'
+    + '答对三轮就从错题本毕业。</div>'));
+}
+let DIAGQS = null;
+function startDiag() {
+  DIAGQS = buildDiag();
+  runner(DIAGQS, {
+    title: '摸底 21 题', backTo: 'today', fact: false,
+    onDone: (res, host) => {
       finishDiag(DIAGQS, res); DIAGQS = null;
-      const b = el('button', 'btn big', '看结果和计划'); b.onclick = () => { go('diag'); }; m.appendChild(b);
+      host.appendChild(el('div', 'card', '<div class="eyebrow">摸完了</div>'
+        + '<div class="sub">明天开始每天四站。详细结果在「家长」里，你不用管。</div>'));
     }
   });
 }
 
-/* ---------- 计划 ---------- */
-function viewPlan(m) {
-  const wi = weekInfo();
-  const c = el('div', 'card');
-  const dMid = dayDiff(today(), addDays(DB.profile.schoolStart, 9 * 7));   /* 期中约在 W10 */
-  const dFin = dayDiff(today(), '2027-01-14');                             /* 深圳规定期末不早于此日 */
-  c.innerHTML = '<h2>学习计划</h2><div class="sub">' + wi.label + '。启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart
-    + '。每天四段：口算热身 → 补漏主攻 → 跟课练习（开头一对搭桥题）→ 到期错题重做。</div>'
-    + '<div class="miles">'
-    + '<div><b>' + (dMid > 0 ? dMid + ' 天' : '已过') + '</b><span>到期中（约 11 月初）</span></div>'
-    + '<div><b>' + (dFin > 0 ? dFin + ' 天' : '已过') + '</b><span>到期末（不早于 1/14）</span></div>'
-    + '<div><b>' + Math.max(0, Math.ceil(dFin / 7)) + ' 周</b><span>剩余可用周数</span></div>'
-    + '</div>';
-  m.appendChild(c);
-
-  const k = el('div', 'card');
-  k.innerHTML = '<b>8/29 – 8/31 破冰三天</b><div class="sub">他 29 号才从老家回深圳，开学前只有这三天，目标不是学完，是开学第一节课能听懂。</div><ol class="q">'
-    + '<li>第 1 天：做完入学诊断（21 题），当晚家长陪着过 2 道错题</li>'
-    + '<li>第 2 天：主攻诊断里最差的那个小学知识点 + 预习数轴/相反数/绝对值</li>'
-    + '<li>第 3 天：昨天错题重做 + 预习有理数加减，把「减号改写成加相反数」练成肌肉记忆</li>'
-    + '</ol><div class="sub">目的不是学完，是开学第一节课能听懂，先把「我能听懂」这个感觉拿回来。</div>';
-  m.appendChild(k);
-
-  const t = el('div', 'card');
-  let h = '<b>一学期 20 周跟课表</b><div class="sub">按北师大版（2024）七上章序 + 深圳市 2026–2027 校历排的。'
-    + '以学校实际进度为准，不一样就点「改」。</div><div class="scrollx"><table class="tb"><tr><th>周</th><th>日期</th><th>跟课内容</th><th></th></tr>';
-  for (let w = 1; w <= 20; w++) {
-    const tr = trackOf(w);
-    const d0 = addDays(DB.profile.schoolStart, (w - 1) * 7);
-    const dd = d0.slice(5).replace('-', '/') + '–' + addDays(d0, 6).slice(5).replace('-', '/');
-    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td>W' + w + '</td><td class="nw">' + dd + '</td><td>' + esc(tr.ch)
-      + (tr.mile ? '<div class="mile">' + esc(tr.mile) + '</div>' : '')
-      + '</td><td><button class="mini" data-w="' + w + '">改</button></td></tr>';
-  }
-  h += '</table></div>';
-  t.innerHTML = h;
-  t.querySelectorAll('.mini').forEach(b => b.onclick = () => {
-    const w = +b.dataset.w, tr = trackOf(w);
-    const ch = prompt('第 ' + w + ' 周学校在讲什么？（只改显示文字）', tr.ch);
-    if (ch === null) return;
-    const opts = M_TOPICS.map((x, i) => (i + 1) + '=' + TMAP[x].name).join('  ');
-    const pickStr = prompt('这周练哪些知识点？填编号，逗号分隔\n' + opts, tr.ks.map(x => M_TOPICS.indexOf(x) + 1).join(','));
-    if (pickStr === null) return;
-    const ks = pickStr.split(/[,，\s]+/).map(x => M_TOPICS[+x - 1]).filter(Boolean);
-    DB.trackOverride[w] = { ch, ks: ks.length ? ks : tr.ks };
-    delete DB.logs[today()];
-    save(); render();
-  });
-  m.appendChild(t);
-
-  const g = el('div', 'card');
-  g.innerHTML = '<b>阶段目标（对齐考试节点）</b><ol class="q">'
-    + '<li><b>开学第 4 周末</b>（9 月底）：有理数加减单独测 10 题错不超过 2 题；口算热身正确率 ≥ 80%</li>'
-    + '<li><b>国庆假期</b>（10/1–10/7）：一天不断，每天 15 分钟也算。断档一周开学回来就跟不上乘除</li>'
-    + '<li><b>期中前</b>（第 9 周）：(−2)² 和 −2² 连续 10 题不错；补漏队列清掉 3 个小学知识点</li>'
-    + '<li><b>第 14 周</b>（整式学完）：去括号变号 10 题对 8 道；错题本存量降到 30 道以内</li>'
-    + '<li><b>期末前</b>（1 月上旬）：含分母的一元一次方程 10 题对 7 道；错题本降到 20 道以内</li>'
-    + '</ol><div class="sub">及格线不是目标。他现在丢分的大头是运算规则，不是难题——'
-    + '把「会做的题不丢分」做到了，分数自己会上来。</div>';
-  m.appendChild(g);
-}
-
-/* ---------- 错题本 ---------- */
-function viewWrong(m) {
+/* ============================================================
+   孩子视图 · 重练
+   ============================================================ */
+function viewRedo(m) {
   const t = today();
   const due = DB.wrong.filter(w => w.due <= t);
-  const c = el('div', 'card');
-  c.innerHTML = '<h2>错题本</h2><div class="sub">共 ' + DB.wrong.length + ' 道，今天到期 ' + due.length + ' 道。答对一次隔 1 天再考，连续对 3 轮就毕业移出。</div>';
-  m.appendChild(c);
-  if (due.length) {
-    const b = el('button', 'btn big', '重做今天到期的 ' + due.length + ' 道');
-    b.onclick = () => {
-      m.innerHTML = '';
-      const back = el('button', 'btn ghost', '← 返回'); back.onclick = () => go('wrong'); m.appendChild(back);
-      buildToday();
-      runner(m, due, { title: '错题重做', onEach: (q, ok, v) => recordAnswer('review', q, v, ok), onDone: () => { const b2 = el('button', 'btn big', '完成'); b2.onclick = () => go('wrong'); m.appendChild(b2); } });
-    };
-    m.appendChild(b);
+  if (!DB.wrong.length) {
+    m.appendChild(el('div', 'empty', '<span class="mk">◌</span>错题本是空的。'));
+    return;
   }
+  const c = el('div', 'card');
+  c.innerHTML = '<div class="eyebrow">错题本</div><h2 class="mono" style="font-size:28px">' + DB.wrong.length + ' 道</h2>'
+    + '<div class="sub" style="margin-top:6px">今天该重考 ' + due.length + ' 道。答对一次隔几天再考，连对三轮就毕业。</div>';
+  if (due.length) {
+    const b = el('button', 'go', '重考今天到期的 ' + due.length + ' 道');
+    b.onclick = () => { buildToday(); runner(due.slice(), { title: '错题重练', backTo: 'redo',
+      onEach: (q, ok, v) => recordAnswer('review', q, v, ok) }); };
+    c.appendChild(b);
+  }
+  m.appendChild(c);
+
   const grp = {};
   DB.wrong.forEach(w => (grp[w.topic] = grp[w.topic] || []).push(w));
   Object.keys(grp).sort((a, b) => grp[b].length - grp[a].length).forEach(k => {
     const c2 = el('div', 'card');
-    let h = '<b>' + TMAP[k].name + '</b> <span class="pill b">' + grp[k].length + ' 道</span>';
-    grp[k].forEach(w => { h += '<div class="wq"><div class="wqq">' + sup(esc(w.q)) + '</div><div class="wqa">答案 ' + sup(esc(w.ans)) + ' · 下次重考 ' + w.due + '</div></div>'; });
+    let h = '<div class="eyebrow">' + esc(TMAP[k].name) + ' · ' + grp[k].length + ' 道</div>';
+    grp[k].slice(0, 6).forEach(w => { h += '<div class="wq"><div class="t">' + sup(esc(w.q)) + '</div><div class="a">'
+      + ans(w.ans) + ' · ' + w.due + ' 重考</div></div>'; });
+    if (grp[k].length > 6) h += '<div class="sub" style="margin-top:10px">还有 ' + (grp[k].length - 6) + ' 道</div>';
     c2.innerHTML = h;
     m.appendChild(c2);
   });
-  if (!DB.wrong.length) m.appendChild(el('div', 'card dim', '错题本是空的。'));
 }
 
-/* ---------- 家长 ---------- */
-function viewParent(m) {
-  const t = today();
-  const log = DB.logs[t];
+/* ============================================================
+   孩子视图 · 收藏（数学史卡片墙）
+   收集感本身就是奖励，不需要积分
+   ============================================================ */
+let FOPEN = null;
+function viewColl(m) {
+  const got = FACTS.filter(f => DB.facts.indexOf(f.id) >= 0);
   const c = el('div', 'card');
-  c.innerHTML = '<h2>今晚这 10 分钟怎么用</h2><div class="sub">别通篇讲。挑下面 2 道，让他讲给你听，你只负责问问题。</div>';
+  c.innerHTML = '<div class="eyebrow">数学冷知识收藏</div>'
+    + '<h2 class="mono" style="font-size:30px;letter-spacing:-.03em">' + got.length + '<span style="color:var(--ink3)">/' + FACTS.length + '</span></h2>'
+    + '<div class="sub" style="margin-top:6px">每天做完两站解锁一张，打赢本周挑战多得一张。'
+    + '都是真事——你学的那些规则，是这些人想出来的。</div>';
+  m.appendChild(c);
+  if (FOPEN) {
+    const f = FACTS.filter(x => x.id === FOPEN)[0];
+    if (f) m.appendChild(factCard(f, '收藏卡 ' + f.id.toUpperCase()));
+  }
+  const wall = el('div', 'coll');
+  FACTS.forEach((f, n) => {
+    const has = DB.facts.indexOf(f.id) >= 0;
+    const via = TMAP[f.ks[0]] ? TMAP[f.ks[0]].name : '';
+    const b = el('button', 'fc' + (has ? '' : ' lock'),
+      '<div class="n">' + String(n + 1).padStart(2, '0') + '</div><div class="t">'
+      + (has ? esc(f.t) : '练「' + esc(via) + '」时开') + '</div>');
+    if (has) b.onclick = () => { FOPEN = (FOPEN === f.id ? null : f.id); render(); };
+    wall.appendChild(b);
+  });
+  m.appendChild(wall);
+}
+
+/* ============================================================
+   家长区
+   ============================================================ */
+let PINBUF = '';
+function viewLock(m) {
+  PINBUF = '';
+  const c = el('div', 'card');
+  c.innerHTML = '<div class="eyebrow">家长区</div><h2>输入 4 位密码</h2>'
+    + '<div class="sub" style="margin-top:6px">这里有完整的诊断结果和设置，不适合让他自己改。</div>'
+    + '<div class="pin" id="pindots"><i></i><i></i><i></i><i></i></div>';
+  const pad = el('div', 'pad');
+  ['1','2','3','4','5','6','7','8','9','','0','删'].forEach(k => {
+    if (!k) { pad.appendChild(el('div')); return; }
+    const b = el('button', k === '删' ? 'fn' : '', k);
+    b.onclick = () => {
+      if (k === '删') PINBUF = PINBUF.slice(0, -1);
+      else if (PINBUF.length < 4) PINBUF += k;
+      const ds = document.querySelectorAll('#pindots i');
+      ds.forEach((d, n) => d.className = n < PINBUF.length ? 'on' : '');
+      if (PINBUF.length === 4) {
+        if (PINBUF === DB.profile.pin) { PARENT_OK = true; go('p-plan'); }
+        else { PINBUF = ''; ds.forEach(d => d.className = ''); const w = $('#pinmsg'); if (w) w.textContent = '不对，再试一次'; }
+      }
+    };
+    pad.appendChild(b);
+  });
+  c.appendChild(pad);
+  c.appendChild(el('div', 'sub', '<span id="pinmsg"></span>'));
+  m.appendChild(c);
+  const b2 = el('button', 'go sec', '忘了密码 · 回孩子视图');
+  b2.onclick = () => go('today');
+  m.appendChild(b2);
+}
+
+function pbanner(m, txt) { m.appendChild(el('div', 'pbanner', txt)); }
+
+function viewPlan(m) {
+  const wi = weekInfo();
+  pbanner(m, '孩子那边只看得到「今天做什么」和进步，看不到下面这些分档和设置。');
+
+  const c = el('div', 'card');
+  const dMid = dayDiff(today(), addDays(DB.profile.schoolStart, 9 * 7));
+  const dFin = dayDiff(today(), '2027-01-14');
+  c.innerHTML = '<div class="eyebrow">当前进度</div><h2>' + esc(wi.label) + '</h2>'
+    + '<div class="sub">启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart
+    + '，每天 ' + DB.profile.dailyMin + ' 分钟</div>'
+    + '<div class="miles">'
+    + '<div><b>' + (dMid > 0 ? dMid : 0) + '</b><span>天到期中（约 11 月初）</span></div>'
+    + '<div><b>' + (dFin > 0 ? dFin : 0) + '</b><span>天到期末（不早于 1/14）</span></div>'
+    + '<div><b>' + Math.max(0, Math.ceil(dFin / 7)) + '</b><span>周还能用</span></div></div>';
+  m.appendChild(c);
+
+  const k = el('div', 'card');
+  k.innerHTML = '<div class="eyebrow">8/29 – 8/31 破冰三天</div>'
+    + '<div class="sub">他 29 号才从老家回深圳，开学前只有这三天。目标不是学完，是开学第一节课能听懂。</div>'
+    + '<ol class="q2"><li>第 1 天：做完摸底 21 题，当晚陪他过 2 道错题</li>'
+    + '<li>第 2 天：主攻摸底里最差的那个小学知识点 + 预习数轴、相反数、绝对值</li>'
+    + '<li>第 3 天：昨天错题重做 + 预习有理数加减，把「减号改写成加相反数」练成条件反射</li></ol>';
+  m.appendChild(k);
+
+  const t = el('div', 'card');
+  let h = '<div class="eyebrow">一学期 20 周跟课表</div>'
+    + '<div class="sub">按北师大版（2024）七上章序 + 深圳市 2026–2027 校历排的。学校进度不一样就点「改」。</div>'
+    + '<div style="overflow-x:auto"><table class="tb"><tr><th>周</th><th>日期</th><th>跟课内容</th><th></th></tr>';
+  for (let w = 1; w <= 20; w++) {
+    const tr = trackOf(w);
+    const d0 = addDays(DB.profile.schoolStart, (w - 1) * 7);
+    const dd = d0.slice(5).replace('-', '/') + '–' + addDays(d0, 6).slice(5).replace('-', '/');
+    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td class="nw">W' + w
+      + '</td><td class="nw">' + dd + '</td><td>' + esc(tr.ch)
+      + (tr.mile ? '<div class="mile">' + esc(tr.mile) + '</div>' : '')
+      + '</td><td><button class="pill" data-w="' + w + '">改</button></td></tr>';
+  }
+  h += '</table></div>';
+  t.innerHTML = h;
+  t.querySelectorAll('button[data-w]').forEach(b => b.onclick = () => {
+    const w = +b.dataset.w, tr = trackOf(w);
+    const ch = prompt('第 ' + w + ' 周学校在讲什么？', tr.ch);
+    if (ch === null) return;
+    const opts = M_TOPICS.map((x, n) => (n + 1) + '=' + TMAP[x].name).join('  ');
+    const ps = prompt('这周练哪些知识点？填编号，逗号分隔\n' + opts, tr.ks.map(x => M_TOPICS.indexOf(x) + 1).join(','));
+    if (ps === null) return;
+    const ks = ps.split(/[,，\s]+/).map(x => M_TOPICS[+x - 1]).filter(Boolean);
+    DB.trackOverride[w] = { ch: ch, ks: ks.length ? ks : tr.ks };
+    delete DB.logs[today()]; save(); render();
+  });
+  m.appendChild(t);
+
+  const g = el('div', 'card');
+  g.innerHTML = '<div class="eyebrow">阶段目标</div><ol class="q2">'
+    + '<li><b>开学第 4 周末</b>（9 月底）：有理数加减单测 10 题错不超过 2 题；热身正确率 ≥ 80%</li>'
+    + '<li><b>国庆 10/1–10/7</b>：一天不断，每天 15 分钟也算。断一周回来就跟不上乘除</li>'
+    + '<li><b>期中前</b>（第 9 周）：(−2)² 和 −2² 连对 10 题；补漏队列清掉 3 个小学知识点</li>'
+    + '<li><b>第 14 周</b>（整式学完）：去括号变号 10 题对 8 道；错题本降到 30 道内</li>'
+    + '<li><b>期末前</b>（1 月上旬）：含分母的一元一次方程 10 题对 7 道；错题本降到 20 道内</li>'
+    + '</ol><div class="sub" style="margin-top:12px">及格线不是目标。他丢分的大头是运算规则不是难题，'
+    + '把「会做的题不丢分」做到了，分数自己会上来。</div>';
+  m.appendChild(g);
+}
+
+function viewDiag(m) {
+  if (!DB.diag.done) {
+    m.appendChild(el('div', 'empty', '<span class="mk">◌</span>还没做摸底。让他在孩子视图里点「开始 21 题」。'));
+    return;
+  }
+  pbanner(m, '这页只在家长区。孩子看到「你要补 6 项」的清单只会更确认「我不行」。');
+  const rows = Object.keys(DB.diag.scores).map(k => { const s = DB.diag.scores[k]; return { k: k, r: s.right / s.total, s: s }; }).sort((a, b) => a.r - b.r);
+  const c = el('div', 'card');
+  let h = '<div class="eyebrow">摸底结果 · ' + DB.diag.date + '</div><table class="tb"><tr><th>知识点</th><th>对</th><th>判断</th></tr>';
+  rows.forEach(r => {
+    const lv = r.s.total < 2 ? ['只测 1 题', ''] : r.r >= 0.85 ? ['稳', 'g'] : r.r >= 0.5 ? ['夹生', 'w'] : ['要补', 'b'];
+    h += '<tr><td>' + esc(TMAP[r.k].name) + '<div class="sub" style="font-size:12px">'
+      + (TMAP[r.k].stage === 'P' ? '小学' : '七上') + '</div></td><td class="nw">' + r.s.right + '/' + r.s.total
+      + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
+  });
+  h += '</table>';
+  c.innerHTML = h;
+  m.appendChild(c);
+
+  const c2 = el('div', 'card');
+  c2.innerHTML = '<div class="eyebrow">补漏队列</div>'
+    + '<div class="sub">按「影响初一的程度 × 掌握度」排。近 20 题正确率到 85% 就自动毕业出队。</div>'
+    + '<ol class="q2">' + DB.queue.map(k => '<li>' + esc(TMAP[k].name) + '</li>').join('') + '</ol>';
+  m.appendChild(c2);
+
+  const c3 = el('div', 'card');
+  c3.innerHTML = '<div class="eyebrow">发给 Claude 调计划</div>'
+    + '<div class="sub">这个页面没有后端，成绩只在这台设备上，外面读不到。复制一段摘要（不含姓名学校）粘给他，'
+    + '他能判断补漏顺序要不要重排、难度合不合适。</div>';
+  const b1 = el('button', 'go', '复制进度摘要'); b1.onclick = () => copyBrief(c3);
+  const b2 = el('button', 'go sec', '直接看这段文字'); b2.onclick = () => showBrief(c3);
+  c3.appendChild(b1); c3.appendChild(b2);
+  m.appendChild(c3);
+
+  const b = el('button', 'btn', '重做摸底（清空队列，保留错题本）');
+  b.onclick = () => { if (confirm('重做摸底？')) { go('today'); startDiag(); } };
+  m.appendChild(b);
+}
+
+function viewTonight(m) {
+  const t = today(), log = DB.logs[t];
+  const c = el('div', 'card');
+  c.innerHTML = '<div class="eyebrow">今晚这 10 分钟</div><h2>挑 2 道，让他讲给你听</h2>'
+    + '<div class="sub" style="margin-top:6px">你只负责问问题，不用讲。</div>';
   m.appendChild(c);
 
   let wt = (log && log.wrongToday) ? log.wrongToday.slice() : [];
   if (!wt.length) wt = DB.wrong.filter(w => w.addedAt === t);
   if (!wt.length) {
-    m.appendChild(el('div', 'card dim', '今天还没有错题记录。等他做完今日任务再来看。'));
+    m.appendChild(el('div', 'empty', '<span class="mk">◌</span>今天还没有错题记录。等他做完再来。'));
   } else {
     const cnt = {}; wt.forEach(w => cnt[w.topic] = (cnt[w.topic] || 0) + 1);
     wt.sort((a, b) => cnt[b.topic] - cnt[a.topic]);
-    const seen = new Set(); const chosen = [];
-    wt.forEach(w => { if (chosen.length < 2 && !seen.has(w.topic)) { seen.add(w.topic); chosen.push(w); } });
-    if (chosen.length < 2 && wt.length > 1) chosen.push(wt.find(w => !chosen.includes(w)));
-    chosen.filter(Boolean).forEach((w, i) => {
+    const seen = {}, chosen = [];
+    wt.forEach(w => { if (chosen.length < 2 && !seen[w.topic]) { seen[w.topic] = 1; chosen.push(w); } });
+    if (chosen.length < 2) wt.forEach(w => { if (chosen.length < 2 && chosen.indexOf(w) < 0) chosen.push(w); });
+    chosen.forEach((w, n) => {
       const c2 = el('div', 'card');
-      c2.innerHTML = '<div class="tag">第 ' + (i + 1) + ' 道 · ' + TMAP[w.topic].name + '</div>'
-        + '<div class="qtext">' + sup(esc(w.q)) + '</div>'
-        + '<div class="kv"><span>正确答案</span><b>' + sup(esc(w.ans)) + '</b></div>'
-        + '<div class="pask"><b>你问这句</b><div>' + esc(w.ask) + '</div></div>'
-        + '<details><summary>讲解思路（他讲不出来你再看）</summary><ol class="sol">' + w.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol></details>';
+      c2.innerHTML = '<div class="eyebrow">第 ' + (n + 1) + ' 道 · ' + esc(TMAP[w.topic].name) + '</div>'
+        + '<div class="' + qClass(w.q) + '" style="font-size:' + (qClass(w.q) === 'q long' ? '16.5px' : '22px') + ';text-align:left">' + sup(esc(w.q)) + '</div>'
+        + '<div class="sub" style="margin-top:10px">答案 <b class="mono">' + ans(w.ans) + '</b></div>'
+        + '<div class="pask"><div class="k">你问这句</div>' + esc(w.ask) + '</div>'
+        + '<details><summary>讲解思路（他讲不出来你再看）</summary><ol class="sol">'
+        + w.sol.map(x => '<li>' + sup(esc(x)) + '</li>').join('') + '</ol></details>';
       m.appendChild(c2);
     });
   }
 
-  const tip = el('div', 'card note');
-  tip.innerHTML = '<b>三条底线</b><ol class="q">'
-    + '<li>不说「这么简单都不会」。他现在的问题是小学没打牢，不是不聪明。</li>'
-    + '<li>只讲 2 道。讲多了他记不住，也会把 10 分钟拖成 40 分钟然后崩。</li>'
+  const tip = el('div', 'card');
+  tip.innerHTML = '<div class="eyebrow">四条底线</div><ol class="q2">'
+    + '<li>不说「这么简单都不会」。他的问题是小学没打牢，不是不聪明。</li>'
+    + '<li>只讲 2 道。讲多了记不住，还会把 10 分钟拖成 40 分钟然后崩。</li>'
     + '<li>让他讲、你听。他能把步骤说顺就算过关，说不出来的地方才是真漏洞。</li>'
-    + '<li>表扬要落在具体动作上：「你这次符号定对了」「你先算括号了」。别说「你真聪明」——'
-    + '夸天赋会让他下次遇到难题就认定「我不是这块料」，夸具体做对的步骤才顶用。</li></ol>';
+    + '<li>表扬落在具体动作上：「你这次符号定对了」「你先算括号了」。别说「你真聪明」——'
+    + '夸天赋会让他下次遇到难题就认定自己不是这块料。</li></ol>';
   m.appendChild(tip);
 
-  const cq = el('div', 'card note');
-  cq.innerHTML = '<b>卡住了想问 Claude</b><div class="sub">连续两周没进步、或者不知道该不该调计划的时候，复制这段摘要发给他。</div>';
-  const cqb = el('button', 'btn ghost', '复制进度摘要');
-  cqb.onclick = () => copyBrief(cq);
-  cq.appendChild(cqb);
-  m.appendChild(cq);
-
   const w7 = weekReport();
-  const wr = el('div', 'card');
-  wr.innerHTML = '<b>最近 7 天</b><div class="sub">练了 ' + w7.days + ' 天，共 ' + w7.total + ' 题，正确率 ' + w7.rate + '%。'
-    + (w7.days < 4 ? '天数偏少——先保住每天都碰一下，比某天做很多有用。' : '节奏没问题，保持。') + '</div>';
-  m.appendChild(wr);
+  m.appendChild(el('div', 'card', '<div class="eyebrow">最近 7 天</div>'
+    + '<div class="sub">练了 ' + w7.days + ' 天，' + w7.total + ' 题，正确率 ' + w7.rate + '%。'
+    + (w7.days < 4 ? '天数偏少——先保住每天都碰一下，比某天做很多有用。' : '节奏没问题，保持。') + '</div>'));
+
+  const cq = el('div', 'card');
+  cq.innerHTML = '<div class="eyebrow">卡住了想问 Claude</div>'
+    + '<div class="sub">连续两周没进步、或者不确定该不该调计划的时候，复制这段发给他。</div>';
+  const cb = el('button', 'go sec', '复制进度摘要'); cb.onclick = () => copyBrief(cq);
+  cq.appendChild(cb);
+  m.appendChild(cq);
 }
 
-/* ---------- 数据 ---------- */
 function viewData(m) {
-  const c = el('div', 'card');
-  c.innerHTML = '<h2>最近 14 天</h2>';
   const rows = [];
   for (let i = 13; i >= 0; i--) {
     const d = addDays(today(), -i), l = DB.logs[d];
     let n = 0, r = 0;
     if (l) ['warm', 'focus', 'track', 'review'].forEach(p => (l.res[p] || []).forEach(x => { n++; if (x.ok) r++; }));
-    rows.push({ d, n, r });
+    rows.push({ d: d, n: n, r: r });
   }
-  let h = '<div class="chart">';
+  const c = el('div', 'card');
+  let h = '<div class="eyebrow">最近 14 天正确率</div><div class="chart">';
   rows.forEach(x => {
     const pct = x.n ? Math.round(x.r / x.n * 100) : 0;
-    h += '<div class="bar" title="' + x.d + ' ' + x.r + '/' + x.n + '"><i style="height:' + (x.n ? Math.max(pct, 4) : 0) + '%"></i><span>' + x.d.slice(5).replace('-', '/') + '</span></div>';
+    h += '<div class="bar" title="' + x.d + ' ' + x.r + '/' + x.n + '"><i style="height:'
+      + (x.n ? Math.max(pct, 4) : 0) + '%"></i><b>' + x.d.slice(5).replace('-', '/') + '</b></div>';
   });
-  h += '</div><div class="sub">柱高 = 当天正确率，没柱子 = 那天没练。</div>';
-  c.innerHTML += h;
+  h += '</div><div class="sub">没有柱子 = 那天没练。</div>';
+  c.innerHTML = h;
   m.appendChild(c);
 
   const c2 = el('div', 'card');
-  let h2 = '<b>各知识点掌握度</b><div class="sub">按累计做题正确率，做满 8 题才显示判断</div><table class="tb"><tr><th>知识点</th><th>题数</th><th>正确率</th><th></th></tr>';
+  let h2 = '<div class="eyebrow">各知识点掌握度</div><table class="tb"><tr><th>知识点</th><th>题</th><th>正确率</th><th>难度</th><th></th></tr>';
   TOPICS.forEach(t => {
     const n = mstN(t.k); if (!n) return;
     const r = Math.round(mst(t.k) * 100);
     const lv = n < 8 ? ['样本少', ''] : r >= 85 ? ['稳', 'g'] : r >= 60 ? ['夹生', 'w'] : ['要补', 'b'];
-    h2 += '<tr><td>' + t.name + '<span class="st">' + (t.stage === 'P' ? '小学' : '七上') + '</span></td><td>' + n + '</td><td>' + r + '%</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
+    h2 += '<tr><td>' + esc(t.name) + '<div class="sub" style="font-size:12px">' + (t.stage === 'P' ? '小学' : '七上')
+      + '</div></td><td class="nw">' + n + '</td><td class="nw">' + r + '%</td><td class="nw">L' + pickLv(t.k)
+      + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
   });
-  h2 += '</table>';
+  h2 += '</table><div class="sub" style="margin-top:12px">难度档自动调：近 10 题低于 60% 降到 L1，'
+    + '到 90% 且累计 ≥75%、做过 ≥15 题才升 L3。升保守降灵敏，避免把他砸崩。</div>';
   c2.innerHTML = h2;
   m.appendChild(c2);
 }
 
-/* ---------- 设置 ---------- */
 function viewSet(m) {
   const c = el('div', 'card');
-  c.innerHTML = '<h2>设置</h2>'
+  c.innerHTML = '<div class="eyebrow">时间与节奏</div>'
     + '<div class="kv"><span>启动日</span><input id="s-kick" value="' + DB.profile.kickoff + '"></div>'
     + '<div class="kv"><span>开学日</span><input id="s-ss" value="' + DB.profile.schoolStart + '"></div>'
     + '<div class="kv"><span>每天分钟</span><input id="s-min" value="' + DB.profile.dailyMin + '"></div>';
-  const b = el('button', 'btn', '保存');
+  const b = el('button', 'go', '保存');
   b.onclick = () => {
     DB.profile.kickoff = $('#s-kick').value.trim();
     DB.profile.schoolStart = $('#s-ss').value.trim();
     DB.profile.dailyMin = Math.max(10, Math.min(90, +$('#s-min').value || 25));
-    delete DB.logs[today()];
-    save(); alert('已保存，今日任务会按新时长重新生成'); go('today');
+    delete DB.logs[today()]; save(); render();
   };
   c.appendChild(b);
   m.appendChild(c);
 
+  const cp = el('div', 'card');
+  cp.innerHTML = '<div class="eyebrow">家长区密码</div>'
+    + '<div class="sub">' + (DB.profile.pin ? '已设置。' : '没设置，他自己也能点进这里改分钟数或者清空记录。')
+    + '</div><div class="kv"><span>4 位数字</span><input id="s-pin" value="' + (DB.profile.pin || '') + '" maxlength="4"></div>';
+  const pb = el('button', 'go sec', DB.profile.pin ? '更新密码' : '设置密码');
+  pb.onclick = () => {
+    const v = $('#s-pin').value.trim();
+    if (v && !/^\d{4}$/.test(v)) { alert('要 4 位数字'); return; }
+    DB.profile.pin = v || null; PARENT_OK = true; save(); render();
+  };
+  cp.appendChild(pb);
+  m.appendChild(cp);
+
   const c2 = el('div', 'card');
-  c2.innerHTML = '<b>进度备份</b><div class="sub">数据只存在这台设备的浏览器里。换设备、清缓存前先导出。</div>';
-  const b1 = el('button', 'btn', '导出进度文件');
+  c2.innerHTML = '<div class="eyebrow">进度备份</div>'
+    + '<div class="sub">数据只在这台设备的浏览器里。换设备、清缓存之前先导出。</div>';
+  const b0 = el('button', 'go', '复制进度摘要（给 Claude 看）'); b0.onclick = () => copyBrief(c2);
+  const b1 = el('button', 'go sec', '导出进度文件');
   b1.onclick = () => {
     const blob = new Blob([JSON.stringify(DB)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = 'math-progress-' + today() + '.json';
     document.body.appendChild(a); a.click(); a.remove();
   };
-  const b2 = el('button', 'btn ghost', '复制进度到剪贴板');
-  b2.onclick = () => { const s = JSON.stringify(DB); navigator.clipboard ? navigator.clipboard.writeText(s).then(() => alert('已复制')) : prompt('手动复制：', s); };
-  const inp = el('input', 'file'); inp.type = 'file'; inp.accept = '.json';
-  inp.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader();
-    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.ver) throw new Error('格式不对'); DB = d; save(); alert('已导入'); go('today'); } catch (err) { alert('导入失败：' + err.message); } };
-    r.readAsText(f); };
-  const b0 = el('button', 'btn', '复制进度摘要（给 Claude 看）');
-  b0.onclick = () => copyBrief(c2);
-  c2.appendChild(b0);
-  c2.appendChild(b1); c2.appendChild(b2);
+  const inp = el('input'); inp.type = 'file'; inp.accept = '.json';
+  inp.style.cssText = 'margin-top:14px;font-size:13px;color:var(--ink3)';
+  inp.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.ver) throw new Error('格式不对'); DB = d; save(); render(); }
+      catch (err) { alert('导入失败：' + err.message); } };
+    r.readAsText(f);
+  };
+  c2.appendChild(b0); c2.appendChild(b1);
   c2.appendChild(el('div', 'sub', '导入备份：'));
   c2.appendChild(inp);
   m.appendChild(c2);
 
   const c3 = el('div', 'card');
-  const b3 = el('button', 'btn ghost danger', '清空全部数据');
-  b3.onclick = () => { if (confirm('全部清空，不可恢复。确定？')) { localStorage.removeItem(KEY); load(); go('today'); } };
+  c3.innerHTML = '<div class="eyebrow">危险操作</div>';
+  const b3 = el('button', 'btn danger', '清空全部数据');
+  b3.onclick = () => { if (confirm('全部清空，不可恢复。确定？')) { localStorage.removeItem(KEY); load(); PARENT_OK = true; go('today'); } };
   c3.appendChild(b3);
   m.appendChild(c3);
 }
 
 /* ---------- 启动 ---------- */
 load();
-document.querySelectorAll('.tab').forEach(b => b.onclick = () => go(b.dataset.t));
+if (DB.profile.pin === undefined) { DB.profile.pin = null; save(); }
 render();

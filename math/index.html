@@ -4,154 +4,261 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>数学补漏计划 · 初一</title>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#12161a">
+<title>每天一站 · 初一数学</title>
 <style>
+/* ============================================================
+   视觉系统
+   结构隐喻：线路图。路线固定、站点清晰、你在哪一站、还差几站。
+   数字是主角 → 题目走等宽栈，中文说明走黑体栈，混排即性格。
+   错误不用红色 → 错题明天还会回来，那是「待返回的站」不是「失败」。
+     红只留给清空数据这种真正破坏性的操作。
+   ============================================================ */
 :root{
-  --bg:#f4f2ee; --card:#fffefb; --ink:#23201c; --muted:#7b746a; --line:#e2ddd4;
-  --accent:#2f6f8f; --accent-w:#e8f0f4; --good:#3d7a5a; --good-w:#e6f0ea;
-  --warn:#9a7434; --warn-w:#f4eddd; --bad:#9c5050; --bad-w:#f3e5e3;
-  --r:14px;
+  --bg:#eef2f5; --surface:#ffffff; --surface2:#e4eaef;
+  --ink:#16202a; --ink2:#5a6b7a; --ink3:#8b9aa8;
+  --line:#cdd8e0;
+  --signal:#b8760c; --signal-bg:#fdf3e2;
+  --go:#12796f;    --go-bg:#e2f2f0;
+  --stop:#b8453a;  --stop-bg:#fbeae8;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"PingFang SC","Microsoft YaHei",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+  --r:16px; --tabh:62px;
 }
-@media (prefers-color-scheme:dark){
-:root{
-  --bg:#191817; --card:#232120; --ink:#e9e5df; --muted:#9a938a; --line:#332f2d;
-  --accent:#6ea8c4; --accent-w:#1e2b32; --good:#7bb394; --good-w:#1d2823;
-  --warn:#c9a86a; --warn-w:#2c2620; --bad:#cf8f8f; --bad-w:#2e2222;
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12161a; --surface:#1a2026; --surface2:#232c34;
+  --ink:#e7edf2; --ink2:#9dacb9; --ink3:#6d7d8b;
+  --line:#2e3841;
+  --signal:#f0a93b; --signal-bg:#2a2114;
+  --go:#3fc3b4;    --go-bg:#132622;
+  --stop:#ef7a6e;  --stop-bg:#2a1917;
 }}
-*{box-sizing:border-box}
-html,body{margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Helvetica,Arial,sans-serif;
-  font-size:17px;line-height:1.6;-webkit-text-size-adjust:100%}
-header{position:sticky;top:0;z-index:9;background:var(--bg);border-bottom:1px solid var(--line);
-  padding:10px 12px 0;padding-top:calc(10px + env(safe-area-inset-top))}
-h1{font-size:17px;margin:0 0 8px;font-weight:600;letter-spacing:.02em}
-h1 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
-nav{display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
-nav::-webkit-scrollbar{display:none}
-.tab{flex:0 0 auto;background:none;border:1px solid var(--line);color:var(--muted);
-  padding:7px 14px;border-radius:999px;font-size:15px;font-family:inherit;cursor:pointer}
-.tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
-main{max-width:820px;margin:0 auto;padding:14px 12px calc(40px + env(safe-area-inset-bottom))}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
-.card.dim{color:var(--muted)}
-.card.note{border-left:3px solid var(--accent)}
-.card.fin{opacity:.62}
-h2{font-size:19px;margin:0 0 6px;font-weight:600}
-p{margin:6px 0}
-.sub{color:var(--muted);font-size:14.5px;line-height:1.55;margin-top:4px}
-.row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-.prog{flex:0 0 auto;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums;padding-top:2px}
-.btn{display:inline-block;margin-top:12px;background:var(--accent);color:#fff;border:none;
-  border-radius:10px;padding:11px 20px;font-size:16px;font-family:inherit;cursor:pointer}
-.btn:disabled{opacity:.4}
-.btn.big{width:100%;padding:14px;font-size:17px}
-.btn.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
-.btn.danger{color:var(--bad)}
-.mini{background:none;border:1px solid var(--line);color:var(--muted);border-radius:7px;
-  padding:3px 9px;font-size:13px;font-family:inherit;cursor:pointer}
-.tag{display:inline-block;background:var(--accent-w);color:var(--accent);font-size:13px;
-  padding:3px 10px;border-radius:6px;margin-bottom:10px}
-.qhead{display:flex;justify-content:space-between;color:var(--muted);font-size:14px;margin-bottom:8px}
-.cnt{font-variant-numeric:tabular-nums}
-.pbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:16px}
-.pbar i{display:block;height:100%;background:var(--accent);transition:width .25s}
-.qtext{font-size:22px;line-height:1.75;margin:10px 0 18px;font-weight:500}
-.qtext sup{font-size:.62em;vertical-align:super}
-input.ans{width:100%;font-size:24px;padding:12px 14px;border:1.5px solid var(--line);
-  border-radius:10px;background:var(--bg);color:var(--ink);font-family:inherit;text-align:center}
-.kb{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
-.k{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:15px 0;
-  font-size:21px;font-family:inherit;color:var(--ink);cursor:pointer;-webkit-user-select:none;user-select:none}
-.k:active{background:var(--accent-w)}
-.k.fn{font-size:15px;color:var(--muted)}
-.k.go{background:var(--accent);color:#fff;border-color:var(--accent);font-size:17px}
-.opts{display:grid;gap:9px}
-.opt{text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:10px;
-  padding:14px 16px;font-size:19px;font-family:inherit;color:var(--ink);cursor:pointer}
-.opt.sel{border-color:var(--accent)}
-.fb{margin-top:14px}
-.fb.ok{border-top:1px solid var(--good);padding-top:12px}
-.fb.no{border-top:1px solid var(--bad);padding-top:12px}
-.fbhead{font-weight:600;font-size:17px}
-.fb.ok .fbhead{color:var(--good)}
-.fb.no .fbhead{color:var(--bad)}
-.right{margin-top:4px}
-.sol{margin:10px 0 0;padding-left:22px;color:var(--muted);font-size:15.5px}
-.sol li{margin:5px 0}
-.done{text-align:center;padding:22px 0}
-.done b{font-size:19px}
-.tb{width:100%;border-collapse:collapse;margin-top:10px;font-size:15px}
-.tb th{text-align:left;color:var(--muted);font-weight:500;font-size:13.5px;
-  border-bottom:1px solid var(--line);padding:6px 8px 6px 0}
-.tb td{padding:8px 8px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
-.tb tr.now td{background:var(--accent-w)}
-.st{color:var(--muted);font-size:12px;margin-left:6px}
-.pill{display:inline-block;font-size:12.5px;padding:2px 9px;border-radius:5px;
-  background:var(--line);color:var(--muted)}
-.pill.g{background:var(--good-w);color:var(--good)}
-.pill.w{background:var(--warn-w);color:var(--warn)}
-.pill.b{background:var(--bad-w);color:var(--bad)}
-ol.q{margin:8px 0 0;padding-left:22px}
-ol.q li{margin:6px 0}
-.wq{border-top:1px solid var(--line);padding:10px 0}
-.wqq{font-size:16.5px}
-.wqa{color:var(--muted);font-size:13.5px;margin-top:3px}
-.kv{display:flex;justify-content:space-between;align-items:center;gap:12px;
-  padding:9px 0;border-bottom:1px solid var(--line)}
-.kv span{color:var(--muted);font-size:14.5px;flex:0 0 auto}
-.kv input{flex:1 1 auto;max-width:200px;text-align:right;font-size:16px;padding:6px 10px;
-  border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:inherit}
-.pask{background:var(--accent-w);border-radius:10px;padding:12px 14px;margin-top:12px}
-.pask b{color:var(--accent);font-size:14px}
-details{margin-top:10px}
-summary{color:var(--accent);font-size:15px;cursor:pointer}
-.chart{display:flex;align-items:flex-end;gap:4px;height:130px;margin:14px 0 4px}
-.bar{flex:1 1 0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
-.bar i{display:block;width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:0}
-.bar span{font-size:9.5px;color:var(--muted);margin-top:4px;writing-mode:vertical-rl;letter-spacing:-.04em}
-input.file{margin-top:8px;font-size:14px;color:var(--muted)}
-textarea.briefbox{width:100%;margin-top:12px;font-size:12.5px;line-height:1.5;padding:10px;
-  border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);
-  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;-webkit-text-size-adjust:100%}
-.card.gain{border-left:3px solid var(--good)}
-.grow{display:flex;align-items:baseline;gap:10px;margin-top:9px}
-.grow i{flex:0 0 auto;font-style:normal;font-weight:600;color:var(--good);font-size:16px;
-  background:var(--good-w);padding:2px 9px;border-radius:6px;font-variant-numeric:tabular-nums}
-.grow span{font-size:15px;line-height:1.45}
-.fact{margin-top:18px;padding:14px 16px;background:var(--accent-w);border-radius:12px}
-.fact .ftag{font-size:12px;color:var(--accent);letter-spacing:.06em;margin-bottom:6px}
-.fact b{font-size:17px;display:block;margin-bottom:6px}
-.fact p{margin:0;font-size:15px;line-height:1.65;color:var(--ink)}
-.card.boss{border-left:3px solid var(--warn)}
-.lvtag{display:inline-block;margin-top:5px;font-size:12.5px;color:var(--warn);
-  background:var(--warn-w);padding:2px 8px;border-radius:5px}
-.miles{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
-.miles>div{flex:1 1 120px;background:var(--accent-w);border-radius:10px;padding:10px 12px}
-.miles b{display:block;font-size:20px;color:var(--accent);font-variant-numeric:tabular-nums}
-.miles span{font-size:12.5px;color:var(--muted);line-height:1.35;display:block;margin-top:2px}
-.mile{font-size:13px;color:var(--warn);margin-top:4px;line-height:1.45}
-.nw{white-space:nowrap;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
-.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.warnbar{background:var(--bad-w);color:var(--bad);padding:11px 14px;font-size:14.5px;line-height:1.5;
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  font-size:16px;line-height:1.6}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+
+.top{position:sticky;top:0;z-index:20;background:var(--bg);
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
   border-bottom:1px solid var(--line)}
-@media (min-width:700px){ .qtext{font-size:25px} .kb{max-width:420px} }
+.top .d{font-family:var(--mono);font-size:19px;font-weight:650;letter-spacing:-.03em}
+.top .d i{font-family:var(--sans);font-size:13px;font-weight:400;font-style:normal;
+  color:var(--ink2);margin:0 1px 0 1px}
+.top .w{font-size:12px;color:var(--ink3);letter-spacing:.06em;margin-left:9px;font-family:var(--sans)}
+.pbtn{font-size:12px;color:var(--ink3);letter-spacing:.06em;padding:5px 11px;
+  border:1px solid var(--line);border-radius:999px;white-space:nowrap}
+.pbtn:active{background:var(--surface2)}
+
+main{max-width:680px;margin:0 auto;padding:16px 16px calc(var(--tabh) + 26px + env(safe-area-inset-bottom))}
+main.full{padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;
+  background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{flex:1;padding:9px 0 8px;display:flex;flex-direction:column;
+  align-items:center;gap:3px;color:var(--ink3);font-size:11px;letter-spacing:.06em}
+.tabs button b{font-size:18px;line-height:1;font-weight:400;font-family:var(--mono)}
+.tabs button.on{color:var(--signal)}
+.tabs.hide{display:none}
+
+.card{background:var(--surface);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.eyebrow{font-size:11.5px;letter-spacing:.14em;color:var(--ink3);margin-bottom:12px}
+.sub{color:var(--ink2);font-size:14px;line-height:1.55}
+.mono{font-family:var(--mono)}
+
+/* 线路：signature element */
+.route{display:flex;margin:2px 0}
+.stop{flex:1 1 0;position:relative;text-align:center;min-width:0}
+.stop::before,.stop::after{content:'';position:absolute;top:10px;height:2px;background:var(--line)}
+.stop::before{left:0;right:50%}
+.stop::after{left:50%;right:0}
+.stop:first-child::before,.stop:last-child::after{display:none}
+.stop.done::before,.stop.done::after,.stop.now::before{background:var(--go)}
+.stop i{position:relative;z-index:1;display:block;width:22px;height:22px;margin:0 auto;
+  border-radius:50%;background:var(--surface);border:2px solid var(--line);
+  transition:background .25s,border-color .25s}
+.stop.done i{background:var(--go);border-color:var(--go)}
+.stop.wait i{border-color:var(--signal);background:var(--signal-bg)}
+.stop.now i{border-color:var(--signal);border-width:3px;box-shadow:0 0 0 5px var(--signal-bg)}
+.stop b{display:block;font-size:12px;font-weight:500;margin-top:8px;color:var(--ink2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stop em{display:block;font-family:var(--mono);font-size:11px;font-style:normal;
+  color:var(--ink3);margin-top:1px}
+.stop.now b{color:var(--signal);font-weight:650}
+.stop.done b{color:var(--ink3)}
+.weekbar{margin:2px 0 18px}
+.weekbar .wt{font-size:13px;color:var(--ink2);margin-top:11px;line-height:1.5}
+.route.mini .stop i{width:8px;height:8px;border-width:1.5px}
+.route.mini .stop.now i{border-width:2px;box-shadow:0 0 0 3px var(--signal-bg)}
+.route.mini .stop::before,.route.mini .stop::after{height:1.5px}
+.route.mini .stop::before,.route.mini .stop::after{top:3px}
+.route.mini .stop b{font-size:11px;margin-top:7px;font-weight:400}
+.route.mini .stop.now b{font-weight:600}
+
+.nowcard{background:var(--surface);border-radius:var(--r);padding:20px;margin-bottom:14px;
+  border:1.5px solid var(--signal)}
+.nowcard .k{font-size:11.5px;letter-spacing:.14em;color:var(--signal);margin-bottom:9px}
+.nowcard h2{font-size:21px;margin-bottom:6px}
+.nowcard .meta{font-family:var(--mono);font-size:13px;color:var(--ink3);margin-top:5px}
+.go{display:block;width:100%;margin-top:17px;background:var(--signal);color:#fff;
+  border-radius:12px;padding:15px;font-size:17px;font-weight:600;letter-spacing:.02em}
+.go:active{transform:scale(.985)}
+.go.sec{background:none;color:var(--signal);border:1.5px solid var(--line);font-weight:500}
+.btn{display:inline-block;margin-top:12px;background:var(--surface2);color:var(--ink);
+  border-radius:10px;padding:10px 18px;font-size:15px;font-weight:500}
+.btn.pri{background:var(--signal);color:#fff}
+.btn.danger{color:var(--stop);background:var(--stop-bg)}
+
+.qwrap{display:flex;flex-direction:column;min-height:calc(100vh - 92px);
+  min-height:calc(100dvh - 92px)}
+.qbar{display:flex;align-items:center;gap:11px;padding:0 0 13px}
+.qbar .back{font-family:var(--mono);font-size:20px;color:var(--ink3);padding-right:4px}
+.qbar .nm{font-size:13px;color:var(--ink2);flex:1 1 auto;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qbar .ct{font-family:var(--mono);font-size:13px;color:var(--ink3);flex:0 0 auto}
+.dots{display:flex;gap:5px;padding-bottom:22px}
+.dots i{flex:1 1 0;height:4px;border-radius:2px;background:var(--line);transition:background .3s}
+.dots i.ok{background:var(--go)}
+.dots i.no{background:var(--signal)}
+.dots i.cur{background:var(--ink3)}
+.qbody{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;
+  padding:10px 0 76px;text-align:center}
+.tag{display:inline-block;align-self:center;font-size:12px;letter-spacing:.05em;
+  color:var(--signal);background:var(--signal-bg);padding:4px 12px;border-radius:999px;margin-bottom:22px}
+.tag.plain{color:var(--ink3);background:var(--surface2)}
+.q{font-family:var(--mono);font-size:34px;font-weight:600;line-height:1.5;
+  letter-spacing:-.02em;font-variant-numeric:tabular-nums;word-break:break-word}
+.q.mid{font-size:25px;line-height:1.55}
+.q.long{font-size:19.5px;line-height:1.8;text-align:left;font-weight:400;font-family:var(--sans)}
+.q.long b{font-family:var(--mono);font-weight:600}
+.q sup{font-size:.58em;vertical-align:super}
+.slot{margin:22px auto 0;min-width:190px;max-width:100%;padding:8px 24px 10px;
+  border-bottom:3px solid var(--ink3);font-family:var(--mono);font-size:38px;
+  font-weight:600;min-height:60px;transition:border-color .2s;font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;justify-content:center}
+.slot.has{border-color:var(--signal)}
+.caret{display:inline-block;width:3px;height:38px;background:var(--signal);
+  animation:blink 1.1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.hint{font-size:12.5px;color:var(--ink3);margin-top:11px;letter-spacing:.02em}
+.opts{display:grid;gap:10px;margin-top:24px;text-align:left}
+.opt{background:var(--surface);border:1.5px solid var(--line);border-radius:12px;
+  padding:16px 18px;font-family:var(--mono);font-size:18px;font-weight:500}
+.opt:active{border-color:var(--signal)}
+
+.pad{position:sticky;bottom:0;background:var(--bg);
+  padding:10px 0 calc(8px + env(safe-area-inset-bottom));
+  display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.pad button{background:var(--surface);border-radius:13px;padding:15px 0;
+  font-family:var(--mono);font-size:23px;font-weight:500;box-shadow:0 1px 0 var(--line)}
+.pad button:active{background:var(--surface2);transform:scale(.96)}
+.pad .fn{font-family:var(--sans);font-size:14px;color:var(--ink2)}
+.pad .ok{background:var(--signal);color:#fff;font-family:var(--sans);font-size:16px;font-weight:600}
+.skip{display:block;width:100%;text-align:center;font-size:13.5px;color:var(--ink3);
+  padding:13px 0 2px;text-decoration:underline;text-underline-offset:3px}
+
+.fb{margin-top:22px;padding-top:17px;border-top:2px solid var(--line);text-align:left}
+.fb.ok{border-color:var(--go)}
+.fb.no{border-color:var(--signal)}
+.fb .h{font-size:16px;font-weight:650;display:flex;align-items:baseline;gap:9px}
+.fb.ok .h{color:var(--go)}
+.fb.no .h{color:var(--signal)}
+.fb .h .mk{font-family:var(--mono);font-size:19px}
+.fb .ra{margin-top:9px;font-size:15px;color:var(--ink2)}
+.fb .ra b{font-family:var(--mono);font-size:19px;color:var(--ink)}
+.sol{margin:14px 0 0;padding-left:20px;color:var(--ink2);font-size:14.5px;line-height:1.7}
+.sol li{margin:6px 0}
+.pulse{animation:pulse .45s ease-out}
+@keyframes pulse{0%{transform:scale(1)}35%{transform:scale(1.3)}100%{transform:scale(1)}}
+.fadein{animation:fadein .22s ease-out}
+@keyframes fadein{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+.gains{background:var(--go-bg);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.gains .eyebrow{color:var(--go)}
+.grow{display:flex;align-items:baseline;gap:13px;margin-top:11px}
+.grow i{flex:0 0 auto;font-family:var(--mono);font-style:normal;font-weight:650;
+  font-size:19px;color:var(--go);font-variant-numeric:tabular-nums;min-width:60px}
+.grow span{font-size:14.5px;line-height:1.45}
+
+.coll{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+.fc{background:var(--surface);border-radius:13px;padding:14px;min-height:102px;
+  display:flex;flex-direction:column;justify-content:space-between;text-align:left}
+.fc .n{font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.08em}
+.fc .t{font-size:14.5px;font-weight:600;line-height:1.4;margin-top:9px}
+.fc.lock{background:none;border:1.5px dashed var(--line)}
+.fc.lock .t{color:var(--ink3);font-weight:400}
+.fdetail{background:var(--signal-bg);border-radius:var(--r);padding:20px;margin-bottom:14px}
+.fdetail .eyebrow{color:var(--signal)}
+.fdetail h3{font-size:19px;margin-bottom:11px;line-height:1.4}
+.fdetail p{margin:0;font-size:15px;line-height:1.75}
+
+body.parent{--signal:#12796f;--signal-bg:#e2f2f0}
+@media (prefers-color-scheme:dark){body.parent{--signal:#3fc3b4;--signal-bg:#132622}}
+.pbanner{background:var(--surface2);border-radius:12px;padding:12px 15px;margin-bottom:16px;
+  font-size:13.5px;color:var(--ink2);line-height:1.55}
+.tb{width:100%;border-collapse:collapse;font-size:14px}
+.tb th{text-align:left;font-weight:500;font-size:11.5px;letter-spacing:.1em;color:var(--ink3);
+  padding:0 8px 8px 0;border-bottom:1px solid var(--line)}
+.tb td{padding:9px 8px 9px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.tb tr.now td{background:var(--signal-bg)}
+.tb .nw{font-family:var(--mono);font-size:12px;color:var(--ink3);white-space:nowrap}
+.pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:6px;
+  background:var(--surface2);color:var(--ink2);white-space:nowrap}
+.pill.g{background:var(--go-bg);color:var(--go)}
+.pill.w{background:#fdf3e2;color:#b8760c}
+.pill.b{background:var(--stop-bg);color:var(--stop)}
+@media (prefers-color-scheme:dark){.pill.w{background:#2a2114;color:#f0a93b}}
+.mile{font-size:12.5px;color:#b8760c;margin-top:5px;line-height:1.45}
+@media (prefers-color-scheme:dark){.mile{color:#f0a93b}}
+.miles{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap}
+.miles>div{flex:1 1 110px;background:var(--surface2);border-radius:11px;padding:11px 13px}
+.miles b{display:block;font-family:var(--mono);font-size:21px;font-weight:650}
+.miles span{font-size:11.5px;color:var(--ink3);display:block;margin-top:2px;line-height:1.35}
+ol.q2{margin:10px 0 0;padding-left:20px;font-size:14.5px;line-height:1.7}
+ol.q2 li{margin:7px 0}
+.kv{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:11px 0;border-bottom:1px solid var(--line)}
+.kv span{color:var(--ink2);font-size:14px;flex:0 0 auto}
+.kv input{flex:1 1 auto;max-width:190px;text-align:right;font-family:var(--mono);font-size:15px;
+  padding:7px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink)}
+.pask{background:var(--signal-bg);border-radius:12px;padding:14px 16px;margin-top:14px}
+.pask .k{font-size:11.5px;letter-spacing:.1em;color:var(--signal);margin-bottom:5px}
+details{margin-top:12px}
+summary{color:var(--signal);font-size:14.5px;cursor:pointer}
+.wq{border-top:1px solid var(--line);padding:11px 0}
+.wq .t{font-family:var(--mono);font-size:15px;line-height:1.5}
+.wq .a{font-size:12.5px;color:var(--ink3);margin-top:4px;font-family:var(--mono)}
+.chart{display:flex;align-items:flex-end;gap:3px;height:110px;margin:16px 0 6px}
+.bar{flex:1 1 0;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+.bar i{display:block;background:var(--signal);border-radius:2px 2px 0 0}
+.bar b{font-family:var(--mono);font-size:8.5px;color:var(--ink3);font-weight:400;
+  writing-mode:vertical-rl;margin-top:4px;letter-spacing:-.05em}
+textarea.brief{width:100%;margin-top:12px;font-family:var(--mono);font-size:12px;line-height:1.55;
+  padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);
+  color:var(--ink);resize:vertical}
+.pin{display:flex;gap:10px;justify-content:center;margin:20px 0 6px}
+.pin i{width:15px;height:15px;border-radius:50%;border:2px solid var(--line);display:block}
+.pin i.on{background:var(--ink);border-color:var(--ink)}
+.warnbar{background:var(--stop-bg);color:var(--stop);padding:11px 16px;font-size:13.5px;line-height:1.5}
+.empty{text-align:center;padding:42px 20px;color:var(--ink3)}
+.empty .mk{font-family:var(--mono);font-size:28px;display:block;margin-bottom:12px;color:var(--line)}
+
+@media (min-width:620px){
+  .q{font-size:42px}
+  .pad{max-width:400px;margin:0 auto}
+  .slot{font-size:44px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
-<header>
-  <h1>数学补漏计划 <small>北师大版 · 七年级上</small></h1>
-  <nav>
-    <button class="tab on" data-t="today">今日</button>
-    <button class="tab" data-t="diag">诊断</button>
-    <button class="tab" data-t="plan">计划</button>
-    <button class="tab" data-t="wrong">错题本</button>
-    <button class="tab" data-t="parent">家长</button>
-    <button class="tab" data-t="data">数据</button>
-    <button class="tab" data-t="set">设置</button>
-  </nav>
-</header>
+<header class="top" id="top"></header>
 <main id="main"></main>
+<nav class="tabs" id="tabs"></nav>
 <script>
 /* ============================================================
    题库引擎 —— 北师大版七年级上 + 小学基础补漏
@@ -169,6 +276,8 @@ function nCop(d) { const c = []; for (let i = 1; i < d; i++) if (gcd(i, d) === 1
 function divisors(n) { const r = []; for (let i = 1; i <= n; i++) if (n % i === 0) r.push(i); return r; }
 /* 负数套括号 */
 function P(x) { return x < 0 ? '(−' + (-x) + ')' : '' + x; }
+/* 裸数字用数学负号，别让题干里冒出半角 -3 */
+function N(x) { return x < 0 ? '−' + (-x) : '' + x; }
 /* 带符号连接，如 " − 3" / " + 5" */
 function S(x) { return x < 0 ? ' − ' + (-x) : ' + ' + x; }
 /* 形如 3x − 5 的一次式 */
@@ -259,7 +368,7 @@ const TOPICS = [
     const L = d1 * d2 / gcd(d1, d2);
     const a = n1 * L / d1, b = n2 * L / d2;
     const f = frac(plus ? a + b : a - b, L);
-    return { q: `计算（结果化成最简分数）：${n1}/${d1} ${plus ? '+' : '−'} ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
+    return { q: `${n1}/${d1} ${plus ? '+' : '−'} ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
       sol: [`公分母取 ${L}`, `${n1}/${d1} = ${a}/${L}，${n2}/${d2} = ${b}/${L}`,
             `${a}/${L} ${plus ? '+' : '−'} ${b}/${L} = ${plus ? a + b : a - b}/${L} = ${fstr(f)}`] };
   }
@@ -273,7 +382,7 @@ const TOPICS = [
     const a = nCop(b), c = nCop(d);
     const mul = Math.random() < 0.5;
     const f = mul ? frac(a * c, b * d) : frac(a * d, b * c);
-    return { q: `计算（结果化成最简分数）：${a}/${b} ${mul ? '×' : '÷'} ${c}/${d} = ?`, ans: fstr(f), type: 'frac',
+    return { q: `${a}/${b} ${mul ? '×' : '÷'} ${c}/${d} = ?`, ans: fstr(f), type: 'frac',
       sol: mul ? [`分子乘分子，分母乘分母：${a * c}/${b * d}`, `约简 = ${fstr(f)}`]
                : [`除以一个分数 = 乘它的倒数：${a}/${b} × ${d}/${c}`, `= ${a * d}/${b * c} = ${fstr(f)}`] };
   }
@@ -286,7 +395,7 @@ const TOPICS = [
     if (t === 1) {
       const x = R(11, 99) / 10, y = R(2, 9);
       const ans = Math.round(x * y * 10) / 10;
-      return { q: `计算：${x} × ${y} = ?`, ans: '' + ans, type: 'num',
+      return { q: `${x} × ${y} = ?`, ans: '' + ans, type: 'num',
         sol: [`先当整数算：${x * 10} × ${y} = ${x * 10 * y}`, `原来一共 1 位小数，结果点上 1 位：${ans}`] };
     }
     if (t === 2) {
@@ -297,7 +406,7 @@ const TOPICS = [
     }
     const q0 = R(2, 9), dv = R(11, 49) / 10;
     const dd = Math.round(dv * q0 * 10) / 10;
-    return { q: `计算：${dd} ÷ ${dv} = ?`, ans: '' + q0, type: 'num',
+    return { q: `${dd} ÷ ${dv} = ?`, ans: '' + q0, type: 'num',
       sol: [`除数变整数：两边同时乘 10 → ${dd * 10} ÷ ${dv * 10}`, `= ${q0}`] };
   }
 },
@@ -446,7 +555,7 @@ const TOPICS = [
   gen() {
     const t = R(1, 4);
     if (t === 1) { const a = R(2, 20) * pick([1, -1]);
-      return { q: `${a} 的相反数是 ?`, ans: '' + (-a), type: 'num', sol: [`只改符号不改大小：${-a}`] }; }
+      return { q: `${N(a)} 的相反数是 ?`, ans: '' + (-a), type: 'num', sol: [`只改符号不改大小：${N(-a)}`] }; }
     if (t === 2) { const d = R(2, 11), n = nCop(d), s = pick([1, -1]);
       return { q: `${s < 0 ? '−' : ''}${n}/${d} 的倒数是 ?`, ans: fstr(frac(s * d, n)), type: 'frac',
         sol: [`分子分母对调，符号不变：${fstr(frac(s * d, n))}`] }; }
@@ -465,7 +574,7 @@ const TOPICS = [
     const M = LV === 1 ? 9 : LV === 3 ? 30 : 15;
     const a = R(-M, M) || 3, b = R(-M, M) || -4, c = R(-M, M) || 5;
     const ans = a + b - c;
-    return { q: `计算：${P(a)} + ${P(b)} − ${P(c)} = ?`, ans: '' + ans, type: 'num',
+    return { q: `${P(a)} + ${P(b)} − ${P(c)} = ?`, ans: '' + ans, type: 'num',
       sol: [`减 ${P(c)} 就是加它的相反数 ${P(-c)}`, `${P(a)} + ${P(b)} + ${P(-c)}`, `= ${a + b} + ${P(-c)} = ${ans}`] };
   }
 },
@@ -477,7 +586,7 @@ const TOPICS = [
     const b = Math.abs(c) * k * pick([1, -1]);
     const ans = a * b / c;
     const negs = [a, b, c].filter(x => x < 0).length;
-    return { q: `计算：${P(a)} × ${P(b)} ÷ ${P(c)} = ?`, ans: '' + ans, type: 'num',
+    return { q: `${P(a)} × ${P(b)} ÷ ${P(c)} = ?`, ans: '' + ans, type: 'num',
       sol: [`先看符号：有 ${negs} 个负号，${negs % 2 === 0 ? '偶数个 → 结果为正' : '奇数个 → 结果为负'}`,
             `再算绝对值：${Math.abs(a)} × ${Math.abs(b)} ÷ ${Math.abs(c)} = ${Math.abs(ans)}`, `所以 = ${ans}`] };
   }
@@ -488,7 +597,7 @@ const TOPICS = [
   gen() {
     const a = R(-15, -2), b = R(1, 9), c = R(1, 9), d = R(2, 15);
     const ans = Math.abs(a) + Math.abs(b - c) - d;
-    return { q: `计算：|−${-a}| + |${b} − ${c}| − |−${d}| = ?`, ans: '' + ans, type: 'num',
+    return { q: `|−${-a}| + |${b} − ${c}| − |−${d}| = ?`, ans: '' + ans, type: 'num',
       sol: [`先把每个绝对值里面算出来：|${b}−${c}| = |${b - c}| = ${Math.abs(b - c)}`,
             `${-a} + ${Math.abs(b - c)} − ${d} = ${ans}`] };
   }
@@ -498,13 +607,13 @@ const TOPICS = [
   ask: '这是初一最大的坑：让他读出来——是「负数的平方」还是「平方的相反数」。',
   gen() {
     const b = R(2, LV === 1 ? 4 : 6), form = LV === 1 ? R(1, 2) : R(1, 4);
-    if (form === 1) return { q: `计算：(−${b})² = ?`, ans: '' + b * b, type: 'num',
+    if (form === 1) return { q: `(−${b})² = ?`, ans: '' + b * b, type: 'num',
       sol: [`底数是 −${b}，(−${b})² = (−${b})×(−${b}) = ${b * b}`, `负负得正`] };
-    if (form === 2) return { q: `计算：−${b}² = ?`, ans: '' + (-b * b), type: 'num',
+    if (form === 2) return { q: `−${b}² = ?`, ans: '' + (-b * b), type: 'num',
       sol: [`底数只是 ${b}，负号在外面`, `−${b}² = −(${b}×${b}) = ${-b * b}`] };
-    if (form === 3) return { q: `计算：(−${b})³ = ?`, ans: '' + (-b * b * b), type: 'num',
+    if (form === 3) return { q: `(−${b})³ = ?`, ans: '' + (-b * b * b), type: 'num',
       sol: [`三个负数相乘，奇数个负号 → 结果为负`, `= ${-b * b * b}`] };
-    return { q: `计算：−(−${b})² = ?`, ans: '' + (-b * b), type: 'num',
+    return { q: `−(−${b})² = ?`, ans: '' + (-b * b), type: 'num',
       sol: [`先算 (−${b})² = ${b * b}`, `外面还有一个负号：${-b * b}`] };
   }
 },
@@ -516,13 +625,13 @@ const TOPICS = [
     if (t === 1) {
       const a = R(2, LV === 1 ? 3 : 5), b = R(2, 4), d = R(1, 9);
       const ans = -a * a - b * b + d;
-      return { q: `计算：−${a}² + (−${b})³ ÷ ${b} − (−${d}) = ?`, ans: '' + ans, type: 'num',
+      return { q: `−${a}² + (−${b})³ ÷ ${b} − (−${d}) = ?`, ans: '' + ans, type: 'num',
         sol: [`−${a}² = ${-a * a}（负号在外）`, `(−${b})³ = ${-b * b * b}，÷ ${b} = ${-b * b}`,
               `− (−${d}) = + ${d}`, `${-a * a} + ${P(-b * b)} + ${d} = ${ans}`] };
     }
     const a = R(2, 5), b = R(2, 9), c0 = R(2, 6), k = R(2, 5), c = c0 * k;
     const real = a * a * b + c / c0;
-    return { q: `计算：(−${a})² × ${b} + ${c} ÷ ${c0} = ?`, ans: '' + real, type: 'num',
+    return { q: `(−${a})² × ${b} + ${c} ÷ ${c0} = ?`, ans: '' + real, type: 'num',
       sol: [`(−${a})² = ${a * a}`, `${a * a} × ${b} = ${a * a * b}`, `${c} ÷ ${c0} = ${c / c0}`, `合并 = ${real}`] };
   }
 },
@@ -538,19 +647,19 @@ const TOPICS = [
     const t = lvT(3);
     if (t === 1) {
       const a = lvR(2, 15), b = R(2, LV === 1 ? 6 : 9), c = -R(2, LV === 1 ? 6 : 9);
-      return { q: `计算：${a} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
+      return { q: `${a} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
         sol: [`中间的「−」是减法运算，${P(c)} 的负号是这个数自带的，两个不能合成一个`,
               `先算乘法：${b} × ${P(c)} = ${b * c}`,
               `再减：${a} − ${P(b * c)} = ${a} + ${-b * c} = ${a - b * c}`] };
     }
     if (t === 2) {
       const a = R(2, 15), c0 = R(2, 6), k = R(2, 5), b = -c0 * k;
-      return { q: `计算：${a} + ${P(b)} ÷ ${c0} = ?`, ans: '' + (a + b / c0), type: 'num',
+      return { q: `${a} + ${P(b)} ÷ ${c0} = ?`, ans: '' + (a + b / c0), type: 'num',
         sol: [`先算除法：${P(b)} ÷ ${c0} = ${b / c0}`,
               `再算加法：${a} + ${P(b / c0)} = ${a + b / c0}`] };
     }
     const a = -R(2, 12), b = R(2, 9), c = -R(2, 9);
-    return { q: `计算：${P(a)} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
+    return { q: `${P(a)} − ${b} × ${P(c)} = ?`, ans: '' + (a - b * c), type: 'num',
       sol: [`三个符号各管各的：开头的负号属于 ${-a}，中间是减法，最后括号里的负号属于 ${-c}`,
             `${b} × ${P(c)} = ${b * c}`,
             `${a} − ${P(b * c)} = ${a} + ${-b * c} = ${a - b * c}`] };
@@ -564,14 +673,14 @@ const TOPICS = [
     if (t === 1) {
       const a = lvR(2, 12), b = lvR(2, 12), c = R(2, 9), d = R(2, 9);
       const ans = (a - b) - (-c + d);
-      return { q: `计算：(${a} − ${b}) − (−${c} + ${d}) = ?`, ans: '' + ans, type: 'num',
+      return { q: `(${a} − ${b}) − (−${c} + ${d}) = ?`, ans: '' + ans, type: 'num',
         sol: [`第一个括号先算出来：${a} − ${b} = ${a - b}`,
               `第二个括号前面是「−」，里面两项都要变号：−(−${c} + ${d}) = +${c} − ${d}`,
               `${a - b} + ${c} − ${d} = ${ans}`] };
     }
     const a = R(5, 20), b = R(2, 12), c = R(2, 9), d = R(2, 9);
     const ans = a - (b - (c - d));
-    return { q: `计算：${a} − [${b} − (${c} − ${d})] = ?`, ans: '' + ans, type: 'num',
+    return { q: `${a} − [${b} − (${c} − ${d})] = ?`, ans: '' + ans, type: 'num',
       sol: [`从最里面的小括号开始：${c} − ${d} = ${c - d}`,
             `中括号里：${b} − ${P(c - d)} = ${b - (c - d)}`,
             `${a} − ${P(b - (c - d))} = ${ans}`] };
@@ -592,7 +701,7 @@ const TOPICS = [
       const f = frac(A + B, L);
       const t1 = (s1 < 0 ? '−' : '') + n1 + '/' + d1;
       const t2 = s2 < 0 ? '(−' + n2 + '/' + d2 + ')' : n2 + '/' + d2;
-      return { q: `计算（结果化成最简分数）：${t1} + ${t2} = ?`, ans: fstr(f), type: 'frac',
+      return { q: `${t1} + ${t2} = ?`, ans: fstr(f), type: 'frac',
         sol: [`通分，公分母 ${L}：${t1} = ${A}/${L}，${(s2 < 0 ? '−' : '') + n2 + '/' + d2} = ${B}/${L}`,
               `分母相同，分子直接加：${A} + ${P(B)} = ${A + B}`,
               `${A + B}/${L} 约简 = ${fstr(f)}`] };
@@ -601,7 +710,7 @@ const TOPICS = [
     const d2 = pick([2, 3, 4, 6].filter(x => x !== d1)), n2 = nCop(d2);
     const A = frac(-(w * d1 + n1), d1), B = frac(n2, d2);
     const f = frac(A.n * B.d + B.n * A.d, A.d * B.d);
-    return { q: `计算（结果化成最简分数）：−${w} ${n1}/${d1} + ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
+    return { q: `−${w} ${n1}/${d1} + ${n2}/${d2} = ?`, ans: fstr(f), type: 'frac',
       sol: [`带分数先化成假分数：−${w} ${n1}/${d1} = ${fstr(A)}`,
             `再通分相加：${fstr(A)} + ${n2}/${d2}`,
             `= ${fstr(f)}`] };
@@ -615,13 +724,13 @@ const TOPICS = [
     const sup = e === 2 ? '²' : '³';
     if (Math.random() < 0.5) {
       const v = frac(Math.pow(n, e) * (e % 2 ? -1 : 1), Math.pow(d, e));
-      return { q: `计算：(−${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
+      return { q: `(−${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
         sol: [`括号里整个 −${n}/${d} 是底数，分子分母都要乘方`,
               `${e} 个负数相乘，${e % 2 ? '奇数个 → 结果为负' : '偶数个 → 结果为正'}`,
               `= ${fstr(v)}`] };
     }
     const v = frac(-Math.pow(n, e), Math.pow(d, e));
-    return { q: `计算：−(${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
+    return { q: `−(${n}/${d})${sup} = ?`, ans: fstr(v), type: 'frac',
       sol: [`底数只是 ${n}/${d}，负号在括号外面，等乘方算完再取相反数`,
             `(${n}/${d})${sup} = ${fstr(frac(Math.pow(n, e), Math.pow(d, e)))}`,
             `前面还有负号 = ${fstr(v)}`] };
@@ -704,8 +813,8 @@ const TOPICS = [
   gen() {
     const t = lvT(3);
     if (t === 1) { const x = LV === 1 ? R(1, 8) : R(-6, 9), m = R(2, LV === 1 ? 5 : 7), n = R(-9, 9);
-      return { q: `解方程：${m}x${S(n)} = ${m * x + n}，x = ?`, ans: '' + x, type: 'num',
-        sol: [`把常数移到右边（变号）：${m}x = ${m * x + n}${S(-n)} = ${m * x}`, `两边除以 ${m}：x = ${x}`] }; }
+      return { q: `解方程：${m}x${S(n)} = ${N(m * x + n)}，x = ?`, ans: '' + x, type: 'num',
+        sol: [`把常数移到右边（变号）：${m}x = ${N(m * x + n)}${S(-n)} = ${N(m * x)}`, `两边除以 ${m}：x = ${N(x)}`] }; }
     if (t === 2) { const x = R(-5, 8), m = R(3, 8); let n = R(2, 7); if (n === m) n = m + 1;
       const a = R(-9, 9), b = (m - n) * x + a;
       return { q: `解方程：${m}x${S(a)} = ${n}x${S(b)}，x = ?`, ans: '' + x, type: 'num',
@@ -713,7 +822,7 @@ const TOPICS = [
     const b1 = pick([2, 3, 4]); let d1 = pick([2, 3, 6]); if (d1 === b1) d1 = b1 + 1;
     const k1 = R(1, 5), k2 = R(1, 5), x = R(-4, 14);
     const a = b1 * k1 - x, c = x - d1 * k2, e = k1 - k2;
-    return { q: `解方程：(x${S(a)})/${b1} − (x${S(c)})/${d1} = ${e}，x = ?`, ans: '' + x, type: 'num',
+    return { q: `解方程：(x${S(a)})/${b1} − (x${S(c)})/${d1} = ${N(e)}，x = ?`, ans: '' + x, type: 'num',
       sol: [`两边同乘分母的最小公倍数 ${b1 * d1 / gcd(b1, d1)}，去分母`,
             `注意：去分母后每个括号整体乘，别漏项`, `整理解得 x = ${x}`] };
   }
@@ -794,39 +903,39 @@ const TMAP = {}; TOPICS.forEach(t => TMAP[t.k] = t);
    出处：小学薄弱生衔接初一的通行做法——先算 5−3，再算 5−(−3)。
    ============================================================ */
 const BRIDGE = {
-  'rat-addsub': () => { const a = R(6, 18), b = R(2, 9);
-    return { p: { q: `${a} − ${b} = ?`, ans: '' + (a - b), type: 'num', sol: [`小学就会：${a - b}`] },
+  'rat-addsub': () => { const a = R(8, 18), b = R(2, a - 3);   /* 必须 a>b，锚点题得是他真会做的 */
+    return { p: { q: `${a} − ${b} = ?`, ans: '' + (a - b), type: 'num', sol: [`这道你小学就做过：${a - b}`, `记住这个数，下一题只多一个负号`] },
              m: { q: `${a} − (−${b}) = ?`, ans: '' + (a + b), type: 'num',
                   sol: [`和上面那道只差括号里的一个负号`, `减去 −${b}，等于加上 ${b}`, `${a} + ${b} = ${a + b}`] } }; },
 
   'rat-muldiv': () => { const a = R(3, 9), b = R(3, 9);
-    return { p: { q: `${a} × ${b} = ?`, ans: '' + a * b, type: 'num', sol: [`口诀就够：${a * b}`] },
+    return { p: { q: `${a} × ${b} = ?`, ans: '' + a * b, type: 'num', sol: [`乘法口诀就够：${a * b}`, `下一题的数字一样，只是前面多个负号`] },
              m: { q: `(−${a}) × ${b} = ?`, ans: '' + (-a * b), type: 'num',
                   sol: [`数字部分和上面一样是 ${a * b}`, `只有 1 个负号，奇数个 → 结果为负`, `= ${-a * b}`] } }; },
 
   'power': () => { const b = R(2, 5);
-    return { p: { q: `${b}³ = ?`, ans: '' + b * b * b, type: 'num', sol: [`${b}×${b}×${b} = ${b * b * b}`] },
+    return { p: { q: `${b}³ = ?`, ans: '' + b * b * b, type: 'num', sol: [`${b}×${b}×${b} = ${b * b * b}`, `下一题把底数换成 −${b}，看看结果会怎样`] },
              m: { q: `(−${b})³ = ?`, ans: '' + (-b * b * b), type: 'num',
                   sol: [`绝对值和上面一样是 ${b * b * b}`, `3 个负数相乘，奇数个 → 负`, `= ${-b * b * b}`] } }; },
 
   'neg-frac': () => { const d1 = pick([2, 3, 4, 6]), d2 = pick([2, 3, 4, 6].filter(x => x !== d1));
     const L = d1 * d2 / gcd(d1, d2);
     return { p: { q: `1/${d1} + 1/${d2} = ?`, ans: fstr(frac(L / d1 + L / d2, L)), type: 'frac',
-                  sol: [`公分母 ${L}，通分后相加 = ${fstr(frac(L / d1 + L / d2, L))}`] },
+                  sol: [`公分母 ${L}，通分后相加 = ${fstr(frac(L / d1 + L / d2, L))}`, `下一题通分的做法一字不改，只是第一项带负号`] },
              m: { q: `−1/${d1} + 1/${d2} = ?`, ans: fstr(frac(-L / d1 + L / d2, L)), type: 'frac',
                   sol: [`通分的做法和上面完全一样，公分母还是 ${L}`, `只是第一项带负号：${-L / d1}/${L} + ${L / d2}/${L}`,
                         `= ${fstr(frac(-L / d1 + L / d2, L))}`] } }; },
 
   'like-terms': () => { const a = R(2, 6), b = R(2, 6), n = R(3, 9);
     return { p: { q: `${a} × ${n} + ${b} × ${n} = ?（用简便方法）`, ans: '' + (a + b) * n, type: 'num',
-                  sol: [`都有 ${n}，提出来：(${a}+${b}) × ${n} = ${(a + b) * n}`] },
+                  sol: [`都有 ${n}，提出来：(${a}+${b}) × ${n} = ${(a + b) * n}`, `下一题把 ${n} 换成字母 a，做法完全一样`] },
              m: { q: `化简：${a}a + ${b}a = ?（填合并后 a 前面的数）`, ans: '' + (a + b), type: 'num',
                   sol: [`把上面那道的 ${n} 换成字母 a，做法一样`, `${a} 个 a 加 ${b} 个 a = ${a + b} 个 a`,
                         `所以是 ${a + b}a，系数 ${a + b}`] } }; },
 
-  'remove-paren': () => { const a = R(10, 20), b = R(2, 6), c = R(2, 6);
+  'remove-paren': () => { const b = R(2, 6), c = R(2, 6), a = R(b + c + 2, 24);
     return { p: { q: `${a} − (${b} + ${c}) = ?`, ans: '' + (a - b - c), type: 'num',
-                  sol: [`括号里先算：${b}+${c} = ${b + c}`, `${a} − ${b + c} = ${a - b - c}`] },
+                  sol: [`括号里先算：${b}+${c} = ${b + c}`, `${a} − ${b + c} = ${a - b - c}`, `下一题不许先算括号，直接去括号看符号`] },
              m: { q: `${a} − (${b} + ${c}) 去括号后等于 ${a} − ${b} ? ${c}，问号处是 + 还是 −？（填 1 表示 +，填 2 表示 −）`,
                   ans: '2', type: 'num',
                   sol: [`括号前是负号，里面每一项都要变号`, `${a} − ${b} − ${c}，所以问号是「−」`,
@@ -834,21 +943,21 @@ const BRIDGE = {
 
   'eval-expr': () => { const a = R(2, 5), b = R(1, 9), x = R(2, 5);
     return { p: { q: `当 x = ${x} 时，${a}x + ${b} = ?`, ans: '' + (a * x + b), type: 'num',
-                  sol: [`把 x 换成 ${x}：${a}×${x} + ${b} = ${a * x + b}`] },
+                  sol: [`把 x 换成 ${x}：${a}×${x} + ${b} = ${a * x + b}`, `下一题 x 变成负数，代入时记得加括号`] },
              m: { q: `当 x = −${x} 时，${a}x + ${b} = ?`, ans: '' + (-a * x + b), type: 'num',
                   sol: [`代入时把 x 用括号包起来：${a}×(−${x}) + ${b}`, `${a}×(−${x}) = ${-a * x}`,
                         `${-a * x} + ${b} = ${-a * x + b}`] } }; },
 
   'linear-eq': () => { const m = R(2, 7), x = R(2, 9), n = R(1, 12);
     return { p: { q: `解方程：${m}x + ${n} = ${m * x + n}，x = ?`, ans: '' + x, type: 'num',
-                  sol: [`两边减 ${n}，再除 ${m}：x = ${x}`] },
-             m: { q: `解方程：${m}x + ${n} = ${-m * x + n}，x = ?`, ans: '' + (-x), type: 'num',
-                  sol: [`步骤和上面一题一模一样：两边减 ${n}`, `${m}x = ${-m * x}`,
-                        `两边除 ${m}：x = ${-x}（初一开始，答案可以是负数）`] } }; },
+                  sol: [`两边减 ${n}，再除 ${m}：x = ${x}`, `下一题步骤一字不改，只是答案会是负数`] },
+             m: { q: `解方程：${m}x + ${n} = ${N(-m * x + n)}，x = ?`, ans: '' + (-x), type: 'num',
+                  sol: [`步骤和上面一题一模一样：两边减 ${n}`, `${m}x = ${N(-m * x)}`,
+                        `两边除 ${m}：x = ${N(-x)}（初一开始，答案可以是负数）`] } }; },
 
-  'sign-mix': () => { const a = R(5, 15), b = R(2, 6), c = R(2, 6);
+  'sign-mix': () => { const b = R(2, 6), c = R(2, 6), a = R(b * c + 1, b * c + 16);
     return { p: { q: `${a} − ${b} × ${c} = ?`, ans: '' + (a - b * c), type: 'num',
-                  sol: [`先乘后减：${b}×${c} = ${b * c}，${a} − ${b * c} = ${a - b * c}`] },
+                  sol: [`先乘后减：${b}×${c} = ${b * c}，${a} − ${b * c} = ${a - b * c}`, `下一题只把 ${c} 换成 −${c}，顺序不变`] },
              m: { q: `${a} − ${b} × (−${c}) = ?`, ans: '' + (a + b * c), type: 'num',
                   sol: [`顺序和上面一样，先算乘法：${b} × (−${c}) = ${-b * c}`,
                         `${a} − (−${b * c})，减负数变加正数`, `= ${a} + ${b * c} = ${a + b * c}`] } }; }
@@ -1393,72 +1502,140 @@ function copyBrief(host) {
   } else showBrief(host, txt);
 }
 function showBrief(host, txt) {
-  const old = host.querySelector('.briefbox'); if (old) old.remove();
-  const ta = el('textarea', 'briefbox'); ta.value = txt || buildBrief(); ta.rows = 16; ta.readOnly = true;
+  const old = host.querySelector('.brief'); if (old) old.remove();
+  const ta = el('textarea', 'brief'); ta.value = txt || buildBrief(); ta.rows = 16; ta.readOnly = true;
   host.appendChild(ta);
   ta.focus(); ta.select();
   host.appendChild(el('div', 'sub', '自动复制没成功。长按上面的框全选复制，粘给 Claude。'));
 }
 
+
 /* ============================================================
-   UI
+   界面层
+   两套视图，分得很干净：
+     孩子看到 今天 / 重练 / 收藏 —— 只有正向信息和行动
+     家长区在右上角，放诊断分档、20 周计划、今晚讲哪 2 题、
+     进度摘要、设置、清空。可选 4 位 PIN。
+   孩子不该看到「你要补 6 项」的清单，也不该能把每天分钟数
+   调成 10 或者一键清空自己的记录。
    ============================================================ */
 const $ = s => document.querySelector(s);
-const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
-function sup(s) { return ('' + s).replace(/\^(-?\d+)/g, '<sup>$1</sup>'); }
+const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h !== undefined) e.innerHTML = h; return e; };
 function esc(s) { return ('' + s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
-
-let TAB = 'today';
-function go(tab) { TAB = tab; render(); window.scrollTo(0, 0); }
-
-function render() {
-  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
-  const m = $('#main'); m.innerHTML = '';
-  if (TAB === 'today') viewToday(m);
-  else if (TAB === 'diag') viewDiag(m);
-  else if (TAB === 'plan') viewPlan(m);
-  else if (TAB === 'wrong') viewWrong(m);
-  else if (TAB === 'parent') viewParent(m);
-  else if (TAB === 'data') viewData(m);
-  else if (TAB === 'set') viewSet(m);
+/* 所有要显示的数学文本都过这里：上标 + 半角负号统一成数学负号。
+   生成器里散落的 -7/60、= -12 混着题干的 −，看着很脏。
+   判定走 parseVal，两种负号都吃，所以这层纯显示、不影响对错。 */
+function sup(s) {
+  return ('' + s)
+    .replace(/\^(-?\d+)/g, '<sup>$1</sup>')
+    .replace(/(^|[\s=(（+×÷,，：|])-(\d)/g, '$1−$2');
+}
+function ans(s) { return sup(esc(s)); }
+/* 题干形态：纯表达式给大等宽，长文字题给正常行文，中间态压字号。
+   一行放不下会折成「= ?」孤零零一行，很难看，所以按长度分三档。 */
+function qClass(q) {
+  q = q || '';
+  const cn = q.replace(/[\s\d+\-−×÷=?()（）。，、：/²³|]/g, '').length;
+  if (cn > 8) return 'q long';
+  return q.length > 16 ? 'q mid' : 'q';
 }
 
-/* ---------- 通用：做题器 ---------- */
-function runner(host, qs, opt) {
-  /* opt: {title, onDone(res), onEach(q,ok,input,i), showSol} */
+const KID_TABS = [
+  { k: 'today', ic: '◉', n: '今天' },
+  { k: 'redo', ic: '◐', n: '重练' },
+  { k: 'coll', ic: '◇', n: '收藏' }
+];
+const P_TABS = [
+  { k: 'p-plan', n: '计划' }, { k: 'p-diag', n: '诊断' }, { k: 'p-tonight', n: '今晚' },
+  { k: 'p-data', n: '数据' }, { k: 'p-set', n: '设置' }
+];
+
+let VIEW = 'today';
+let PARENT_OK = false;        /* 本次会话是否已通过 PIN */
+function isParent(v) { return (v || VIEW).indexOf('p-') === 0; }
+
+function go(v) {
+  if (isParent(v) && DB.profile.pin && !PARENT_OK) { VIEW = 'p-lock'; render(); return; }
+  VIEW = v; render();
+  window.scrollTo(0, 0);
+}
+
+function render() {
+  document.body.classList.toggle('parent', isParent() || VIEW === 'p-lock');
+  const main = $('#main'); main.innerHTML = ''; main.className = '';
+  renderTop();
+  renderTabs();
+  const V = {
+    today: viewToday, redo: viewRedo, coll: viewColl,
+    'p-lock': viewLock, 'p-plan': viewPlan, 'p-diag': viewDiag,
+    'p-tonight': viewTonight, 'p-data': viewData, 'p-set': viewSet
+  };
+  (V[VIEW] || viewToday)(main);
+}
+
+function renderTop() {
+  const t = $('#top');
+  if (isParent() || VIEW === 'p-lock') {
+    t.innerHTML = '<div><span class="d">家长区</span><span class="w">孩子看到的是另一套界面</span></div>';
+    const b = el('button', 'pbtn', '回孩子视图'); b.onclick = () => { go('today'); }; t.appendChild(b);
+    return;
+  }
+  const wi = weekInfo();
+  const dd = parseD(today());
+  t.innerHTML = '<div><span class="d">' + (dd.getMonth() + 1) + '<i>月</i>' + dd.getDate() + '<i>日</i></span>'
+    + '<span class="w">' + '周' + '日一二三四五六'[dd.getDay()] + ' · ' + esc(wi.label) + '</span></div>';
+  const b = el('button', 'pbtn', '家长'); b.onclick = () => go('p-plan'); t.appendChild(b);
+}
+
+function renderTabs() {
+  const n = $('#tabs'); n.innerHTML = ''; n.className = 'tabs';
+  if (VIEW === 'doing' || VIEW === 'p-lock') { n.className = 'tabs hide'; return; }
+  const list = isParent() ? P_TABS : KID_TABS;
+  list.forEach(t => {
+    const b = el('button', VIEW === t.k ? 'on' : '', (t.ic ? '<b>' + t.ic + '</b>' : '') + t.n);
+    b.onclick = () => go(t.k); n.appendChild(b);
+  });
+}
+
+/* ============================================================
+   做题
+   题目居中放大、键盘钉在拇指区、答对答错都给强反馈
+   ============================================================ */
+function runner(qs, opt) {
+  VIEW = 'doing'; renderTabs();
+  const main = $('#main'); main.innerHTML = ''; main.className = 'full';
+  document.body.classList.remove('parent');
+  $('#top').innerHTML = '';
+  const bk = el('button', 'pbtn', '× 退出'); bk.onclick = () => go(opt.backTo || 'today');
+  $('#top').innerHTML = '<div><span class="d">' + esc(opt.title) + '</span></div>';
+  $('#top').appendChild(bk);
+
   let i = 0; const res = [];
-  const box = el('div', 'card');
-  host.appendChild(box);
-  const bar = el('div', 'pbar'); const fill = el('i'); bar.appendChild(fill);
-  const head = el('div', 'qhead');
-  box.appendChild(head); box.appendChild(bar);
-  const body = el('div'); box.appendChild(body);
+  const wrap = el('div', 'qwrap'); main.appendChild(wrap);
+  const dots = el('div', 'dots'); wrap.appendChild(dots);
+  const body = el('div', 'qbody'); wrap.appendChild(body);
+  const padSlot = el('div'); wrap.appendChild(padSlot);
+
+  function paintDots(judged) {
+    dots.innerHTML = '';
+    qs.forEach((q, n) => {
+      let c = '';
+      if (n < i || (n === i && judged !== undefined)) c = res[n] ? 'ok' : 'no';
+      else if (n === i) c = 'cur';
+      dots.appendChild(el('i', c));
+    });
+    if (judged !== undefined && dots.children[i]) dots.children[i].classList.add('pulse');
+  }
 
   function step() {
-    if (i >= qs.length) {
-      box.innerHTML = '';
-      box.appendChild(el('div', 'done', '<b>这一组做完了</b><div class="sub">正确 ' + res.filter(Boolean).length + ' / ' + qs.length + '</div>'));
-      if (opt.fact !== false) {
-        const lg = DB.logs[today()];
-        if (lg && (lg.factsToday || []).length < 2) {
-          const ks = qs.map(x => x.topic).filter(Boolean);
-          const f = pickFact(ks, DB.facts);
-          if (f) {
-            DB.facts.push(f.id); if (DB.facts.length > 200) DB.facts.shift();
-            lg.factsToday.push(f.id); save();
-            box.appendChild(el('div', 'fact', '<div class="ftag">数学冷知识 · 解锁</div><b>' + esc(f.t) + '</b><p>' + esc(f.b) + '</p>'));
-          }
-        }
-      }
-      if (opt.onDone) opt.onDone(res);
-      return;
-    }
+    if (i >= qs.length) return finish();
     const q = qs[i];
-    head.innerHTML = '<span>' + opt.title + '</span><span class="cnt">' + (i + 1) + ' / ' + qs.length + '</span>';
-    fill.style.width = (i / qs.length * 100) + '%';
-    body.innerHTML = '';
-    if (q.tname) body.appendChild(el('div', 'tag', q.tname));
-    body.appendChild(el('div', 'qtext', sup(esc(q.q))));
+    paintDots();
+    body.innerHTML = ''; padSlot.innerHTML = '';
+    body.className = 'qbody fadein';
+
+    if (q.tname) body.appendChild(el('div', 'tag' + (q.bridge === 'p' ? '' : (q.topic ? ' plain' : '')), esc(q.tname)));
+    body.appendChild(el('div', qClass(q.q), sup(esc(q.q))));
 
     let cur = '';
     const fb = el('div', 'fb');
@@ -1467,131 +1644,182 @@ function runner(host, qs, opt) {
       const ok = judge(q, val);
       res[i] = ok;
       if (opt.onEach) opt.onEach(q, ok, val, i);
-      fb.className = 'fb ' + (ok ? 'ok' : 'no');
-      let head;
+      paintDots(ok);
+      fb.className = 'fb ' + (ok ? 'ok' : 'no') + ' fadein';
+      let h;
       if (ok) {
         const st = q.topic ? streakOf(q.topic) : 0;
-        head = '✓ 对了' + (st >= 3 ? ' · 这个知识点连对 ' + st + ' 题了' : '');
+        h = '<div class="h"><span class="mk">✓</span>' + (st >= 3 ? '连对 ' + st + ' 题' : '对了') + '</div>';
       } else {
-        head = '✗ 这次不对 —— 已经放进错题本，明天再考你一次';
+        h = '<div class="h"><span class="mk">→</span>进错题本了，明天再考你一次</div>'
+          + '<div class="ra">答案 <b>' + ans(q.ans) + '</b></div>';
       }
-      let h = '<div class="fbhead">' + head + '</div>';
-      if (!ok) h += '<div class="right">正确答案：<b>' + sup(esc(q.ans)) + '</b></div>';
-      if (opt.showSol !== false && q.sol) h += '<ol class="sol">' + q.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol>';
-      h += '<button class="btn next">下一题 →</button>';
+      if (opt.showSol !== false && q.sol) h += '<ol class="sol">' + q.sol.map(x => '<li>' + sup(esc(x)) + '</li>').join('') + '</ol>';
       fb.innerHTML = h;
-      fb.querySelector('.next').onclick = () => { i++; step(); };
-      body.querySelectorAll('button,input').forEach(b => b.disabled = true);
-      fb.querySelector('.next').disabled = false;
-      fb.scrollIntoView({ block: 'nearest' });
+      const nx = el('button', 'go', i + 1 >= qs.length ? '这组做完了 →' : '下一题 →');
+      nx.onclick = () => { i++; step(); };
+      fb.appendChild(nx);
+      padSlot.innerHTML = '';
+      const hn = body.querySelector('.hint'); if (hn) hn.remove();
+      const sl = body.querySelector('.slot'); if (sl && !ok) sl.style.borderColor = 'var(--signal)';
+      body.querySelectorAll('.opt').forEach(b => b.disabled = true);
+      body.appendChild(fb);
+      nx.scrollIntoView({ block: 'nearest' });
     }
 
     if (q.type === 'choice') {
-      const wrap = el('div', 'opts');
-      q.opts.forEach(o => { const b = el('button', 'opt', sup(esc(o))); b.onclick = () => { wrap.querySelectorAll('.opt').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); submit(o); }; wrap.appendChild(b); });
-      body.appendChild(wrap);
+      const w = el('div', 'opts');
+      q.opts.forEach(o => { const b = el('button', 'opt', sup(esc(o))); b.onclick = () => submit(o); w.appendChild(b); });
+      body.appendChild(w);
     } else {
-      const inp = el('input', 'ans'); inp.setAttribute('inputmode', 'none'); inp.readOnly = true;
-      inp.placeholder = '答案（分数写成 3/4）';
-      body.appendChild(inp);
-      const kb = el('div', 'kb');
-      const keys = ['7', '8', '9', '/', '4', '5', '6', '-', '1', '2', '3', '.', '0', '⌫', '清空', '确定'];
-      keys.forEach(k => {
-        const b = el('button', 'k' + (k === '确定' ? ' go' : (k === '⌫' || k === '清空' ? ' fn' : '')), k);
+      const slot = el('div', 'slot', '<span class="caret"></span>');
+      body.appendChild(slot);
+      body.appendChild(el('div', 'hint', q.type === 'frac' ? '分数写成 3/4，约到最简；负号用 −' : '用下面的键盘输入'));
+      const pad = el('div', 'pad');
+      [['7'], ['8'], ['9'], ['/'], ['4'], ['5'], ['6'], ['−'], ['1'], ['2'], ['3'], ['.'],
+       ['0'], ['删', 'fn'], ['清空', 'fn'], ['确定', 'ok']].forEach(k => {
+        const b = el('button', k[1] || '', k[0]);
         b.onclick = () => {
-          if (k === '⌫') cur = cur.slice(0, -1);
-          else if (k === '清空') cur = '';
-          else if (k === '确定') { if (!cur.trim()) return; submit(cur); return; }
-          else cur += k;
-          inp.value = cur;
+          if (k[0] === '删') cur = cur.slice(0, -1);
+          else if (k[0] === '清空') cur = '';
+          else if (k[0] === '确定') { if (cur.trim()) submit(cur); return; }
+          else cur += (k[0] === '−' ? '-' : k[0]);
+          slot.className = 'slot' + (cur ? ' has' : '');
+          slot.innerHTML = cur ? esc(cur.replace(/-/g, '−')) : '<span class="caret"></span>';
         };
-        kb.appendChild(b);
+        pad.appendChild(b);
       });
-      body.appendChild(kb);
-      const skip = el('button', 'btn ghost', '不会，看解析');
-      skip.onclick = () => submit('###');
-      body.appendChild(skip);
+      padSlot.appendChild(pad);
+      const sk = el('button', 'skip', '不会做，直接看解析');
+      sk.onclick = () => submit('###');
+      padSlot.appendChild(sk);
     }
-    body.appendChild(fb);
+  }
+
+  function finish() {
+    body.innerHTML = ''; padSlot.innerHTML = ''; paintDots();
+    const n = res.filter(Boolean).length;
+    const c = el('div', 'card fadein');
+    c.innerHTML = '<div class="eyebrow">这一组做完了</div><h2 class="mono" style="font-size:30px">' + n + ' / ' + qs.length + '</div>';
+    body.appendChild(c);
+    if (opt.fact !== false) {
+      const lg = DB.logs[today()];
+      if (lg && (lg.factsToday || []).length < 2) {
+        const f = pickFact(qs.map(x => x.topic).filter(Boolean), DB.facts);
+        if (f) {
+          DB.facts.push(f.id); if (DB.facts.length > 300) DB.facts.shift();
+          lg.factsToday.push(f.id); save();
+          body.appendChild(factCard(f, '解锁一张收藏卡'));
+        }
+      }
+    }
+    if (opt.onDone) opt.onDone(res, body);
+    const b = el('button', 'go', '回到今天');
+    b.onclick = () => go(opt.backTo || 'today');
+    body.appendChild(b);
   }
   step();
 }
+function factCard(f, label) {
+  return el('div', 'fdetail fadein', '<div class="eyebrow">' + esc(label) + '</div><h3>' + esc(f.t) + '</h3><p>' + esc(f.b) + '</p>');
+}
 
-/* ---------- 今日 ---------- */
+/* ============================================================
+   孩子视图 · 今天
+   ============================================================ */
+const SEG = [
+  { k: 'warm', n: '热身', full: '口算热身' },
+  { k: 'focus', n: '补漏', full: '补漏主攻' },
+  { k: 'track', n: '跟课', full: '跟课练习' },
+  { k: 'review', n: '重练', full: '错题重练' }
+];
+
 function viewToday(m) {
-  if (!DB.diag.done) {
-    m.appendChild(el('div', 'card hero', '<h2>先做一次入学诊断</h2><p>21 道题，覆盖小学 13 个知识点 + 初一 3 个前置点，大约 20 分钟。做完才知道漏在哪，计划才有意义。中间可以停，成绩会存在这台设备上。</p><button class="btn big" onclick="go(\'diag\')">开始诊断 →</button>'));
-    return;
-  }
+  if (!DB.diag.done) return viewFirst(m);
   const wi = weekInfo();
   const log = buildToday();
-  const parts = [
-    { k: 'warm', name: '① 口算热身', sub: '限时不限对，练手速', qs: log.qs.warm },
-    { k: 'focus', name: '② 补漏主攻', sub: TMAP[log.focusK].name + (log.focus2 ? ' + ' + TMAP[log.focus2].name : ''), qs: log.qs.focus },
-    { k: 'track', name: '③ 跟课练习', sub: log.trackCh, qs: log.qs.track },
-    { k: 'review', name: '④ 错题重做', sub: log.qs.review.length ? '到期错题 ' + log.qs.review.length + ' 道' : '今天没有到期错题', qs: log.qs.review }
-  ];
-  const hdr = el('div', 'card');
-  const lvTxt = log.mini ? '迷你模式' : ({ 1: '题目已自动调简单一档', 2: '', 3: '题目已自动调难一档' })[log.lv ? log.lv.focus : 2] || '';
-  hdr.innerHTML = '<div class="row"><div><h2>' + cnDate(today()) + '</h2><div class="sub">' + wi.label + ' · 本周跟课：' + esc(log.trackCh)
-    + (lvTxt ? '<br><span class="lvtag">' + lvTxt + '</span>' : '') + '</div></div></div>';
-  m.appendChild(hdr);
 
-  /* 今天变强了什么——放在最上面，先看到进步再看到任务 */
-  const gs = gains();
-  const anyDone = ['warm', 'focus', 'track', 'review'].some(k => (log.res[k] || []).length);
-  if (gs.length) {
-    const gc = el('div', 'card gain');
-    gc.innerHTML = '<b>今天你变强了这些</b>' + gs.map(g => '<div class="grow"><i>' + esc(g.big) + '</i><span>' + esc(g.txt) + '</span></div>').join('');
-    m.appendChild(gc);
-  } else if (anyDone) {
-    m.appendChild(el('div', 'card gain', '<b>今天守住了</b><div class="sub">没有退步。基础题稳住不掉，本来就是这个阶段该拿到的东西。</div>'));
+  /* 本周在哪一站 */
+  if (wi.phase === 'term') {
+    const c = el('div', 'weekbar');
+    let h = '<div class="route mini">';
+    for (let w = 1; w <= 20; w++) h += '<div class="stop ' + (w < wi.w ? 'done' : w === wi.w ? 'now' : '') + '"><i></i></div>';
+    h += '</div><div class="wt">学校在讲 · ' + esc(log.trackCh) + '</div>';
+    c.innerHTML = h;
+    m.appendChild(c);
   }
 
-  parts.forEach(p => {
-    const doneN = log.res[p.k].length, totN = p.qs.length;
-    const c = el('div', 'card task' + (totN === 0 ? ' dim' : (doneN >= totN ? ' fin' : '')));
-    const rightN = log.res[p.k].filter(r => r.ok).length;
-    c.innerHTML = '<div class="row"><div><b>' + p.name + '</b><div class="sub">' + esc(p.sub) + '</div></div>'
-      + '<div class="prog">' + (totN === 0 ? '—' : doneN + '/' + totN + (doneN >= totN ? ' ✓ 对 ' + rightN : '')) + '</div></div>';
-    if (totN > 0 && doneN < totN) {
-      const b = el('button', 'btn', doneN ? '继续做' : '开始');
-      b.onclick = () => {
-        m.innerHTML = '';
-        const back = el('button', 'btn ghost', '← 回今日'); back.onclick = () => go('today'); m.appendChild(back);
-        runner(m, p.qs.slice(doneN), {
-          title: p.name,
-          onEach: (q, ok, val) => recordAnswer(p.k, q, val, ok),
-          onDone: () => { const b2 = el('button', 'btn big', '回到今日任务'); b2.onclick = () => go('today'); m.appendChild(b2); }
-        });
-      };
-      c.appendChild(b);
-    }
-    m.appendChild(c);
+  /* 今天四站 */
+  const segs = SEG.map(s => ({ s, qs: log.qs[s.k] || [], done: (log.res[s.k] || []).length }));
+  const live = segs.filter(x => x.qs.length);
+  const curIdx = live.findIndex(x => x.done < x.qs.length);
+  const c2 = el('div', 'card');
+  let h2 = '<div class="eyebrow">今天' + '零一二三四五'[live.length] + '站</div><div class="route">';
+  live.forEach((x, n) => {
+    const st = x.done >= x.qs.length ? 'done' : (n === curIdx ? 'now' : '');
+    const right = (log.res[x.s.k] || []).filter(r => r.ok).length;
+    h2 += '<div class="stop ' + st + '"><i></i><b>' + x.s.n + '</b><em>'
+      + (x.done >= x.qs.length ? '对 ' + right : x.done + '/' + x.qs.length) + '</em></div>';
   });
+  h2 += '</div>';
+  c2.innerHTML = h2;
+  m.appendChild(c2);
 
-  /* 本周挑战：3 道最难档的题，攻下来解锁一条彩蛋。用内容当奖励，不用积分 */
+  /* 当前站 = 唯一的行动 */
+  if (curIdx >= 0) {
+    const x = live[curIdx];
+    const left = x.qs.length - x.done;
+    const nc = el('div', 'nowcard');
+    const detail = x.s.k === 'focus' ? TMAP[log.focusK].name + (log.focus2 ? ' + ' + TMAP[log.focus2].name : '')
+      : x.s.k === 'track' ? log.trackCh
+      : x.s.k === 'review' ? '之前做错的题，回来再考一次'
+      : '先用小学题热手，再进负数';
+    nc.innerHTML = '<div class="k">现在这一站</div><h2>' + x.s.full + '</h2>'
+      + '<div class="sub">' + esc(detail) + '</div>'
+      + '<div class="meta">' + left + ' 道 · 约 ' + Math.max(2, Math.round(left * 0.7)) + ' 分钟</div>';
+    const b = el('button', 'go', x.done ? '接着做' : '开始');
+    b.onclick = () => runner(x.qs.slice(x.done), {
+      title: x.s.full, backTo: 'today',
+      onEach: (q, ok, v) => recordAnswer(x.s.k, q, v, ok)
+    });
+    nc.appendChild(b);
+    m.appendChild(nc);
+  } else {
+    m.appendChild(el('div', 'card', '<div class="eyebrow">今天的四站都过了</div><div class="sub">'
+      + '明天这个时候再来。想多练可以去「重练」翻错题，或者去「收藏」看还差几张卡。</div>'));
+  }
+
+  /* 进步 */
+  const gs = gains();
+  const anyDone = live.some(x => x.done);
+  if (gs.length) {
+    const g = el('div', 'gains');
+    g.innerHTML = '<div class="eyebrow">今天你变强了</div>'
+      + gs.map(x => '<div class="grow"><i>' + esc(x.big) + '</i><span>' + esc(x.txt) + '</span></div>').join('');
+    m.appendChild(g);
+  } else if (anyDone) {
+    m.appendChild(el('div', 'gains', '<div class="eyebrow">今天守住了</div>'
+      + '<div class="sub">没有退步。基础题稳住不掉，本来就是这个阶段该拿到的东西。</div>'));
+  }
+
+  /* 本周挑战 */
   if (!log.mini && wi.phase === 'term') {
-    const bkey = 'W' + wi.w;
-    const doneB = DB.boss[bkey];
-    const bc = el('div', 'card boss' + (doneB ? ' fin' : ''));
-    bc.innerHTML = '<div class="row"><div><b>本周挑战 · ' + bkey + '</b><div class="sub">'
-      + (doneB ? '这周的挑战已经攻下来了，下周一有新的。' : '3 道本周内容里最难档的题。不计入正确率，做不出来不影响任何东西。') + '</div></div></div>';
+    const bkey = 'W' + wi.w, doneB = DB.boss[bkey];
+    const bc = el('div', 'card');
+    bc.innerHTML = '<div class="eyebrow">本周挑战 · ' + bkey + '</div>'
+      + '<div class="sub">' + (doneB ? '这周的攻下来了，下周一有新的。' : '3 道本周内容里最难的。不算正确率，做不出来不影响任何东西。') + '</div>';
     if (!doneB) {
-      const bb = el('button', 'btn', '来一把');
+      const bb = el('button', 'go sec', '来一把');
       bb.onclick = () => {
         const tr = trackOf(wi.w);
-        const bqs = tr.ks.slice(0, 3).concat(tr.ks, tr.ks).slice(0, 3).map(k => genQ(k, 3));
-        m.innerHTML = '';
-        const back = el('button', 'btn ghost', '← 回今日'); back.onclick = () => go('today'); m.appendChild(back);
-        runner(m, bqs, {
-          title: '本周挑战', fact: false,
-          onDone: res => {
+        const ks = tr.ks.concat(tr.ks, tr.ks).slice(0, 3);
+        runner(ks.map(k => genQ(k, 3)), {
+          title: '本周挑战', backTo: 'today', fact: false,
+          onDone: (res, host) => {
             DB.boss[bkey] = { date: today(), right: res.filter(Boolean).length };
             const f = pickFact(tr.ks, DB.facts);
-            if (f) { DB.facts.push(f.id); m.appendChild(el('div', 'card fact', '<div class="ftag">挑战奖励 · 解锁一条冷知识</div><b>' + esc(f.t) + '</b><p>' + esc(f.b) + '</p>')); }
+            if (f) { DB.facts.push(f.id); host.appendChild(factCard(f, '挑战奖励 · 解锁一张卡')); }
             save();
-            const b2 = el('button', 'btn big', '回到今日任务'); b2.onclick = () => go('today'); m.appendChild(b2);
           }
         });
       };
@@ -1600,295 +1828,403 @@ function viewToday(m) {
     m.appendChild(bc);
   }
 
-  /* 状态不好的日子：不硬撑，也不断档 */
+  /* 状态不好 */
   if (!log.mini && !anyDone) {
     const mc = el('div', 'card');
-    mc.innerHTML = '<b>今天状态不好？</b><div class="sub">换成 5 题的迷你版。断一天比硬撑到崩掉更难补回来。</div>';
-    const mb = el('button', 'btn ghost', '换成 5 题');
-    mb.onclick = () => { if (confirm('今天改成 5 题迷你版？')) { buildMini(); go('today'); } };
+    mc.innerHTML = '<div class="eyebrow">今天不太想做</div><div class="sub">换成 5 题的迷你版。'
+      + '断一天比硬撑到崩掉更难补回来。</div>';
+    const mb = el('button', 'go sec', '换成 5 题');
+    mb.onclick = () => { buildMini(); go('today'); };
     mc.appendChild(mb);
     m.appendChild(mc);
   }
-
-  if (log.wrongToday.length) {
-    const c = el('div', 'card note');
-    c.innerHTML = '<b>今天错了 ' + log.wrongToday.length + ' 道</b><div class="sub">去「家长」页拿今晚讲哪 2 道</div>';
-    const b = el('button', 'btn', '看家长清单'); b.onclick = () => go('parent'); c.appendChild(b);
-    m.appendChild(c);
-  }
 }
 
-/* ---------- 诊断 ---------- */
-let DIAGQS = null, DIAGRES = null;
-function viewDiag(m) {
-  if (DB.diag.done && !DIAGQS) {
-    const c = el('div', 'card');
-    let h = '<h2>诊断结果 · ' + DB.diag.date + '</h2><table class="tb"><tr><th>知识点</th><th>正确</th><th>判断</th></tr>';
-    const rows = Object.keys(DB.diag.scores).map(k => { const s = DB.diag.scores[k]; return { k, r: s.right / s.total, s }; }).sort((a, b) => a.r - b.r);
-    rows.forEach(r => {
-      const lv = r.s.total < 2 ? ['只测 1 题', ''] : r.r >= 0.85 ? ['稳', 'g'] : r.r >= 0.5 ? ['夹生', 'w'] : ['要补', 'b'];
-      h += '<tr><td>' + TMAP[r.k].name + '<span class="st">' + (TMAP[r.k].stage === 'P' ? '小学' : '七上') + '</span></td><td>' + r.s.right + '/' + r.s.total + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
-    });
-    h += '</table>';
-    c.innerHTML = h;
-    m.appendChild(c);
-    const c2 = el('div', 'card');
-    c2.innerHTML = '<b>当前补漏队列</b><div class="sub">按「影响初一的程度 × 掌握度」排序，做到近 20 题正确率 85% 自动毕业出队</div><ol class="q">'
-      + DB.queue.map(k => '<li>' + TMAP[k].name + '</li>').join('') + '</ol>';
-    m.appendChild(c2);
-    const c3 = el('div', 'card note');
-    c3.innerHTML = '<b>把结果发给 Claude</b><div class="sub">这个页面没有后端，成绩只存在这台设备上，外面读不到。'
-      + '点下面按钮复制一段摘要（不含姓名学校），粘到对话里，他就能判断补漏顺序要不要重排、难度合不合适。</div>';
-    const cb = el('button', 'btn', '复制进度摘要');
-    cb.onclick = () => copyBrief(c3);
-    const cb2 = el('button', 'btn ghost', '直接看这段文字');
-    cb2.onclick = () => showBrief(c3);
-    c3.appendChild(cb); c3.appendChild(cb2);
-    m.appendChild(c3);
-
-    const b = el('button', 'btn ghost', '重做诊断（会清空队列，保留错题本）');
-    b.onclick = () => { if (confirm('重做诊断？')) { DIAGQS = buildDiag(); DIAGRES = []; render(); } };
-    m.appendChild(b);
-    return;
-  }
-  if (!DIAGQS) { DIAGQS = buildDiag(); DIAGRES = []; }
-  runner(m, DIAGQS, {
-    title: '入学诊断', showSol: true,
-    onEach: (q, ok, v, i) => { DIAGRES[i] = ok; },
-    onDone: res => {
+/* 第一次打开 */
+function viewFirst(m) {
+  const c = el('div', 'card');
+  c.innerHTML = '<div class="eyebrow">开始之前</div>'
+    + '<h2 style="font-size:24px;line-height:1.4">先摸清底子在哪，<br>再决定每天练什么</h2>'
+    + '<div class="sub" style="margin-top:12px">21 道题，小学 13 个知识点加初一 3 个前置点，大约 20 分钟。'
+    + '做完才知道该补哪里。中间可以停，进度存在这台设备上。</div>';
+  const b = el('button', 'go', '开始 21 题');
+  b.onclick = () => startDiag();
+  c.appendChild(b);
+  m.appendChild(c);
+  m.appendChild(el('div', 'card', '<div class="eyebrow">这个 app 怎么用</div>'
+    + '<div class="route" style="margin:6px 0 14px">'
+    + '<div class="stop done"><i></i><b>热身</b></div><div class="stop done"><i></i><b>补漏</b></div>'
+    + '<div class="stop now"><i></i><b>跟课</b></div><div class="stop"><i></i><b>重练</b></div></div>'
+    + '<div class="sub">每天四站，一站一站过。做错的题会自己排到后面的日子再考你一次，'
+    + '答对三轮就从错题本毕业。</div>'));
+}
+let DIAGQS = null;
+function startDiag() {
+  DIAGQS = buildDiag();
+  runner(DIAGQS, {
+    title: '摸底 21 题', backTo: 'today', fact: false,
+    onDone: (res, host) => {
       finishDiag(DIAGQS, res); DIAGQS = null;
-      const b = el('button', 'btn big', '看结果和计划'); b.onclick = () => { go('diag'); }; m.appendChild(b);
+      host.appendChild(el('div', 'card', '<div class="eyebrow">摸完了</div>'
+        + '<div class="sub">明天开始每天四站。详细结果在「家长」里，你不用管。</div>'));
     }
   });
 }
 
-/* ---------- 计划 ---------- */
-function viewPlan(m) {
-  const wi = weekInfo();
-  const c = el('div', 'card');
-  const dMid = dayDiff(today(), addDays(DB.profile.schoolStart, 9 * 7));   /* 期中约在 W10 */
-  const dFin = dayDiff(today(), '2027-01-14');                             /* 深圳规定期末不早于此日 */
-  c.innerHTML = '<h2>学习计划</h2><div class="sub">' + wi.label + '。启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart
-    + '。每天四段：口算热身 → 补漏主攻 → 跟课练习（开头一对搭桥题）→ 到期错题重做。</div>'
-    + '<div class="miles">'
-    + '<div><b>' + (dMid > 0 ? dMid + ' 天' : '已过') + '</b><span>到期中（约 11 月初）</span></div>'
-    + '<div><b>' + (dFin > 0 ? dFin + ' 天' : '已过') + '</b><span>到期末（不早于 1/14）</span></div>'
-    + '<div><b>' + Math.max(0, Math.ceil(dFin / 7)) + ' 周</b><span>剩余可用周数</span></div>'
-    + '</div>';
-  m.appendChild(c);
-
-  const k = el('div', 'card');
-  k.innerHTML = '<b>8/29 – 8/31 破冰三天</b><div class="sub">他 29 号才从老家回深圳，开学前只有这三天，目标不是学完，是开学第一节课能听懂。</div><ol class="q">'
-    + '<li>第 1 天：做完入学诊断（21 题），当晚家长陪着过 2 道错题</li>'
-    + '<li>第 2 天：主攻诊断里最差的那个小学知识点 + 预习数轴/相反数/绝对值</li>'
-    + '<li>第 3 天：昨天错题重做 + 预习有理数加减，把「减号改写成加相反数」练成肌肉记忆</li>'
-    + '</ol><div class="sub">目的不是学完，是开学第一节课能听懂，先把「我能听懂」这个感觉拿回来。</div>';
-  m.appendChild(k);
-
-  const t = el('div', 'card');
-  let h = '<b>一学期 20 周跟课表</b><div class="sub">按北师大版（2024）七上章序 + 深圳市 2026–2027 校历排的。'
-    + '以学校实际进度为准，不一样就点「改」。</div><div class="scrollx"><table class="tb"><tr><th>周</th><th>日期</th><th>跟课内容</th><th></th></tr>';
-  for (let w = 1; w <= 20; w++) {
-    const tr = trackOf(w);
-    const d0 = addDays(DB.profile.schoolStart, (w - 1) * 7);
-    const dd = d0.slice(5).replace('-', '/') + '–' + addDays(d0, 6).slice(5).replace('-', '/');
-    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td>W' + w + '</td><td class="nw">' + dd + '</td><td>' + esc(tr.ch)
-      + (tr.mile ? '<div class="mile">' + esc(tr.mile) + '</div>' : '')
-      + '</td><td><button class="mini" data-w="' + w + '">改</button></td></tr>';
-  }
-  h += '</table></div>';
-  t.innerHTML = h;
-  t.querySelectorAll('.mini').forEach(b => b.onclick = () => {
-    const w = +b.dataset.w, tr = trackOf(w);
-    const ch = prompt('第 ' + w + ' 周学校在讲什么？（只改显示文字）', tr.ch);
-    if (ch === null) return;
-    const opts = M_TOPICS.map((x, i) => (i + 1) + '=' + TMAP[x].name).join('  ');
-    const pickStr = prompt('这周练哪些知识点？填编号，逗号分隔\n' + opts, tr.ks.map(x => M_TOPICS.indexOf(x) + 1).join(','));
-    if (pickStr === null) return;
-    const ks = pickStr.split(/[,，\s]+/).map(x => M_TOPICS[+x - 1]).filter(Boolean);
-    DB.trackOverride[w] = { ch, ks: ks.length ? ks : tr.ks };
-    delete DB.logs[today()];
-    save(); render();
-  });
-  m.appendChild(t);
-
-  const g = el('div', 'card');
-  g.innerHTML = '<b>阶段目标（对齐考试节点）</b><ol class="q">'
-    + '<li><b>开学第 4 周末</b>（9 月底）：有理数加减单独测 10 题错不超过 2 题；口算热身正确率 ≥ 80%</li>'
-    + '<li><b>国庆假期</b>（10/1–10/7）：一天不断，每天 15 分钟也算。断档一周开学回来就跟不上乘除</li>'
-    + '<li><b>期中前</b>（第 9 周）：(−2)² 和 −2² 连续 10 题不错；补漏队列清掉 3 个小学知识点</li>'
-    + '<li><b>第 14 周</b>（整式学完）：去括号变号 10 题对 8 道；错题本存量降到 30 道以内</li>'
-    + '<li><b>期末前</b>（1 月上旬）：含分母的一元一次方程 10 题对 7 道；错题本降到 20 道以内</li>'
-    + '</ol><div class="sub">及格线不是目标。他现在丢分的大头是运算规则，不是难题——'
-    + '把「会做的题不丢分」做到了，分数自己会上来。</div>';
-  m.appendChild(g);
-}
-
-/* ---------- 错题本 ---------- */
-function viewWrong(m) {
+/* ============================================================
+   孩子视图 · 重练
+   ============================================================ */
+function viewRedo(m) {
   const t = today();
   const due = DB.wrong.filter(w => w.due <= t);
-  const c = el('div', 'card');
-  c.innerHTML = '<h2>错题本</h2><div class="sub">共 ' + DB.wrong.length + ' 道，今天到期 ' + due.length + ' 道。答对一次隔 1 天再考，连续对 3 轮就毕业移出。</div>';
-  m.appendChild(c);
-  if (due.length) {
-    const b = el('button', 'btn big', '重做今天到期的 ' + due.length + ' 道');
-    b.onclick = () => {
-      m.innerHTML = '';
-      const back = el('button', 'btn ghost', '← 返回'); back.onclick = () => go('wrong'); m.appendChild(back);
-      buildToday();
-      runner(m, due, { title: '错题重做', onEach: (q, ok, v) => recordAnswer('review', q, v, ok), onDone: () => { const b2 = el('button', 'btn big', '完成'); b2.onclick = () => go('wrong'); m.appendChild(b2); } });
-    };
-    m.appendChild(b);
+  if (!DB.wrong.length) {
+    m.appendChild(el('div', 'empty', '<span class="mk">◌</span>错题本是空的。'));
+    return;
   }
+  const c = el('div', 'card');
+  c.innerHTML = '<div class="eyebrow">错题本</div><h2 class="mono" style="font-size:28px">' + DB.wrong.length + ' 道</h2>'
+    + '<div class="sub" style="margin-top:6px">今天该重考 ' + due.length + ' 道。答对一次隔几天再考，连对三轮就毕业。</div>';
+  if (due.length) {
+    const b = el('button', 'go', '重考今天到期的 ' + due.length + ' 道');
+    b.onclick = () => { buildToday(); runner(due.slice(), { title: '错题重练', backTo: 'redo',
+      onEach: (q, ok, v) => recordAnswer('review', q, v, ok) }); };
+    c.appendChild(b);
+  }
+  m.appendChild(c);
+
   const grp = {};
   DB.wrong.forEach(w => (grp[w.topic] = grp[w.topic] || []).push(w));
   Object.keys(grp).sort((a, b) => grp[b].length - grp[a].length).forEach(k => {
     const c2 = el('div', 'card');
-    let h = '<b>' + TMAP[k].name + '</b> <span class="pill b">' + grp[k].length + ' 道</span>';
-    grp[k].forEach(w => { h += '<div class="wq"><div class="wqq">' + sup(esc(w.q)) + '</div><div class="wqa">答案 ' + sup(esc(w.ans)) + ' · 下次重考 ' + w.due + '</div></div>'; });
+    let h = '<div class="eyebrow">' + esc(TMAP[k].name) + ' · ' + grp[k].length + ' 道</div>';
+    grp[k].slice(0, 6).forEach(w => { h += '<div class="wq"><div class="t">' + sup(esc(w.q)) + '</div><div class="a">'
+      + ans(w.ans) + ' · ' + w.due + ' 重考</div></div>'; });
+    if (grp[k].length > 6) h += '<div class="sub" style="margin-top:10px">还有 ' + (grp[k].length - 6) + ' 道</div>';
     c2.innerHTML = h;
     m.appendChild(c2);
   });
-  if (!DB.wrong.length) m.appendChild(el('div', 'card dim', '错题本是空的。'));
 }
 
-/* ---------- 家长 ---------- */
-function viewParent(m) {
-  const t = today();
-  const log = DB.logs[t];
+/* ============================================================
+   孩子视图 · 收藏（数学史卡片墙）
+   收集感本身就是奖励，不需要积分
+   ============================================================ */
+let FOPEN = null;
+function viewColl(m) {
+  const got = FACTS.filter(f => DB.facts.indexOf(f.id) >= 0);
   const c = el('div', 'card');
-  c.innerHTML = '<h2>今晚这 10 分钟怎么用</h2><div class="sub">别通篇讲。挑下面 2 道，让他讲给你听，你只负责问问题。</div>';
+  c.innerHTML = '<div class="eyebrow">数学冷知识收藏</div>'
+    + '<h2 class="mono" style="font-size:30px;letter-spacing:-.03em">' + got.length + '<span style="color:var(--ink3)">/' + FACTS.length + '</span></h2>'
+    + '<div class="sub" style="margin-top:6px">每天做完两站解锁一张，打赢本周挑战多得一张。'
+    + '都是真事——你学的那些规则，是这些人想出来的。</div>';
+  m.appendChild(c);
+  if (FOPEN) {
+    const f = FACTS.filter(x => x.id === FOPEN)[0];
+    if (f) m.appendChild(factCard(f, '收藏卡 ' + f.id.toUpperCase()));
+  }
+  const wall = el('div', 'coll');
+  FACTS.forEach((f, n) => {
+    const has = DB.facts.indexOf(f.id) >= 0;
+    const via = TMAP[f.ks[0]] ? TMAP[f.ks[0]].name : '';
+    const b = el('button', 'fc' + (has ? '' : ' lock'),
+      '<div class="n">' + String(n + 1).padStart(2, '0') + '</div><div class="t">'
+      + (has ? esc(f.t) : '练「' + esc(via) + '」时开') + '</div>');
+    if (has) b.onclick = () => { FOPEN = (FOPEN === f.id ? null : f.id); render(); };
+    wall.appendChild(b);
+  });
+  m.appendChild(wall);
+}
+
+/* ============================================================
+   家长区
+   ============================================================ */
+let PINBUF = '';
+function viewLock(m) {
+  PINBUF = '';
+  const c = el('div', 'card');
+  c.innerHTML = '<div class="eyebrow">家长区</div><h2>输入 4 位密码</h2>'
+    + '<div class="sub" style="margin-top:6px">这里有完整的诊断结果和设置，不适合让他自己改。</div>'
+    + '<div class="pin" id="pindots"><i></i><i></i><i></i><i></i></div>';
+  const pad = el('div', 'pad');
+  ['1','2','3','4','5','6','7','8','9','','0','删'].forEach(k => {
+    if (!k) { pad.appendChild(el('div')); return; }
+    const b = el('button', k === '删' ? 'fn' : '', k);
+    b.onclick = () => {
+      if (k === '删') PINBUF = PINBUF.slice(0, -1);
+      else if (PINBUF.length < 4) PINBUF += k;
+      const ds = document.querySelectorAll('#pindots i');
+      ds.forEach((d, n) => d.className = n < PINBUF.length ? 'on' : '');
+      if (PINBUF.length === 4) {
+        if (PINBUF === DB.profile.pin) { PARENT_OK = true; go('p-plan'); }
+        else { PINBUF = ''; ds.forEach(d => d.className = ''); const w = $('#pinmsg'); if (w) w.textContent = '不对，再试一次'; }
+      }
+    };
+    pad.appendChild(b);
+  });
+  c.appendChild(pad);
+  c.appendChild(el('div', 'sub', '<span id="pinmsg"></span>'));
+  m.appendChild(c);
+  const b2 = el('button', 'go sec', '忘了密码 · 回孩子视图');
+  b2.onclick = () => go('today');
+  m.appendChild(b2);
+}
+
+function pbanner(m, txt) { m.appendChild(el('div', 'pbanner', txt)); }
+
+function viewPlan(m) {
+  const wi = weekInfo();
+  pbanner(m, '孩子那边只看得到「今天做什么」和进步，看不到下面这些分档和设置。');
+
+  const c = el('div', 'card');
+  const dMid = dayDiff(today(), addDays(DB.profile.schoolStart, 9 * 7));
+  const dFin = dayDiff(today(), '2027-01-14');
+  c.innerHTML = '<div class="eyebrow">当前进度</div><h2>' + esc(wi.label) + '</h2>'
+    + '<div class="sub">启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart
+    + '，每天 ' + DB.profile.dailyMin + ' 分钟</div>'
+    + '<div class="miles">'
+    + '<div><b>' + (dMid > 0 ? dMid : 0) + '</b><span>天到期中（约 11 月初）</span></div>'
+    + '<div><b>' + (dFin > 0 ? dFin : 0) + '</b><span>天到期末（不早于 1/14）</span></div>'
+    + '<div><b>' + Math.max(0, Math.ceil(dFin / 7)) + '</b><span>周还能用</span></div></div>';
+  m.appendChild(c);
+
+  const k = el('div', 'card');
+  k.innerHTML = '<div class="eyebrow">8/29 – 8/31 破冰三天</div>'
+    + '<div class="sub">他 29 号才从老家回深圳，开学前只有这三天。目标不是学完，是开学第一节课能听懂。</div>'
+    + '<ol class="q2"><li>第 1 天：做完摸底 21 题，当晚陪他过 2 道错题</li>'
+    + '<li>第 2 天：主攻摸底里最差的那个小学知识点 + 预习数轴、相反数、绝对值</li>'
+    + '<li>第 3 天：昨天错题重做 + 预习有理数加减，把「减号改写成加相反数」练成条件反射</li></ol>';
+  m.appendChild(k);
+
+  const t = el('div', 'card');
+  let h = '<div class="eyebrow">一学期 20 周跟课表</div>'
+    + '<div class="sub">按北师大版（2024）七上章序 + 深圳市 2026–2027 校历排的。学校进度不一样就点「改」。</div>'
+    + '<div style="overflow-x:auto"><table class="tb"><tr><th>周</th><th>日期</th><th>跟课内容</th><th></th></tr>';
+  for (let w = 1; w <= 20; w++) {
+    const tr = trackOf(w);
+    const d0 = addDays(DB.profile.schoolStart, (w - 1) * 7);
+    const dd = d0.slice(5).replace('-', '/') + '–' + addDays(d0, 6).slice(5).replace('-', '/');
+    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td class="nw">W' + w
+      + '</td><td class="nw">' + dd + '</td><td>' + esc(tr.ch)
+      + (tr.mile ? '<div class="mile">' + esc(tr.mile) + '</div>' : '')
+      + '</td><td><button class="pill" data-w="' + w + '">改</button></td></tr>';
+  }
+  h += '</table></div>';
+  t.innerHTML = h;
+  t.querySelectorAll('button[data-w]').forEach(b => b.onclick = () => {
+    const w = +b.dataset.w, tr = trackOf(w);
+    const ch = prompt('第 ' + w + ' 周学校在讲什么？', tr.ch);
+    if (ch === null) return;
+    const opts = M_TOPICS.map((x, n) => (n + 1) + '=' + TMAP[x].name).join('  ');
+    const ps = prompt('这周练哪些知识点？填编号，逗号分隔\n' + opts, tr.ks.map(x => M_TOPICS.indexOf(x) + 1).join(','));
+    if (ps === null) return;
+    const ks = ps.split(/[,，\s]+/).map(x => M_TOPICS[+x - 1]).filter(Boolean);
+    DB.trackOverride[w] = { ch: ch, ks: ks.length ? ks : tr.ks };
+    delete DB.logs[today()]; save(); render();
+  });
+  m.appendChild(t);
+
+  const g = el('div', 'card');
+  g.innerHTML = '<div class="eyebrow">阶段目标</div><ol class="q2">'
+    + '<li><b>开学第 4 周末</b>（9 月底）：有理数加减单测 10 题错不超过 2 题；热身正确率 ≥ 80%</li>'
+    + '<li><b>国庆 10/1–10/7</b>：一天不断，每天 15 分钟也算。断一周回来就跟不上乘除</li>'
+    + '<li><b>期中前</b>（第 9 周）：(−2)² 和 −2² 连对 10 题；补漏队列清掉 3 个小学知识点</li>'
+    + '<li><b>第 14 周</b>（整式学完）：去括号变号 10 题对 8 道；错题本降到 30 道内</li>'
+    + '<li><b>期末前</b>（1 月上旬）：含分母的一元一次方程 10 题对 7 道；错题本降到 20 道内</li>'
+    + '</ol><div class="sub" style="margin-top:12px">及格线不是目标。他丢分的大头是运算规则不是难题，'
+    + '把「会做的题不丢分」做到了，分数自己会上来。</div>';
+  m.appendChild(g);
+}
+
+function viewDiag(m) {
+  if (!DB.diag.done) {
+    m.appendChild(el('div', 'empty', '<span class="mk">◌</span>还没做摸底。让他在孩子视图里点「开始 21 题」。'));
+    return;
+  }
+  pbanner(m, '这页只在家长区。孩子看到「你要补 6 项」的清单只会更确认「我不行」。');
+  const rows = Object.keys(DB.diag.scores).map(k => { const s = DB.diag.scores[k]; return { k: k, r: s.right / s.total, s: s }; }).sort((a, b) => a.r - b.r);
+  const c = el('div', 'card');
+  let h = '<div class="eyebrow">摸底结果 · ' + DB.diag.date + '</div><table class="tb"><tr><th>知识点</th><th>对</th><th>判断</th></tr>';
+  rows.forEach(r => {
+    const lv = r.s.total < 2 ? ['只测 1 题', ''] : r.r >= 0.85 ? ['稳', 'g'] : r.r >= 0.5 ? ['夹生', 'w'] : ['要补', 'b'];
+    h += '<tr><td>' + esc(TMAP[r.k].name) + '<div class="sub" style="font-size:12px">'
+      + (TMAP[r.k].stage === 'P' ? '小学' : '七上') + '</div></td><td class="nw">' + r.s.right + '/' + r.s.total
+      + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
+  });
+  h += '</table>';
+  c.innerHTML = h;
+  m.appendChild(c);
+
+  const c2 = el('div', 'card');
+  c2.innerHTML = '<div class="eyebrow">补漏队列</div>'
+    + '<div class="sub">按「影响初一的程度 × 掌握度」排。近 20 题正确率到 85% 就自动毕业出队。</div>'
+    + '<ol class="q2">' + DB.queue.map(k => '<li>' + esc(TMAP[k].name) + '</li>').join('') + '</ol>';
+  m.appendChild(c2);
+
+  const c3 = el('div', 'card');
+  c3.innerHTML = '<div class="eyebrow">发给 Claude 调计划</div>'
+    + '<div class="sub">这个页面没有后端，成绩只在这台设备上，外面读不到。复制一段摘要（不含姓名学校）粘给他，'
+    + '他能判断补漏顺序要不要重排、难度合不合适。</div>';
+  const b1 = el('button', 'go', '复制进度摘要'); b1.onclick = () => copyBrief(c3);
+  const b2 = el('button', 'go sec', '直接看这段文字'); b2.onclick = () => showBrief(c3);
+  c3.appendChild(b1); c3.appendChild(b2);
+  m.appendChild(c3);
+
+  const b = el('button', 'btn', '重做摸底（清空队列，保留错题本）');
+  b.onclick = () => { if (confirm('重做摸底？')) { go('today'); startDiag(); } };
+  m.appendChild(b);
+}
+
+function viewTonight(m) {
+  const t = today(), log = DB.logs[t];
+  const c = el('div', 'card');
+  c.innerHTML = '<div class="eyebrow">今晚这 10 分钟</div><h2>挑 2 道，让他讲给你听</h2>'
+    + '<div class="sub" style="margin-top:6px">你只负责问问题，不用讲。</div>';
   m.appendChild(c);
 
   let wt = (log && log.wrongToday) ? log.wrongToday.slice() : [];
   if (!wt.length) wt = DB.wrong.filter(w => w.addedAt === t);
   if (!wt.length) {
-    m.appendChild(el('div', 'card dim', '今天还没有错题记录。等他做完今日任务再来看。'));
+    m.appendChild(el('div', 'empty', '<span class="mk">◌</span>今天还没有错题记录。等他做完再来。'));
   } else {
     const cnt = {}; wt.forEach(w => cnt[w.topic] = (cnt[w.topic] || 0) + 1);
     wt.sort((a, b) => cnt[b.topic] - cnt[a.topic]);
-    const seen = new Set(); const chosen = [];
-    wt.forEach(w => { if (chosen.length < 2 && !seen.has(w.topic)) { seen.add(w.topic); chosen.push(w); } });
-    if (chosen.length < 2 && wt.length > 1) chosen.push(wt.find(w => !chosen.includes(w)));
-    chosen.filter(Boolean).forEach((w, i) => {
+    const seen = {}, chosen = [];
+    wt.forEach(w => { if (chosen.length < 2 && !seen[w.topic]) { seen[w.topic] = 1; chosen.push(w); } });
+    if (chosen.length < 2) wt.forEach(w => { if (chosen.length < 2 && chosen.indexOf(w) < 0) chosen.push(w); });
+    chosen.forEach((w, n) => {
       const c2 = el('div', 'card');
-      c2.innerHTML = '<div class="tag">第 ' + (i + 1) + ' 道 · ' + TMAP[w.topic].name + '</div>'
-        + '<div class="qtext">' + sup(esc(w.q)) + '</div>'
-        + '<div class="kv"><span>正确答案</span><b>' + sup(esc(w.ans)) + '</b></div>'
-        + '<div class="pask"><b>你问这句</b><div>' + esc(w.ask) + '</div></div>'
-        + '<details><summary>讲解思路（他讲不出来你再看）</summary><ol class="sol">' + w.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol></details>';
+      c2.innerHTML = '<div class="eyebrow">第 ' + (n + 1) + ' 道 · ' + esc(TMAP[w.topic].name) + '</div>'
+        + '<div class="' + qClass(w.q) + '" style="font-size:' + (qClass(w.q) === 'q long' ? '16.5px' : '22px') + ';text-align:left">' + sup(esc(w.q)) + '</div>'
+        + '<div class="sub" style="margin-top:10px">答案 <b class="mono">' + ans(w.ans) + '</b></div>'
+        + '<div class="pask"><div class="k">你问这句</div>' + esc(w.ask) + '</div>'
+        + '<details><summary>讲解思路（他讲不出来你再看）</summary><ol class="sol">'
+        + w.sol.map(x => '<li>' + sup(esc(x)) + '</li>').join('') + '</ol></details>';
       m.appendChild(c2);
     });
   }
 
-  const tip = el('div', 'card note');
-  tip.innerHTML = '<b>三条底线</b><ol class="q">'
-    + '<li>不说「这么简单都不会」。他现在的问题是小学没打牢，不是不聪明。</li>'
-    + '<li>只讲 2 道。讲多了他记不住，也会把 10 分钟拖成 40 分钟然后崩。</li>'
+  const tip = el('div', 'card');
+  tip.innerHTML = '<div class="eyebrow">四条底线</div><ol class="q2">'
+    + '<li>不说「这么简单都不会」。他的问题是小学没打牢，不是不聪明。</li>'
+    + '<li>只讲 2 道。讲多了记不住，还会把 10 分钟拖成 40 分钟然后崩。</li>'
     + '<li>让他讲、你听。他能把步骤说顺就算过关，说不出来的地方才是真漏洞。</li>'
-    + '<li>表扬要落在具体动作上：「你这次符号定对了」「你先算括号了」。别说「你真聪明」——'
-    + '夸天赋会让他下次遇到难题就认定「我不是这块料」，夸具体做对的步骤才顶用。</li></ol>';
+    + '<li>表扬落在具体动作上：「你这次符号定对了」「你先算括号了」。别说「你真聪明」——'
+    + '夸天赋会让他下次遇到难题就认定自己不是这块料。</li></ol>';
   m.appendChild(tip);
 
-  const cq = el('div', 'card note');
-  cq.innerHTML = '<b>卡住了想问 Claude</b><div class="sub">连续两周没进步、或者不知道该不该调计划的时候，复制这段摘要发给他。</div>';
-  const cqb = el('button', 'btn ghost', '复制进度摘要');
-  cqb.onclick = () => copyBrief(cq);
-  cq.appendChild(cqb);
-  m.appendChild(cq);
-
   const w7 = weekReport();
-  const wr = el('div', 'card');
-  wr.innerHTML = '<b>最近 7 天</b><div class="sub">练了 ' + w7.days + ' 天，共 ' + w7.total + ' 题，正确率 ' + w7.rate + '%。'
-    + (w7.days < 4 ? '天数偏少——先保住每天都碰一下，比某天做很多有用。' : '节奏没问题，保持。') + '</div>';
-  m.appendChild(wr);
+  m.appendChild(el('div', 'card', '<div class="eyebrow">最近 7 天</div>'
+    + '<div class="sub">练了 ' + w7.days + ' 天，' + w7.total + ' 题，正确率 ' + w7.rate + '%。'
+    + (w7.days < 4 ? '天数偏少——先保住每天都碰一下，比某天做很多有用。' : '节奏没问题，保持。') + '</div>'));
+
+  const cq = el('div', 'card');
+  cq.innerHTML = '<div class="eyebrow">卡住了想问 Claude</div>'
+    + '<div class="sub">连续两周没进步、或者不确定该不该调计划的时候，复制这段发给他。</div>';
+  const cb = el('button', 'go sec', '复制进度摘要'); cb.onclick = () => copyBrief(cq);
+  cq.appendChild(cb);
+  m.appendChild(cq);
 }
 
-/* ---------- 数据 ---------- */
 function viewData(m) {
-  const c = el('div', 'card');
-  c.innerHTML = '<h2>最近 14 天</h2>';
   const rows = [];
   for (let i = 13; i >= 0; i--) {
     const d = addDays(today(), -i), l = DB.logs[d];
     let n = 0, r = 0;
     if (l) ['warm', 'focus', 'track', 'review'].forEach(p => (l.res[p] || []).forEach(x => { n++; if (x.ok) r++; }));
-    rows.push({ d, n, r });
+    rows.push({ d: d, n: n, r: r });
   }
-  let h = '<div class="chart">';
+  const c = el('div', 'card');
+  let h = '<div class="eyebrow">最近 14 天正确率</div><div class="chart">';
   rows.forEach(x => {
     const pct = x.n ? Math.round(x.r / x.n * 100) : 0;
-    h += '<div class="bar" title="' + x.d + ' ' + x.r + '/' + x.n + '"><i style="height:' + (x.n ? Math.max(pct, 4) : 0) + '%"></i><span>' + x.d.slice(5).replace('-', '/') + '</span></div>';
+    h += '<div class="bar" title="' + x.d + ' ' + x.r + '/' + x.n + '"><i style="height:'
+      + (x.n ? Math.max(pct, 4) : 0) + '%"></i><b>' + x.d.slice(5).replace('-', '/') + '</b></div>';
   });
-  h += '</div><div class="sub">柱高 = 当天正确率，没柱子 = 那天没练。</div>';
-  c.innerHTML += h;
+  h += '</div><div class="sub">没有柱子 = 那天没练。</div>';
+  c.innerHTML = h;
   m.appendChild(c);
 
   const c2 = el('div', 'card');
-  let h2 = '<b>各知识点掌握度</b><div class="sub">按累计做题正确率，做满 8 题才显示判断</div><table class="tb"><tr><th>知识点</th><th>题数</th><th>正确率</th><th></th></tr>';
+  let h2 = '<div class="eyebrow">各知识点掌握度</div><table class="tb"><tr><th>知识点</th><th>题</th><th>正确率</th><th>难度</th><th></th></tr>';
   TOPICS.forEach(t => {
     const n = mstN(t.k); if (!n) return;
     const r = Math.round(mst(t.k) * 100);
     const lv = n < 8 ? ['样本少', ''] : r >= 85 ? ['稳', 'g'] : r >= 60 ? ['夹生', 'w'] : ['要补', 'b'];
-    h2 += '<tr><td>' + t.name + '<span class="st">' + (t.stage === 'P' ? '小学' : '七上') + '</span></td><td>' + n + '</td><td>' + r + '%</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
+    h2 += '<tr><td>' + esc(t.name) + '<div class="sub" style="font-size:12px">' + (t.stage === 'P' ? '小学' : '七上')
+      + '</div></td><td class="nw">' + n + '</td><td class="nw">' + r + '%</td><td class="nw">L' + pickLv(t.k)
+      + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
   });
-  h2 += '</table>';
+  h2 += '</table><div class="sub" style="margin-top:12px">难度档自动调：近 10 题低于 60% 降到 L1，'
+    + '到 90% 且累计 ≥75%、做过 ≥15 题才升 L3。升保守降灵敏，避免把他砸崩。</div>';
   c2.innerHTML = h2;
   m.appendChild(c2);
 }
 
-/* ---------- 设置 ---------- */
 function viewSet(m) {
   const c = el('div', 'card');
-  c.innerHTML = '<h2>设置</h2>'
+  c.innerHTML = '<div class="eyebrow">时间与节奏</div>'
     + '<div class="kv"><span>启动日</span><input id="s-kick" value="' + DB.profile.kickoff + '"></div>'
     + '<div class="kv"><span>开学日</span><input id="s-ss" value="' + DB.profile.schoolStart + '"></div>'
     + '<div class="kv"><span>每天分钟</span><input id="s-min" value="' + DB.profile.dailyMin + '"></div>';
-  const b = el('button', 'btn', '保存');
+  const b = el('button', 'go', '保存');
   b.onclick = () => {
     DB.profile.kickoff = $('#s-kick').value.trim();
     DB.profile.schoolStart = $('#s-ss').value.trim();
     DB.profile.dailyMin = Math.max(10, Math.min(90, +$('#s-min').value || 25));
-    delete DB.logs[today()];
-    save(); alert('已保存，今日任务会按新时长重新生成'); go('today');
+    delete DB.logs[today()]; save(); render();
   };
   c.appendChild(b);
   m.appendChild(c);
 
+  const cp = el('div', 'card');
+  cp.innerHTML = '<div class="eyebrow">家长区密码</div>'
+    + '<div class="sub">' + (DB.profile.pin ? '已设置。' : '没设置，他自己也能点进这里改分钟数或者清空记录。')
+    + '</div><div class="kv"><span>4 位数字</span><input id="s-pin" value="' + (DB.profile.pin || '') + '" maxlength="4"></div>';
+  const pb = el('button', 'go sec', DB.profile.pin ? '更新密码' : '设置密码');
+  pb.onclick = () => {
+    const v = $('#s-pin').value.trim();
+    if (v && !/^\d{4}$/.test(v)) { alert('要 4 位数字'); return; }
+    DB.profile.pin = v || null; PARENT_OK = true; save(); render();
+  };
+  cp.appendChild(pb);
+  m.appendChild(cp);
+
   const c2 = el('div', 'card');
-  c2.innerHTML = '<b>进度备份</b><div class="sub">数据只存在这台设备的浏览器里。换设备、清缓存前先导出。</div>';
-  const b1 = el('button', 'btn', '导出进度文件');
+  c2.innerHTML = '<div class="eyebrow">进度备份</div>'
+    + '<div class="sub">数据只在这台设备的浏览器里。换设备、清缓存之前先导出。</div>';
+  const b0 = el('button', 'go', '复制进度摘要（给 Claude 看）'); b0.onclick = () => copyBrief(c2);
+  const b1 = el('button', 'go sec', '导出进度文件');
   b1.onclick = () => {
     const blob = new Blob([JSON.stringify(DB)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = 'math-progress-' + today() + '.json';
     document.body.appendChild(a); a.click(); a.remove();
   };
-  const b2 = el('button', 'btn ghost', '复制进度到剪贴板');
-  b2.onclick = () => { const s = JSON.stringify(DB); navigator.clipboard ? navigator.clipboard.writeText(s).then(() => alert('已复制')) : prompt('手动复制：', s); };
-  const inp = el('input', 'file'); inp.type = 'file'; inp.accept = '.json';
-  inp.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader();
-    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.ver) throw new Error('格式不对'); DB = d; save(); alert('已导入'); go('today'); } catch (err) { alert('导入失败：' + err.message); } };
-    r.readAsText(f); };
-  const b0 = el('button', 'btn', '复制进度摘要（给 Claude 看）');
-  b0.onclick = () => copyBrief(c2);
-  c2.appendChild(b0);
-  c2.appendChild(b1); c2.appendChild(b2);
+  const inp = el('input'); inp.type = 'file'; inp.accept = '.json';
+  inp.style.cssText = 'margin-top:14px;font-size:13px;color:var(--ink3)';
+  inp.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.ver) throw new Error('格式不对'); DB = d; save(); render(); }
+      catch (err) { alert('导入失败：' + err.message); } };
+    r.readAsText(f);
+  };
+  c2.appendChild(b0); c2.appendChild(b1);
   c2.appendChild(el('div', 'sub', '导入备份：'));
   c2.appendChild(inp);
   m.appendChild(c2);
 
   const c3 = el('div', 'card');
-  const b3 = el('button', 'btn ghost danger', '清空全部数据');
-  b3.onclick = () => { if (confirm('全部清空，不可恢复。确定？')) { localStorage.removeItem(KEY); load(); go('today'); } };
+  c3.innerHTML = '<div class="eyebrow">危险操作</div>';
+  const b3 = el('button', 'btn danger', '清空全部数据');
+  b3.onclick = () => { if (confirm('全部清空，不可恢复。确定？')) { localStorage.removeItem(KEY); load(); PARENT_OK = true; go('today'); } };
   c3.appendChild(b3);
   m.appendChild(c3);
 }
 
 /* ---------- 启动 ---------- */
 load();
-document.querySelectorAll('.tab').forEach(b => b.onclick = () => go(b.dataset.t));
+if (DB.profile.pin === undefined) { DB.profile.pin = null; save(); }
 render();
 
 </script>
