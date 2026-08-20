@@ -1,0 +1,612 @@
+/* ============================================================
+   计划引擎 + 交互
+   ============================================================ */
+const KEY = 'mathplan_v1';
+const BOX_GAP = [1, 2, 4, 7, 15, 30];
+
+/* 小学基础补漏优先队列的候选 */
+const P_TOPICS = TOPICS.filter(t => t.stage === 'P').map(t => t.k);
+const M_TOPICS = TOPICS.filter(t => t.stage === 'M').map(t => t.k);
+
+/* 开学后 12 周跟课表（以学校实际进度为准，可在计划页调整） */
+const TRACK = [
+  { w: 1, ch: '第一章 丰富的图形世界 · 第二章 有理数（数轴、相反数、绝对值）', ks: ['numline'] },
+  { w: 2, ch: '第二章 有理数的加法与减法', ks: ['rat-addsub'] },
+  { w: 3, ch: '第二章 有理数的乘法、除法与乘方', ks: ['rat-muldiv', 'power'] },
+  { w: 4, ch: '第二章 有理数混合运算 · 科学记数法', ks: ['rat-mixed', 'abs-calc', 'sci'] },
+  { w: 5, ch: '第三章 整式（单项式、多项式、同类项）', ks: ['monomial', 'like-terms'] },
+  { w: 6, ch: '第三章 整式加减 · 去括号 · 化简求值', ks: ['remove-paren', 'eval-expr'] },
+  { w: 7, ch: '期中复习（有理数 + 整式）', ks: ['rat-mixed', 'power', 'remove-paren', 'eval-expr'] },
+  { w: 8, ch: '第五章 一元一次方程（移项、合并同类项）', ks: ['linear-eq'] },
+  { w: 9, ch: '第五章 去括号、去分母解方程', ks: ['linear-eq'] },
+  { w: 10, ch: '第五章 一元一次方程的应用', ks: ['eq-word'] },
+  { w: 11, ch: '第四章 基本平面图形（线段、角）', ks: ['geom'] },
+  { w: 12, ch: '第六章 数据的收集与整理 · 期末总复习', ks: ['stat', 'linear-eq', 'rat-mixed'] }
+];
+
+/* ---------- 日期工具（全部本地时区） ---------- */
+const pad = n => (n < 10 ? '0' : '') + n;
+function ds(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function today() { return ds(new Date()); }
+function parseD(s) { const p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function addDays(s, n) { const d = parseD(s); d.setDate(d.getDate() + n); return ds(d); }
+function dayDiff(a, b) { return Math.round((parseD(b) - parseD(a)) / 86400000); }
+function cnDate(s) { const d = parseD(s); return (d.getMonth() + 1) + '月' + d.getDate() + '日 周' + '日一二三四五六'[d.getDay()]; }
+
+/* ---------- 存档 ---------- */
+let DB = null;
+function fresh() {
+  return {
+    ver: 1,
+    profile: { name: '', kickoff: '2026-08-29', schoolStart: '2026-09-01', dailyMin: 25 },
+    diag: { done: false, date: '', scores: {} },
+    queue: [],
+    mastery: {},
+    wrong: [],
+    logs: {},
+    trackOverride: {}
+  };
+}
+function load() {
+  try { const s = localStorage.getItem(KEY); DB = s ? JSON.parse(s) : fresh(); }
+  catch (e) { DB = fresh(); }
+  if (!DB.ver) DB = fresh();
+  ['diag', 'mastery', 'logs', 'trackOverride'].forEach(k => { if (!DB[k]) DB[k] = {}; });
+  if (!DB.wrong) DB.wrong = [];
+  if (!DB.queue) DB.queue = [];
+  if (!DB.profile) DB.profile = fresh().profile;
+  save();
+}
+/* 存不进去时降级到内存，并在页面顶部挂一条常驻警告，避免白做一晚上 */
+let STORE_OK = true;
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(DB));
+    if (!STORE_OK) { STORE_OK = true; const w = document.getElementById('warnbar'); if (w) w.remove(); }
+  } catch (e) {
+    STORE_OK = false;
+    if (!document.getElementById('warnbar')) {
+      const b = document.createElement('div');
+      b.id = 'warnbar'; b.className = 'warnbar';
+      b.innerHTML = '这个浏览器存不住进度（隐私模式或本地文件限制）。今天做的题只在当前页面里，<b>关掉就没了</b>——练完先去「设置 → 导出进度文件」。';
+      document.body.insertBefore(b, document.body.firstChild);
+    }
+  }
+}
+
+/* ---------- 掌握度 ---------- */
+function mst(k) { const m = DB.mastery[k]; if (!m || !m.total) return null; return m.right / m.total; }
+function mstN(k) { const m = DB.mastery[k]; return m ? m.total : 0; }
+function bump(k, ok) {
+  const m = DB.mastery[k] || (DB.mastery[k] = { right: 0, total: 0, r20: [] });
+  if (!m.r20) m.r20 = [];
+  m.total++; if (ok) m.right++;
+  m.r20.push(ok ? 1 : 0); if (m.r20.length > 20) m.r20.shift();
+}
+/* 近 20 题正确率，用于判断是否出队 */
+function recent(k) { const m = DB.mastery[k]; if (!m || !m.r20 || m.r20.length < 8) return null; return m.r20.reduce((a, b) => a + b, 0) / m.r20.length; }
+
+/* ---------- 补漏队列 ---------- */
+function buildQueue() {
+  const rows = P_TOPICS.map(k => {
+    const s = DB.diag.scores[k];
+    const rate = s && s.total ? s.right / s.total : 0.5;
+    return { k, rate, pri: TMAP[k].pri };
+  });
+  rows.sort((a, b) => (a.rate - b.rate) || (a.pri - b.pri));
+  DB.queue = rows.filter(r => r.rate < 0.85).map(r => r.k);
+  if (!DB.queue.length) DB.queue = rows.slice(0, 3).map(r => r.k);
+}
+function refreshQueue() {
+  /* 近 20 题正确率 ≥ 0.85 且累计 ≥ 20 题 → 出队（毕业） */
+  DB.queue = DB.queue.filter(k => !(mstN(k) >= 20 && (recent(k) || 0) >= 0.85));
+  if (!DB.queue.length) {
+    const left = P_TOPICS.map(k => ({ k, r: mst(k) === null ? 0.5 : mst(k), p: TMAP[k].pri }))
+      .sort((a, b) => (a.r - b.r) || (a.p - b.p));
+    DB.queue = left.slice(0, 2).map(x => x.k);
+  }
+}
+
+/* ---------- 当前处于第几周 ---------- */
+function weekInfo() {
+  const t = today(), ks = DB.profile.kickoff, ss = DB.profile.schoolStart;
+  if (dayDiff(t, ks) > 0) return { phase: 'pre', label: '还没到启动日（' + cnDate(ks) + '）', w: 0 };
+  if (dayDiff(t, ss) > 0) return { phase: 'kick', label: '开学前破冰第 ' + (dayDiff(ks, t) + 1) + ' 天', w: 0 };
+  const w = Math.floor(dayDiff(ss, t) / 7) + 1;
+  const lab = w <= 12 ? '开学第 ' + w + ' 周' : '开学第 ' + w + ' 周（12 周跟课表已走完，现在按第 12 周的复习内容循环）';
+  return { phase: 'term', label: lab, w: Math.min(w, 12) };
+}
+function trackOf(w) {
+  if (DB.trackOverride[w]) { const o = DB.trackOverride[w]; return { w, ch: o.ch, ks: o.ks }; }
+  return TRACK[Math.min(Math.max(w, 1), 12) - 1];
+}
+
+/* ---------- 今日任务 ---------- */
+function dueWrongs() { const t = today(); return DB.wrong.filter(w => w.due <= t); }
+
+function buildToday() {
+  const t = today();
+  if (DB.logs[t] && DB.logs[t].qs) return DB.logs[t];
+  const wi = weekInfo();
+  const min = DB.profile.dailyMin;
+  const scale = min <= 15 ? 0.6 : min >= 40 ? 1.4 : 1;
+  const nWarm = Math.round(10 * scale), nFocus = Math.round(6 * scale), nTrack = Math.round(6 * scale);
+
+  refreshQueue();
+  const focusK = DB.queue[0] || P_TOPICS[0];
+  const focus2 = DB.queue[1];
+
+  /* 破冰期：还没开学，跟课部分改成有理数预习 */
+  let trackKs, trackCh;
+  if (wi.phase === 'term') { const tr = trackOf(wi.w); trackKs = tr.ks; trackCh = tr.ch; }
+  else { trackKs = ['numline', 'rat-addsub']; trackCh = '开学预习：数轴、相反数、绝对值、有理数加减'; }
+
+  const warm = []; for (let i = 0; i < nWarm; i++) warm.push(warmupQ(wi.phase === 'term' ? (wi.w >= 3 ? 3 : 2) : 2));
+
+  const fq = [];
+  const half = focus2 ? Math.ceil(nFocus / 2) : nFocus;
+  genMany(focusK, half).forEach(q => fq.push(q));
+  if (focus2) genMany(focus2, nFocus - half).forEach(q => fq.push(q));
+
+  const tq = [];
+  for (let i = 0; i < nTrack; i++) tq.push(genQ(trackKs[i % trackKs.length]));
+
+  const rv = dueWrongs().slice(0, Math.round(6 * scale));
+
+  const log = {
+    date: t, week: wi.w, phase: wi.phase, trackCh, focusK, focus2,
+    qs: { warm, focus: fq, track: tq, review: rv },
+    res: { warm: [], focus: [], track: [], review: [] },
+    wrongToday: [], startedAt: Date.now(), done: false
+  };
+  DB.logs[t] = log; save();
+  return log;
+}
+
+/* ---------- 判定与记账 ---------- */
+function judge(q, input) {
+  if (q.type === 'choice') return input === q.ans;
+  return eqVal(input, q.ans);
+}
+function recordAnswer(part, q, input, ok) {
+  const log = DB.logs[today()];
+  log.res[part].push({ qid: q.qid, ok, input });
+  if (part === 'warm') { save(); return; }
+
+  bump(q.topic, ok);
+
+  if (part === 'review') {
+    const w = DB.wrong.find(x => x.qid === q.qid);
+    if (w) {
+      w.times = (w.times || 0) + 1;
+      if (ok) {
+        w.box = Math.min((w.box || 0) + 1, BOX_GAP.length - 1);
+        w.due = addDays(today(), BOX_GAP[w.box]);
+        if (w.box >= 3) { DB.wrong = DB.wrong.filter(x => x.qid !== w.qid); }
+      } else { w.box = 0; w.due = addDays(today(), 1); }
+    }
+  } else if (!ok) {
+    const rec = {
+      qid: q.qid, topic: q.topic, tname: q.tname, ask: q.ask, q: q.q, ans: q.ans,
+      type: q.type, opts: q.opts || null, sol: q.sol, box: 0,
+      due: addDays(today(), 1), addedAt: today(), times: 0
+    };
+    DB.wrong.push(rec);
+    log.wrongToday.push(rec);
+  }
+  save();
+}
+
+/* ---------- 诊断 ---------- */
+function buildDiag() {
+  const list = [];
+  P_TOPICS.forEach(k => list.push(genQ(k)));
+  ['calc-order', 'frac-add', 'frac-muldiv', 'simple-eq', 'word-speed'].forEach(k => list.push(genQ(k)));
+  ['numline', 'rat-addsub', 'power'].forEach(k => list.push(genQ(k)));
+  return list;
+}
+function finishDiag(qs, res) {
+  const sc = {};
+  qs.forEach((q, i) => {
+    const s = sc[q.topic] || (sc[q.topic] = { right: 0, total: 0 });
+    s.total++; if (res[i]) s.right++;
+  });
+  DB.diag = { done: true, date: today(), scores: sc };
+  Object.keys(sc).forEach(k => { const m = DB.mastery[k] || (DB.mastery[k] = { right: 0, total: 0, r20: [] });
+    m.total += sc[k].total; m.right += sc[k].right; });
+  buildQueue();
+  /* 诊断错题直接进错题本 */
+  qs.forEach((q, i) => { if (!res[i]) DB.wrong.push({
+    qid: q.qid, topic: q.topic, tname: q.tname, ask: q.ask, q: q.q, ans: q.ans,
+    type: q.type, opts: q.opts || null, sol: q.sol, box: 0, due: addDays(today(), 1), addedAt: today(), times: 0 }); });
+  delete DB.logs[today()];
+  save();
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+function sup(s) { return ('' + s).replace(/\^(-?\d+)/g, '<sup>$1</sup>'); }
+function esc(s) { return ('' + s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+let TAB = 'today';
+function go(tab) { TAB = tab; render(); window.scrollTo(0, 0); }
+
+function render() {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
+  const m = $('#main'); m.innerHTML = '';
+  if (TAB === 'today') viewToday(m);
+  else if (TAB === 'diag') viewDiag(m);
+  else if (TAB === 'plan') viewPlan(m);
+  else if (TAB === 'wrong') viewWrong(m);
+  else if (TAB === 'parent') viewParent(m);
+  else if (TAB === 'data') viewData(m);
+  else if (TAB === 'set') viewSet(m);
+}
+
+/* ---------- 通用：做题器 ---------- */
+function runner(host, qs, opt) {
+  /* opt: {title, onDone(res), onEach(q,ok,input,i), showSol} */
+  let i = 0; const res = [];
+  const box = el('div', 'card');
+  host.appendChild(box);
+  const bar = el('div', 'pbar'); const fill = el('i'); bar.appendChild(fill);
+  const head = el('div', 'qhead');
+  box.appendChild(head); box.appendChild(bar);
+  const body = el('div'); box.appendChild(body);
+
+  function step() {
+    if (i >= qs.length) { box.innerHTML = ''; box.appendChild(el('div', 'done', '<b>这一组做完了</b><div class="sub">正确 ' + res.filter(Boolean).length + ' / ' + qs.length + '</div>')); if (opt.onDone) opt.onDone(res); return; }
+    const q = qs[i];
+    head.innerHTML = '<span>' + opt.title + '</span><span class="cnt">' + (i + 1) + ' / ' + qs.length + '</span>';
+    fill.style.width = (i / qs.length * 100) + '%';
+    body.innerHTML = '';
+    if (q.tname) body.appendChild(el('div', 'tag', q.tname));
+    body.appendChild(el('div', 'qtext', sup(esc(q.q))));
+
+    let cur = '';
+    const fb = el('div', 'fb');
+
+    function submit(val) {
+      const ok = judge(q, val);
+      res[i] = ok;
+      if (opt.onEach) opt.onEach(q, ok, val, i);
+      fb.className = 'fb ' + (ok ? 'ok' : 'no');
+      let h = '<div class="fbhead">' + (ok ? '✓ 对了' : '✗ 不对') + '</div>';
+      if (!ok) h += '<div class="right">正确答案：<b>' + sup(esc(q.ans)) + '</b></div>';
+      if (opt.showSol !== false && q.sol) h += '<ol class="sol">' + q.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol>';
+      h += '<button class="btn next">下一题 →</button>';
+      fb.innerHTML = h;
+      fb.querySelector('.next').onclick = () => { i++; step(); };
+      body.querySelectorAll('button,input').forEach(b => b.disabled = true);
+      fb.querySelector('.next').disabled = false;
+      fb.scrollIntoView({ block: 'nearest' });
+    }
+
+    if (q.type === 'choice') {
+      const wrap = el('div', 'opts');
+      q.opts.forEach(o => { const b = el('button', 'opt', sup(esc(o))); b.onclick = () => { wrap.querySelectorAll('.opt').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); submit(o); }; wrap.appendChild(b); });
+      body.appendChild(wrap);
+    } else {
+      const inp = el('input', 'ans'); inp.setAttribute('inputmode', 'none'); inp.readOnly = true;
+      inp.placeholder = '答案（分数写成 3/4）';
+      body.appendChild(inp);
+      const kb = el('div', 'kb');
+      const keys = ['7', '8', '9', '/', '4', '5', '6', '-', '1', '2', '3', '.', '0', '⌫', '清空', '确定'];
+      keys.forEach(k => {
+        const b = el('button', 'k' + (k === '确定' ? ' go' : (k === '⌫' || k === '清空' ? ' fn' : '')), k);
+        b.onclick = () => {
+          if (k === '⌫') cur = cur.slice(0, -1);
+          else if (k === '清空') cur = '';
+          else if (k === '确定') { if (!cur.trim()) return; submit(cur); return; }
+          else cur += k;
+          inp.value = cur;
+        };
+        kb.appendChild(b);
+      });
+      body.appendChild(kb);
+      const skip = el('button', 'btn ghost', '不会，看解析');
+      skip.onclick = () => submit('###');
+      body.appendChild(skip);
+    }
+    body.appendChild(fb);
+  }
+  step();
+}
+
+/* ---------- 今日 ---------- */
+function viewToday(m) {
+  if (!DB.diag.done) {
+    m.appendChild(el('div', 'card hero', '<h2>先做一次入学诊断</h2><p>21 道题，覆盖小学 13 个知识点 + 初一 3 个前置点，大约 20 分钟。做完才知道漏在哪，计划才有意义。中间可以停，成绩会存在这台设备上。</p><button class="btn big" onclick="go(\'diag\')">开始诊断 →</button>'));
+    return;
+  }
+  const wi = weekInfo();
+  const log = buildToday();
+  const parts = [
+    { k: 'warm', name: '① 口算热身', sub: '限时不限对，练手速', qs: log.qs.warm },
+    { k: 'focus', name: '② 补漏主攻', sub: TMAP[log.focusK].name + (log.focus2 ? ' + ' + TMAP[log.focus2].name : ''), qs: log.qs.focus },
+    { k: 'track', name: '③ 跟课练习', sub: log.trackCh, qs: log.qs.track },
+    { k: 'review', name: '④ 错题重做', sub: log.qs.review.length ? '到期错题 ' + log.qs.review.length + ' 道' : '今天没有到期错题', qs: log.qs.review }
+  ];
+  const hdr = el('div', 'card');
+  hdr.innerHTML = '<div class="row"><div><h2>' + cnDate(today()) + '</h2><div class="sub">' + wi.label + ' · 本周跟课：' + esc(log.trackCh) + '</div></div></div>';
+  m.appendChild(hdr);
+
+  parts.forEach(p => {
+    const doneN = log.res[p.k].length, totN = p.qs.length;
+    const c = el('div', 'card task' + (totN === 0 ? ' dim' : (doneN >= totN ? ' fin' : '')));
+    const rightN = log.res[p.k].filter(r => r.ok).length;
+    c.innerHTML = '<div class="row"><div><b>' + p.name + '</b><div class="sub">' + esc(p.sub) + '</div></div>'
+      + '<div class="prog">' + (totN === 0 ? '—' : doneN + '/' + totN + (doneN >= totN ? ' ✓ 对 ' + rightN : '')) + '</div></div>';
+    if (totN > 0 && doneN < totN) {
+      const b = el('button', 'btn', doneN ? '继续做' : '开始');
+      b.onclick = () => {
+        m.innerHTML = '';
+        const back = el('button', 'btn ghost', '← 回今日'); back.onclick = () => go('today'); m.appendChild(back);
+        runner(m, p.qs.slice(doneN), {
+          title: p.name,
+          onEach: (q, ok, val) => recordAnswer(p.k, q, val, ok),
+          onDone: () => { const b2 = el('button', 'btn big', '回到今日任务'); b2.onclick = () => go('today'); m.appendChild(b2); }
+        });
+      };
+      c.appendChild(b);
+    }
+    m.appendChild(c);
+  });
+
+  if (log.wrongToday.length) {
+    const c = el('div', 'card note');
+    c.innerHTML = '<b>今天错了 ' + log.wrongToday.length + ' 道</b><div class="sub">去「家长」页拿今晚讲哪 2 道</div>';
+    const b = el('button', 'btn', '看家长清单'); b.onclick = () => go('parent'); c.appendChild(b);
+    m.appendChild(c);
+  }
+}
+
+/* ---------- 诊断 ---------- */
+let DIAGQS = null, DIAGRES = null;
+function viewDiag(m) {
+  if (DB.diag.done && !DIAGQS) {
+    const c = el('div', 'card');
+    let h = '<h2>诊断结果 · ' + DB.diag.date + '</h2><table class="tb"><tr><th>知识点</th><th>正确</th><th>判断</th></tr>';
+    const rows = Object.keys(DB.diag.scores).map(k => { const s = DB.diag.scores[k]; return { k, r: s.right / s.total, s }; }).sort((a, b) => a.r - b.r);
+    rows.forEach(r => {
+      const lv = r.r >= 0.85 ? ['稳', 'g'] : r.r >= 0.5 ? ['夹生', 'w'] : ['要补', 'b'];
+      h += '<tr><td>' + TMAP[r.k].name + '<span class="st">' + (TMAP[r.k].stage === 'P' ? '小学' : '七上') + '</span></td><td>' + r.s.right + '/' + r.s.total + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
+    });
+    h += '</table>';
+    c.innerHTML = h;
+    m.appendChild(c);
+    const c2 = el('div', 'card');
+    c2.innerHTML = '<b>当前补漏队列</b><div class="sub">按「影响初一的程度 × 掌握度」排序，做到近 20 题正确率 85% 自动毕业出队</div><ol class="q">'
+      + DB.queue.map(k => '<li>' + TMAP[k].name + '</li>').join('') + '</ol>';
+    m.appendChild(c2);
+    const b = el('button', 'btn ghost', '重做诊断（会清空队列，保留错题本）');
+    b.onclick = () => { if (confirm('重做诊断？')) { DIAGQS = buildDiag(); DIAGRES = []; render(); } };
+    m.appendChild(b);
+    return;
+  }
+  if (!DIAGQS) { DIAGQS = buildDiag(); DIAGRES = []; }
+  runner(m, DIAGQS, {
+    title: '入学诊断', showSol: true,
+    onEach: (q, ok, v, i) => { DIAGRES[i] = ok; },
+    onDone: res => {
+      finishDiag(DIAGQS, res); DIAGQS = null;
+      const b = el('button', 'btn big', '看结果和计划'); b.onclick = () => { go('diag'); }; m.appendChild(b);
+    }
+  });
+}
+
+/* ---------- 计划 ---------- */
+function viewPlan(m) {
+  const wi = weekInfo();
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>学习计划</h2><div class="sub">' + wi.label + '。启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart
+    + '。每天三段：口算热身 → 补漏主攻 → 跟课练习，再加到期错题重做。</div>';
+  m.appendChild(c);
+
+  const k = el('div', 'card');
+  k.innerHTML = '<b>8/29 – 8/31 破冰三天</b><ol class="q">'
+    + '<li>第 1 天：做完入学诊断（21 题），当晚家长陪着过 2 道错题</li>'
+    + '<li>第 2 天：主攻诊断里最差的那个小学知识点 + 预习数轴/相反数/绝对值</li>'
+    + '<li>第 3 天：昨天错题重做 + 预习有理数加减，把「减号改写成加相反数」练成肌肉记忆</li>'
+    + '</ol><div class="sub">目的不是学完，是开学第一节课能听懂，先把「我能听懂」这个感觉拿回来。</div>';
+  m.appendChild(k);
+
+  const t = el('div', 'card');
+  let h = '<b>开学后 12 周跟课表</b><div class="sub">以学校实际进度为准，进度不一样就点「改」。</div><table class="tb"><tr><th>周</th><th>跟课内容</th><th></th></tr>';
+  for (let w = 1; w <= 12; w++) {
+    const tr = trackOf(w);
+    h += '<tr' + (w === wi.w && wi.phase === 'term' ? ' class="now"' : '') + '><td>W' + w + '</td><td>' + esc(tr.ch) + '</td><td><button class="mini" data-w="' + w + '">改</button></td></tr>';
+  }
+  h += '</table>';
+  t.innerHTML = h;
+  t.querySelectorAll('.mini').forEach(b => b.onclick = () => {
+    const w = +b.dataset.w, tr = trackOf(w);
+    const ch = prompt('第 ' + w + ' 周学校在讲什么？（只改显示文字）', tr.ch);
+    if (ch === null) return;
+    const opts = M_TOPICS.map((x, i) => (i + 1) + '=' + TMAP[x].name).join('  ');
+    const pickStr = prompt('这周练哪些知识点？填编号，逗号分隔\n' + opts, tr.ks.map(x => M_TOPICS.indexOf(x) + 1).join(','));
+    if (pickStr === null) return;
+    const ks = pickStr.split(/[,，\s]+/).map(x => M_TOPICS[+x - 1]).filter(Boolean);
+    DB.trackOverride[w] = { ch, ks: ks.length ? ks : tr.ks };
+    delete DB.logs[today()];
+    save(); render();
+  });
+  m.appendChild(t);
+
+  const g = el('div', 'card');
+  g.innerHTML = '<b>阶段目标（可衡量）</b><ol class="q">'
+    + '<li>开学第 2 周末：口算热身正确率 ≥ 80%，有理数加减单独测 10 题错不超过 2 题</li>'
+    + '<li>期中前（第 7 周）：补漏队列里清掉 3 个小学知识点；括号型乘方（−2² 和 (−2)²）连续 10 题不错</li>'
+    + '<li>期末前（第 12 周）：一元一次方程含分母的题 10 题对 7 道；错题本存量降到 20 道以内</li>'
+    + '</ol><div class="sub">及格线不是目标，稳定拿到「会做的题不丢分」才是。他现在的失分大头是运算规则，不是难题。</div>';
+  m.appendChild(g);
+}
+
+/* ---------- 错题本 ---------- */
+function viewWrong(m) {
+  const t = today();
+  const due = DB.wrong.filter(w => w.due <= t);
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>错题本</h2><div class="sub">共 ' + DB.wrong.length + ' 道，今天到期 ' + due.length + ' 道。答对一次隔 1 天再考，连续对 3 轮就毕业移出。</div>';
+  m.appendChild(c);
+  if (due.length) {
+    const b = el('button', 'btn big', '重做今天到期的 ' + due.length + ' 道');
+    b.onclick = () => {
+      m.innerHTML = '';
+      const back = el('button', 'btn ghost', '← 返回'); back.onclick = () => go('wrong'); m.appendChild(back);
+      buildToday();
+      runner(m, due, { title: '错题重做', onEach: (q, ok, v) => recordAnswer('review', q, v, ok), onDone: () => { const b2 = el('button', 'btn big', '完成'); b2.onclick = () => go('wrong'); m.appendChild(b2); } });
+    };
+    m.appendChild(b);
+  }
+  const grp = {};
+  DB.wrong.forEach(w => (grp[w.topic] = grp[w.topic] || []).push(w));
+  Object.keys(grp).sort((a, b) => grp[b].length - grp[a].length).forEach(k => {
+    const c2 = el('div', 'card');
+    let h = '<b>' + TMAP[k].name + '</b> <span class="pill b">' + grp[k].length + ' 道</span>';
+    grp[k].forEach(w => { h += '<div class="wq"><div class="wqq">' + sup(esc(w.q)) + '</div><div class="wqa">答案 ' + sup(esc(w.ans)) + ' · 下次重考 ' + w.due + '</div></div>'; });
+    c2.innerHTML = h;
+    m.appendChild(c2);
+  });
+  if (!DB.wrong.length) m.appendChild(el('div', 'card dim', '错题本是空的。'));
+}
+
+/* ---------- 家长 ---------- */
+function viewParent(m) {
+  const t = today();
+  const log = DB.logs[t];
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>今晚这 10 分钟怎么用</h2><div class="sub">别通篇讲。挑下面 2 道，让他讲给你听，你只负责问问题。</div>';
+  m.appendChild(c);
+
+  let wt = (log && log.wrongToday) ? log.wrongToday.slice() : [];
+  if (!wt.length) wt = DB.wrong.filter(w => w.addedAt === t);
+  if (!wt.length) {
+    m.appendChild(el('div', 'card dim', '今天还没有错题记录。等他做完今日任务再来看。'));
+  } else {
+    const cnt = {}; wt.forEach(w => cnt[w.topic] = (cnt[w.topic] || 0) + 1);
+    wt.sort((a, b) => cnt[b.topic] - cnt[a.topic]);
+    const seen = new Set(); const chosen = [];
+    wt.forEach(w => { if (chosen.length < 2 && !seen.has(w.topic)) { seen.add(w.topic); chosen.push(w); } });
+    if (chosen.length < 2 && wt.length > 1) chosen.push(wt.find(w => !chosen.includes(w)));
+    chosen.filter(Boolean).forEach((w, i) => {
+      const c2 = el('div', 'card');
+      c2.innerHTML = '<div class="tag">第 ' + (i + 1) + ' 道 · ' + TMAP[w.topic].name + '</div>'
+        + '<div class="qtext">' + sup(esc(w.q)) + '</div>'
+        + '<div class="kv"><span>正确答案</span><b>' + sup(esc(w.ans)) + '</b></div>'
+        + '<div class="pask"><b>你问这句</b><div>' + esc(w.ask) + '</div></div>'
+        + '<details><summary>讲解思路（他讲不出来你再看）</summary><ol class="sol">' + w.sol.map(s => '<li>' + sup(esc(s)) + '</li>').join('') + '</ol></details>';
+      m.appendChild(c2);
+    });
+  }
+
+  const tip = el('div', 'card note');
+  tip.innerHTML = '<b>三条底线</b><ol class="q">'
+    + '<li>不说「这么简单都不会」。他现在的问题是小学没打牢，不是不聪明。</li>'
+    + '<li>只讲 2 道。讲多了他记不住，也会把 10 分钟拖成 40 分钟然后崩。</li>'
+    + '<li>让他讲、你听。他能把步骤说顺就算过关，说不出来的地方才是真漏洞。</li></ol>';
+  m.appendChild(tip);
+
+  const w7 = weekReport();
+  const wr = el('div', 'card');
+  wr.innerHTML = '<b>最近 7 天</b><div class="sub">练了 ' + w7.days + ' 天，共 ' + w7.total + ' 题，正确率 ' + w7.rate + '%。'
+    + (w7.days < 4 ? '天数偏少——先保住每天都碰一下，比某天做很多有用。' : '节奏没问题，保持。') + '</div>';
+  m.appendChild(wr);
+}
+function weekReport() {
+  let total = 0, right = 0, days = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(today(), -i), l = DB.logs[d];
+    if (!l) continue;
+    let n = 0;
+    ['warm', 'focus', 'track', 'review'].forEach(p => { (l.res[p] || []).forEach(r => { n++; total++; if (r.ok) right++; }); });
+    if (n) days++;
+  }
+  return { total, right, days, rate: total ? Math.round(right / total * 100) : 0 };
+}
+
+/* ---------- 数据 ---------- */
+function viewData(m) {
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>最近 14 天</h2>';
+  const rows = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = addDays(today(), -i), l = DB.logs[d];
+    let n = 0, r = 0;
+    if (l) ['warm', 'focus', 'track', 'review'].forEach(p => (l.res[p] || []).forEach(x => { n++; if (x.ok) r++; }));
+    rows.push({ d, n, r });
+  }
+  let h = '<div class="chart">';
+  rows.forEach(x => {
+    const pct = x.n ? Math.round(x.r / x.n * 100) : 0;
+    h += '<div class="bar" title="' + x.d + ' ' + x.r + '/' + x.n + '"><i style="height:' + (x.n ? Math.max(pct, 4) : 0) + '%"></i><span>' + x.d.slice(5).replace('-', '/') + '</span></div>';
+  });
+  h += '</div><div class="sub">柱高 = 当天正确率，没柱子 = 那天没练。</div>';
+  c.innerHTML += h;
+  m.appendChild(c);
+
+  const c2 = el('div', 'card');
+  let h2 = '<b>各知识点掌握度</b><div class="sub">按累计做题正确率，做满 8 题才显示判断</div><table class="tb"><tr><th>知识点</th><th>题数</th><th>正确率</th><th></th></tr>';
+  TOPICS.forEach(t => {
+    const n = mstN(t.k); if (!n) return;
+    const r = Math.round(mst(t.k) * 100);
+    const lv = n < 8 ? ['样本少', ''] : r >= 85 ? ['稳', 'g'] : r >= 60 ? ['夹生', 'w'] : ['要补', 'b'];
+    h2 += '<tr><td>' + t.name + '<span class="st">' + (t.stage === 'P' ? '小学' : '七上') + '</span></td><td>' + n + '</td><td>' + r + '%</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
+  });
+  h2 += '</table>';
+  c2.innerHTML = h2;
+  m.appendChild(c2);
+}
+
+/* ---------- 设置 ---------- */
+function viewSet(m) {
+  const c = el('div', 'card');
+  c.innerHTML = '<h2>设置</h2>'
+    + '<div class="kv"><span>启动日</span><input id="s-kick" value="' + DB.profile.kickoff + '"></div>'
+    + '<div class="kv"><span>开学日</span><input id="s-ss" value="' + DB.profile.schoolStart + '"></div>'
+    + '<div class="kv"><span>每天分钟</span><input id="s-min" value="' + DB.profile.dailyMin + '"></div>';
+  const b = el('button', 'btn', '保存');
+  b.onclick = () => {
+    DB.profile.kickoff = $('#s-kick').value.trim();
+    DB.profile.schoolStart = $('#s-ss').value.trim();
+    DB.profile.dailyMin = Math.max(10, Math.min(90, +$('#s-min').value || 25));
+    delete DB.logs[today()];
+    save(); alert('已保存，今日任务会按新时长重新生成'); go('today');
+  };
+  c.appendChild(b);
+  m.appendChild(c);
+
+  const c2 = el('div', 'card');
+  c2.innerHTML = '<b>进度备份</b><div class="sub">数据只存在这台设备的浏览器里。换设备、清缓存前先导出。</div>';
+  const b1 = el('button', 'btn', '导出进度文件');
+  b1.onclick = () => {
+    const blob = new Blob([JSON.stringify(DB)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'math-progress-' + today() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  const b2 = el('button', 'btn ghost', '复制进度到剪贴板');
+  b2.onclick = () => { const s = JSON.stringify(DB); navigator.clipboard ? navigator.clipboard.writeText(s).then(() => alert('已复制')) : prompt('手动复制：', s); };
+  const inp = el('input', 'file'); inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.ver) throw new Error('格式不对'); DB = d; save(); alert('已导入'); go('today'); } catch (err) { alert('导入失败：' + err.message); } };
+    r.readAsText(f); };
+  c2.appendChild(b1); c2.appendChild(b2);
+  c2.appendChild(el('div', 'sub', '导入备份：'));
+  c2.appendChild(inp);
+  m.appendChild(c2);
+
+  const c3 = el('div', 'card');
+  const b3 = el('button', 'btn ghost danger', '清空全部数据');
+  b3.onclick = () => { if (confirm('全部清空，不可恢复。确定？')) { localStorage.removeItem(KEY); load(); go('today'); } };
+  c3.appendChild(b3);
+  m.appendChild(c3);
+}
+
+/* ---------- 启动 ---------- */
+load();
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => go(b.dataset.t));
+render();
