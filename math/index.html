@@ -111,6 +111,9 @@ summary{color:var(--accent);font-size:15px;cursor:pointer}
 .bar i{display:block;width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:0}
 .bar span{font-size:9.5px;color:var(--muted);margin-top:4px;writing-mode:vertical-rl;letter-spacing:-.04em}
 input.file{margin-top:8px;font-size:14px;color:var(--muted)}
+textarea.briefbox{width:100%;margin-top:12px;font-size:12.5px;line-height:1.5;padding:10px;
+  border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;-webkit-text-size-adjust:100%}
 .card.gain{border-left:3px solid var(--good)}
 .grow{display:flex;align-items:baseline;gap:10px;margin-top:9px}
 .grow i{flex:0 0 auto;font-style:normal;font-weight:600;color:var(--good);font-size:16px;
@@ -1081,9 +1084,13 @@ function bump(k, ok) {
 function pickLv(k) {
   const m = DB.mastery[k];
   if (!m || !m.r20 || m.r20.length < 6) return 2;
-  const r = m.r20.slice(-10).reduce((a, b) => a + b, 0) / Math.min(10, m.r20.length);
-  if (r >= 0.9) return 3;
+  const win = m.r20.slice(-10);
+  const r = win.reduce((a, b) => a + b, 0) / win.length;
+  const all = m.total ? m.right / m.total : 0;
+  /* 降档只看近况，反应要快；升档还要看累计，因为近 10 题连对可能只是
+     碰上简单题，累计才 55% 就跳最难档会直接把他砸崩。升保守、降灵敏。 */
   if (r < 0.6) return 1;
+  if (r >= 0.9 && all >= 0.75 && m.total >= 15) return 3;
   return 2;
 }
 /* 近 20 题正确率，用于判断是否出队 */
@@ -1238,7 +1245,8 @@ function recordAnswer(part, q, input, ok) {
 function buildDiag() {
   const list = [];
   P_TOPICS.forEach(k => list.push(genQ(k)));
-  ['calc-order', 'frac-add', 'frac-muldiv', 'simple-eq', 'word-speed'].forEach(k => list.push(genQ(k)));
+  /* 影响初一最深的几项各多测一题，样本太小判不准 */
+  ['frac-add', 'frac-muldiv', 'decimal', 'simple-eq', 'calc-order'].forEach(k => list.push(genQ(k)));
   ['numline', 'rat-addsub', 'power'].forEach(k => list.push(genQ(k)));
   return list;
 }
@@ -1292,6 +1300,104 @@ function streakOf(k) {
   const m = DB.mastery[k]; if (!m || !m.r20) return 0;
   let n = 0; for (let i = m.r20.length - 1; i >= 0; i--) { if (m.r20[i]) n++; else break; }
   return n;
+}
+
+function weekReport() {
+  let total = 0, right = 0, days = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(today(), -i), l = DB.logs[d];
+    if (!l) continue;
+    let n = 0;
+    ['warm', 'focus', 'track', 'review'].forEach(p => { (l.res[p] || []).forEach(r => { n++; total++; if (r.ok) right++; }); });
+    if (n) days++;
+  }
+  return { total, right, days, rate: total ? Math.round(right / total * 100) : 0 };
+}
+
+/* ============================================================
+   给 Claude 看的进度摘要
+   页面没有后端，数据只在本机 localStorage，外部读不到。
+   所以生成一段紧凑纯文本，家长一键复制、粘给 Claude 就能调计划。
+   刻意不含姓名、学校、设备信息。
+   ============================================================ */
+function buildBrief() {
+  const L = [];
+  const wi = weekInfo();
+  L.push('【数学补漏 app 进度摘要】生成于 ' + today() + '（' + wi.label + '）');
+  L.push('每天设定 ' + DB.profile.dailyMin + ' 分钟，启动日 ' + DB.profile.kickoff + '，开学 ' + DB.profile.schoolStart);
+
+  if (!DB.diag.done) { L.push('诊断：还没做'); }
+  else {
+    const rows = Object.keys(DB.diag.scores).map(k => { const s = DB.diag.scores[k]; return { k, r: s.right / s.total, s }; }).sort((a, b) => a.r - b.r);
+    const fmt = r => TMAP[r.k].name + ' ' + r.s.right + '/' + r.s.total;
+    const multi = rows.filter(r => r.s.total >= 2), single = rows.filter(r => r.s.total < 2);
+    const bad = multi.filter(r => r.r < 0.5), mid = multi.filter(r => r.r >= 0.5 && r.r < 0.85), good = multi.filter(r => r.r >= 0.85);
+    L.push('');
+    L.push('== 入学诊断（' + DB.diag.date + '，共 ' + rows.reduce((a, r) => a + r.s.total, 0) + ' 题）==');
+    L.push('要补：' + (bad.length ? bad.map(fmt).join('；') : '无'));
+    L.push('夹生：' + (mid.length ? mid.map(fmt).join('；') : '无'));
+    L.push('已稳：' + (good.length ? good.map(fmt).join('；') : '无'));
+    if (single.length) {
+      const sg = single.filter(r => r.r >= 1), sb = single.filter(r => r.r < 1);
+      L.push('只测了 1 题、判不准（对：' + (sg.length ? sg.map(r => TMAP[r.k].name).join('、') : '无')
+        + ' ／ 错：' + (sb.length ? sb.map(r => TMAP[r.k].name).join('、') : '无') + '）');
+    }
+  }
+
+  L.push('');
+  L.push('== 当前补漏队列（按顺序攻）==');
+  L.push(DB.queue.length ? DB.queue.map((k, i) => (i + 1) + '.' + TMAP[k].name).join('  ') : '（空）');
+
+  const mrows = TOPICS.filter(t => mstN(t.k) >= 8).map(t => ({ k: t.k, n: mstN(t.k), r: Math.round(mst(t.k) * 100), lv: pickLv(t.k) })).sort((a, b) => a.r - b.r);
+  if (mrows.length) {
+    L.push('');
+    L.push('== 累计练过 ≥8 题的知识点（正确率 / 题数 / 当前难度档）==');
+    mrows.forEach(x => L.push('  ' + TMAP[x.k].name + '  ' + x.r + '%  ' + x.n + ' 题  L' + x.lv + (TMAP[x.k].stage === 'P' ? '  [小学]' : '')));
+  }
+
+  L.push('');
+  const grp = {}; DB.wrong.forEach(w => grp[w.topic] = (grp[w.topic] || 0) + 1);
+  const gk = Object.keys(grp).sort((a, b) => grp[b] - grp[a]);
+  L.push('== 错题本 ==');
+  L.push('共 ' + DB.wrong.length + ' 道，今天到期 ' + dueWrongs().length + ' 道' + (gk.length ? '；最集中：' + gk.slice(0, 4).map(k => TMAP[k].name + ' ' + grp[k] + ' 道').join('，') : ''));
+
+  L.push('');
+  L.push('== 最近 14 天练习 ==');
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = addDays(today(), -i), lg = DB.logs[d];
+    let n = 0, r = 0;
+    if (lg) ['warm', 'focus', 'track', 'review'].forEach(pp => (lg.res[pp] || []).forEach(x => { n++; if (x.ok) r++; }));
+    if (n) days.push(d.slice(5) + ' ' + r + '/' + n + (lg.mini ? '(迷你)' : ''));
+  }
+  L.push(days.length ? days.join('  ') : '（还没有练习记录）');
+  const w7 = weekReport();
+  L.push('近 7 天：练了 ' + w7.days + ' 天，' + w7.total + ' 题，正确率 ' + w7.rate + '%');
+
+  L.push('');
+  L.push('== 其他 ==');
+  L.push('已解锁数学史彩蛋 ' + DB.facts.length + '/24；完成周挑战 ' + Object.keys(DB.boss).length + ' 次');
+  const ov = Object.keys(DB.trackOverride);
+  if (ov.length) L.push('家长手改过的跟课周：' + ov.map(w => 'W' + w + '=' + DB.trackOverride[w].ch).join('；'));
+  L.push('');
+  L.push('（请据此判断：补漏优先级要不要重排、难度档是否合适、跟课表要不要调）');
+  return L.join('\n');
+}
+
+/* 复制到剪贴板，失败就摊开让人手选 */
+function copyBrief(host) {
+  const txt = buildBrief();
+  const done = () => { const t = el('div', 'sub', '已复制。粘到和 Claude 的对话里就行。'); host.appendChild(t); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(() => showBrief(host, txt));
+  } else showBrief(host, txt);
+}
+function showBrief(host, txt) {
+  const old = host.querySelector('.briefbox'); if (old) old.remove();
+  const ta = el('textarea', 'briefbox'); ta.value = txt || buildBrief(); ta.rows = 16; ta.readOnly = true;
+  host.appendChild(ta);
+  ta.focus(); ta.select();
+  host.appendChild(el('div', 'sub', '自动复制没成功。长按上面的框全选复制，粘给 Claude。'));
 }
 
 /* ============================================================
@@ -1520,7 +1626,7 @@ function viewDiag(m) {
     let h = '<h2>诊断结果 · ' + DB.diag.date + '</h2><table class="tb"><tr><th>知识点</th><th>正确</th><th>判断</th></tr>';
     const rows = Object.keys(DB.diag.scores).map(k => { const s = DB.diag.scores[k]; return { k, r: s.right / s.total, s }; }).sort((a, b) => a.r - b.r);
     rows.forEach(r => {
-      const lv = r.r >= 0.85 ? ['稳', 'g'] : r.r >= 0.5 ? ['夹生', 'w'] : ['要补', 'b'];
+      const lv = r.s.total < 2 ? ['只测 1 题', ''] : r.r >= 0.85 ? ['稳', 'g'] : r.r >= 0.5 ? ['夹生', 'w'] : ['要补', 'b'];
       h += '<tr><td>' + TMAP[r.k].name + '<span class="st">' + (TMAP[r.k].stage === 'P' ? '小学' : '七上') + '</span></td><td>' + r.s.right + '/' + r.s.total + '</td><td><span class="pill ' + lv[1] + '">' + lv[0] + '</span></td></tr>';
     });
     h += '</table>';
@@ -1530,6 +1636,16 @@ function viewDiag(m) {
     c2.innerHTML = '<b>当前补漏队列</b><div class="sub">按「影响初一的程度 × 掌握度」排序，做到近 20 题正确率 85% 自动毕业出队</div><ol class="q">'
       + DB.queue.map(k => '<li>' + TMAP[k].name + '</li>').join('') + '</ol>';
     m.appendChild(c2);
+    const c3 = el('div', 'card note');
+    c3.innerHTML = '<b>把结果发给 Claude</b><div class="sub">这个页面没有后端，成绩只存在这台设备上，外面读不到。'
+      + '点下面按钮复制一段摘要（不含姓名学校），粘到对话里，他就能判断补漏顺序要不要重排、难度合不合适。</div>';
+    const cb = el('button', 'btn', '复制进度摘要');
+    cb.onclick = () => copyBrief(c3);
+    const cb2 = el('button', 'btn ghost', '直接看这段文字');
+    cb2.onclick = () => showBrief(c3);
+    c3.appendChild(cb); c3.appendChild(cb2);
+    m.appendChild(c3);
+
     const b = el('button', 'btn ghost', '重做诊断（会清空队列，保留错题本）');
     b.onclick = () => { if (confirm('重做诊断？')) { DIAGQS = buildDiag(); DIAGRES = []; render(); } };
     m.appendChild(b);
@@ -1675,22 +1791,18 @@ function viewParent(m) {
     + '夸天赋会让他下次遇到难题就认定「我不是这块料」，夸具体做对的步骤才顶用。</li></ol>';
   m.appendChild(tip);
 
+  const cq = el('div', 'card note');
+  cq.innerHTML = '<b>卡住了想问 Claude</b><div class="sub">连续两周没进步、或者不知道该不该调计划的时候，复制这段摘要发给他。</div>';
+  const cqb = el('button', 'btn ghost', '复制进度摘要');
+  cqb.onclick = () => copyBrief(cq);
+  cq.appendChild(cqb);
+  m.appendChild(cq);
+
   const w7 = weekReport();
   const wr = el('div', 'card');
   wr.innerHTML = '<b>最近 7 天</b><div class="sub">练了 ' + w7.days + ' 天，共 ' + w7.total + ' 题，正确率 ' + w7.rate + '%。'
     + (w7.days < 4 ? '天数偏少——先保住每天都碰一下，比某天做很多有用。' : '节奏没问题，保持。') + '</div>';
   m.appendChild(wr);
-}
-function weekReport() {
-  let total = 0, right = 0, days = 0;
-  for (let i = 0; i < 7; i++) {
-    const d = addDays(today(), -i), l = DB.logs[d];
-    if (!l) continue;
-    let n = 0;
-    ['warm', 'focus', 'track', 'review'].forEach(p => { (l.res[p] || []).forEach(r => { n++; total++; if (r.ok) right++; }); });
-    if (n) days++;
-  }
-  return { total, right, days, rate: total ? Math.round(right / total * 100) : 0 };
 }
 
 /* ---------- 数据 ---------- */
@@ -1759,6 +1871,9 @@ function viewSet(m) {
   inp.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader();
     r.onload = () => { try { const d = JSON.parse(r.result); if (!d.ver) throw new Error('格式不对'); DB = d; save(); alert('已导入'); go('today'); } catch (err) { alert('导入失败：' + err.message); } };
     r.readAsText(f); };
+  const b0 = el('button', 'btn', '复制进度摘要（给 Claude 看）');
+  b0.onclick = () => copyBrief(c2);
+  c2.appendChild(b0);
   c2.appendChild(b1); c2.appendChild(b2);
   c2.appendChild(el('div', 'sub', '导入备份：'));
   c2.appendChild(inp);
