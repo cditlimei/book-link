@@ -2210,7 +2210,7 @@ function markedLines(lines, miss){ return lines.map((l, li) => `<div>${[...l].ma
 let REC = null;
 async function recStart(){
   const R = state.rcheck; R.said = ''; R.err = '';
-  if (aiReady() && window.MediaRecorder && navigator.mediaDevices) {
+  if (aiReady() && AI.asrOff !== today() && window.MediaRecorder && navigator.mediaDevices) {   // 智谱余额不足的当天改用设备自带识别
     try { const stream = await navigator.mediaDevices.getUserMedia({audio: true});
       const type = ['audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
       REC = {stream, blobs: [], type, on: true, t0: Date.now()};
@@ -2238,8 +2238,11 @@ async function recStop(){
       if (x) { hot.push(x.title.replace(/[（(].*$/, '')); if (x.author) hot.push(x.author);
         for (const l of x.text) for (const c of l.split(/[，。；！？、：]/)) { const cc = c.trim(); if (cc.length >= 2 && cc.length <= 8 && [...cc].some(ch => !(PY || {})[ch] || (PY[ch] || '').includes('|'))) hot.push(cc); } }
       let txt = ''; for (const b of REC.blobs) txt += await aiASR(b, [...new Set(hot)]); R.said = txt; }
-  } catch(e) { R.err = '识别失败：' + e.message; }
+  } catch(e) {
+    if (e.noMoney) { AI.asrOff = today(); saveAI(); R.err = '智谱语音识别余额不足（它按 0.06 元/分钟收费，和免费的 AI 辅导不是一回事）。今天先改用设备自带的识别，点「开始背」再来一遍；想用更准的智谱识别，去智谱网站充 10 元就能用很久。'; }
+    else R.err = '识别失败：' + e.message; }
   REC = null;
+  if (!R.said && R.err) { R.phase = 'ready'; render(); return; }   // 识别失败不记成 0 分
   if (!R.said && !R.err) { R.err = '没识别到声音。浏览器的语音识别在国内经常连不上：在「家长 → 设置」填智谱密钥会更稳，或者用「打字默写检验」。'; R.phase = 'ready'; render(); return; }
   await finishCheck();
 }
@@ -2436,7 +2439,9 @@ async function aiASR(blob, hotwords){
   fd.append('file', wav, /mpeg|mp3/.test(wav.type) ? 'rec.mp3' : 'rec.wav');
   const r = await fetch('https://open.bigmodel.cn/api/paas/v4/audio/transcriptions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key}, body: fd});
   if (r.status === 400 && hotwords && hotwords.length) return aiASR(wav);          // 热词写法不被接受时，去掉热词再试一次
-  if (!r.ok) { let why = ''; try { const j = await r.json(); why = (j.error && (j.error.message || j.error.code)) || j.msg || ''; } catch(e) {} throw new Error((r.status === 401 ? '密钥不对' : '语音识别返回 ' + r.status) + (why ? '：' + why : '')); }
+  if (!r.ok) { let why = '', code = ''; try { const j = await r.json(); code = String((j.error && j.error.code) || ''); why = (j.error && (j.error.message || j.error.code)) || j.msg || ''; } catch(e) {}
+    if (r.status === 402 || code === '1113' || /余额|欠费|balance|quota/i.test(why) || (r.status === 429 && !/频率|rate/i.test(why))) { const e = new Error('余额不足'); e.noMoney = true; throw e; }
+    throw new Error((r.status === 401 ? '密钥不对' : '语音识别返回 ' + r.status) + (why ? '：' + why : '')); }
   const j = await r.json(); return j.text || (j.data && j.data.text) || (j.choices && j.choices[0] && (j.choices[0].text || (j.choices[0].message||{}).content)) || '';
 }
 function syncCard(){
