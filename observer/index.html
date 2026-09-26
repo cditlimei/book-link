@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="每日观察">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f1e8">
+<meta name="robots" content="noindex,nofollow">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
@@ -646,15 +647,23 @@ function findings(st, prev, anchors, nDays, monthly){
 }
 const findingsHTML = fs => fs.map(f => `<div class="signal ${f.k}"><span class="k">${{signal:'信号',good:'好的变化',info:'说明'}[f.k]}</span>${f.t}</div>`).join('');
 
-/* ================= 拍照错题本（../math/data/errors.json，同域只读） =================
+/* ================= 拍照错题本（私有仓库 errors.enc.json，用同步口令解密；本机缓存一份离线用） =================
    题干/答案/讲题提示由 Claude 收录流程写入；这里只保存重做进度（DB.extReview），不改原文件 */
 let EXT = [];
 const EXT_TYPE = {cuxin:'calc', fufenshu:'calc', buzhou:'calc', fuhao:'concept', kuohao:'concept', dishu:'concept', gainian:'concept', fangfa:'concept', shenti:'read', biaoda:'read'};
+let EXT_STATE = 'none';
 async function loadExt(){
+  if (DEMO) { EXT = []; return; }
   try {
-    const [er, kt] = await Promise.all([
-      fetch('../math/data/errors.json', {cache:'no-cache'}).then(r => r.json()),
-      fetch('../math/data/kaodian-tree.json', {cache:'no-cache'}).then(r => r.json()).catch(() => ({nodes:[]}))]);
+    let er = null;
+    if (syncReady()) {
+      try { const r = await fetch(ghFileURL('errors.enc.json') + '?t=' + Date.now(), {headers: ghHeaders('application/vnd.github.raw+json'), cache:'no-store'});
+        if (r.ok) { er = await decryptDB(await r.text(), SYNC.pass); IDB.set('observer:ext', er); } } catch(e) {}
+    }
+    if (!er) er = await IDB.get('observer:ext');
+    EXT_STATE = er ? 'ok' : syncReady() ? 'missing' : 'nosync';
+    if (!er) { EXT = []; return; }
+    const kt = await fetch('../math/data/kaodian-tree.json', {cache:'no-cache'}).then(r => r.json()).catch(() => ({nodes:[]}));
     const names = Object.fromEntries((kt.nodes||[]).map(n => [n.id, n.name]));
     EXT = (er.records||[]).filter(r => r.confirmed && r.status === 'active').map(r => ({
       id:'m:'+r.id, ext:true, d:r.date, sid: r.subject || 'sx', type: r.type || EXT_TYPE[r.errorType] || 'concept', conf: r.conf || null, photoId: r.photoId || null,
@@ -881,6 +890,7 @@ async function syncNow(manual, depth){
     if (changedLocal) { const cur = mergeDB(DB, target).M; cur.timer = DB.timer; DB = cur; reindex(); pendingLocal = true; flush(); if (!isTyping()) render(); else pendingRender = true; }
     await uploadPhotos();
     SYNC.last = now(); saveSync();
+    if (EXT_STATE !== 'ok') loadExt().then(() => { if (!isTyping()) render(); });
     if (manual) toast(push || changedLocal ? '已同步' : '已是最新');
   } catch(e) { SYNC.err = e.message || String(e); saveSync(); if (manual) toast(SYNC.err); }
   syncing = false; renderSyncState();
