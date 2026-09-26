@@ -4,84 +4,97 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="每日观察">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f1e8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
 <title>每日观察</title>
 <style>
 /* ============================================================
-   依据：《陪考手记》第 12 章「跨科通用的工具」
-   四件工具 = 错题按类型索引 / 观察式时间记录 / 复盘对话 / 家长情绪标记
-   视觉：观察笔记本。纸色底 + 墨色字，不用红色表示「错」——
-   错题是诊断线索，不是审判证据（琥珀色 = 值得看一眼的信号）。
+   每日观察 v2
+   依据：《陪考手记》第 12 章四件工具 + 2026-09 证据调研
+   - 回忆练习 g≈0.6（Adesope 2017）→ 错题逐题记录，按 2/7/21 天排「盖住答案重做」
+   - 有把握却做错的题改正后最牢（Metcalfe 2017）→ 每道错题记信心，优先重做
+   - 学生自我监控 g=0.47 → 孩子自己计时自己填，家长只问一句
+   - 初中家长干涉型参与与数学成绩负相关（Patall 2008 / 2023 meta）→ 不做家长批改打分
+   - 深圳 2026 中考 630 分结构 → 默认满分、提分空间按中考权重算
+   视觉：观察笔记本。纸色底 + 墨色字，错题用琥珀不用红——它是待返回的线索，不是审判。
    ============================================================ */
 :root{
-  --bg:#f5f1e8; --surface:#fffdf8; --surface2:#efe9dc;
-  --ink:#2b2621; --ink2:#6e665c; --ink3:#a0978a; --line:#e2dacb;
+  --bg:#f5f1e8; --surface:#fffdf8; --surface2:#efe9dc; --surface3:#f8f4ec;
+  --ink:#2b2621; --ink2:#6e665c; --ink3:#a0978a; --line:#e4dccd;
   --accent:#2f5d8a; --accent-bg:#e4ecf4;
   --amber:#a8681a; --amber-bg:#f7ead5;
   --good:#3d7a5c; --good-bg:#e1efe6;
   --danger:#a8423a;
+  --shadow:0 1px 2px rgba(60,45,20,.05),0 4px 14px rgba(60,45,20,.05);
   --serif:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC",Georgia,serif;
   --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  --r:14px; --tabh:62px;
+  --r:16px; --tabh:62px;
 }
 @media (prefers-color-scheme:dark){:root{
-  --bg:#171614; --surface:#211f1c; --surface2:#2b2825;
-  --ink:#ece6db; --ink2:#b1a898; --ink3:#7d7568; --line:#3a3631;
+  --bg:#171614; --surface:#211f1c; --surface2:#2d2a26; --surface3:#1c1a18;
+  --ink:#ece6db; --ink2:#b1a898; --ink3:#7d7568; --line:#38342f;
   --accent:#8cb4dc; --accent-bg:#233142;
   --amber:#e0a656; --amber-bg:#3a2e1d;
   --good:#7fc39f; --good-bg:#1f3328;
-  --danger:#e08078;
+  --danger:#e08078; --shadow:none;
 }}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55}
-body{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 16px)}
+body{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 20px)}
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
-/* 顶栏 */
-#top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.topin{max-width:860px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;align-items:baseline;gap:10px}
+#top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topin{max-width:880px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;align-items:center;gap:10px}
 .brand{font-family:var(--serif);font-size:20px;font-weight:700;letter-spacing:.02em}
 .term{font-size:13px;color:var(--ink2)}
-.saved{margin-left:auto;font-size:12px;color:var(--ink3);white-space:nowrap}
+.syncst{margin-left:auto;font-size:12px;color:var(--ink3);white-space:nowrap;border:0;background:transparent;padding:4px 0}
+.syncst.err{color:var(--amber)}
 .demo-banner{background:var(--amber-bg);color:var(--amber);font-size:13px;text-align:center;padding:6px 16px}
 
-main{max-width:860px;margin:0 auto;padding:16px}
-h2{font-family:var(--serif);font-size:22px;margin:4px 0 4px}
+main{max-width:880px;margin:0 auto;padding:16px}
+h2{font-family:var(--serif);font-size:23px;margin:2px 0 4px;letter-spacing:.01em}
 h3{font-family:var(--serif);font-size:17px;margin:0 0 8px}
 .sub{color:var(--ink2);font-size:14px;margin:0 0 14px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
 .muted{color:var(--ink2)} .faint{color:var(--ink3)} .small{font-size:13px}
 .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .spacer{flex:1}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:640px){.grid2{grid-template-columns:1fr}}
+.cols{display:grid;grid-template-columns:1fr;gap:0 16px}
+@media (min-width:760px){.cols{grid-template-columns:1.25fr 1fr}}
 
-/* 通用控件 */
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:14px;line-height:1.2;min-height:34px;white-space:nowrap}
 .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .chip.soft.on{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
-.seg button{border:0;background:transparent;padding:7px 12px;font-size:14px;min-height:36px;border-right:1px solid var(--line)}
+.seg button{border:0;background:transparent;padding:7px 12px;font-size:14px;min-height:36px;border-right:1px solid var(--line);white-space:nowrap}
 .seg button:last-child{border-right:0}
 .seg button.on{background:var(--ink);color:var(--bg)}
+.seg.sm button{padding:4px 9px;min-height:30px;font-size:13px}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;font-size:15px;min-height:42px}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-@media (prefers-color-scheme:dark){.btn.primary{color:#10161d}}
+.btn.good{background:var(--good);border-color:var(--good);color:#fff}
+@media (prefers-color-scheme:dark){.btn.primary,.btn.good{color:#10161d}}
 .btn.ghost{background:transparent}
 .btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,var(--line))}
 .btn.sm{padding:5px 10px;min-height:34px;font-size:14px}
-input[type=text],input[type=number],input[type=date],input[type=password],textarea,select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 11px;font-size:16px;outline:none}
-input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+input[type=text],input[type=number],input[type=date],input[type=password],textarea,select{width:100%;border:1px solid var(--line);background:var(--surface3);border-radius:10px;padding:9px 11px;font-size:16px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);background:var(--surface)}
 textarea{min-height:64px;resize:vertical;line-height:1.5}
 label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
-.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--surface3)}
 .stepper button{border:0;background:transparent;width:38px;height:38px;font-size:20px;line-height:1;color:var(--ink2)}
-.stepper .v{min-width:30px;text-align:center;font-family:var(--mono);font-size:16px}
-.tip{background:var(--accent-bg);color:var(--ink);border-radius:var(--r);padding:12px 14px;font-size:14px;margin-bottom:12px}
+.stepper .v{min-width:44px;text-align:center;font-family:var(--mono);font-size:16px}
+.tip{background:var(--accent-bg);border-radius:var(--r);padding:12px 14px;font-size:14px;margin-bottom:12px}
 .tip b{color:var(--accent)}
 .signal{background:var(--amber-bg);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14.5px}
 .signal.good{background:var(--good-bg)}
@@ -89,34 +102,63 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .signal .k{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--amber);display:block;margin-bottom:2px}
 .signal.good .k{color:var(--good)} .signal.info .k{color:var(--ink2)}
 .empty{color:var(--ink3);font-size:14px;padding:18px 4px;text-align:center}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.pill{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--surface2);color:var(--ink2);white-space:nowrap}
+.pill.amber{background:var(--amber-bg);color:var(--amber)}
+.pill.accent{background:var(--accent-bg);color:var(--accent)}
+.pill.good{background:var(--good-bg);color:var(--good)}
 
-/* 今天：日期条 */
-.datebar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.datebar .d{font-family:var(--serif);font-size:22px;font-weight:700}
-.datebar .w{color:var(--ink2);font-size:14px}
-.navbtn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:18px}
+/* 首页 hero */
+.hero{padding:14px 16px 12px}
+.hero-top{display:flex;align-items:center;gap:8px}
+.hero .d{font-family:var(--serif);font-size:24px;font-weight:700;line-height:1.2}
+.hero .w{color:var(--ink2);font-size:13px}
+.navbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:18px;color:var(--ink2);flex:none}
 .navbtn:disabled{opacity:.3}
+.rhythm{text-align:right;line-height:1.1}
+.rhythm b{font-family:var(--mono);font-size:26px;color:var(--accent)}
+.rhythm span{display:block;font-size:11.5px;color:var(--ink3)}
+.wstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+.wstrip button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--ink3);padding:2px 0}
+.wstrip i{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-style:normal;font-family:var(--mono);font-size:12px;color:var(--ink2)}
+.wstrip .rec i{background:var(--accent-bg);border-color:var(--accent-bg);color:var(--accent)}
+.wstrip .sel i{border-color:var(--ink);border-width:2px}
+.wstrip .fut{opacity:.35}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.step{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--surface);text-align:left;display:flex;flex-direction:column;gap:2px;min-height:74px;box-shadow:var(--shadow)}
+.step .n{font-size:12px;color:var(--ink3)}
+.step .t{font-weight:600;font-size:14.5px}
+.step .s{font-size:12.5px;color:var(--ink2)}
+.step.done{background:var(--good-bg);border-color:transparent;box-shadow:none}
+.step.done .s{color:var(--good)}
 
-/* 科目卡 */
-.subj{padding:12px 14px}
-.subj-h{display:flex;align-items:center;gap:10px}
-.dot{width:10px;height:10px;border-radius:50%;flex:none}
-.subj-name{font-weight:600;font-size:17px}
-.subj-sum{margin-left:auto;font-size:13px;color:var(--ink2)}
-.subj.none{opacity:.55}
-.subj .line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px}
-.subj .lab{font-size:13px;color:var(--ink2);width:64px;flex:none}
-@media (max-width:520px){.subj .lab{width:100%}}
-.mins{font-family:var(--mono);font-size:17px;min-width:56px;text-align:center}
-.more{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
-.more summary{font-size:14px;color:var(--ink2);cursor:pointer;list-style:none;padding:4px 0}
-.more summary::-webkit-details-marker{display:none}
-.more summary::before{content:"▸ ";color:var(--ink3)}
-.more[open] summary::before{content:"▾ "}
-.errs{display:flex;gap:14px;flex-wrap:wrap}
-.errs .e{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;color:var(--ink2)}
+/* 科目列表 */
+.slist{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:12px;box-shadow:var(--shadow)}
+.slist-h{padding:12px 16px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sr{border-top:1px solid var(--line)}
+.sr-h{display:flex;align-items:center;gap:10px;padding:10px 14px 10px 16px;min-height:58px;cursor:pointer}
+.sr-name{font-weight:600;font-size:16.5px;min-width:3em}
+.sr-meta{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-left:auto;justify-content:flex-end}
+.sr-min{font-family:var(--mono);font-size:15px;min-width:38px;text-align:right}
+.sr.none .sr-name,.sr.none .sr-min{color:var(--ink3)}
+.sr.open{background:var(--surface3)}
+.sr-body{padding:2px 16px 16px}
+.sr .line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sr .lab{font-size:13px;color:var(--ink2);width:64px;flex:none}
+@media (max-width:520px){.sr .lab{width:100%}}
+.tbtn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--accent)}
+.tbtn svg{width:16px;height:16px;fill:currentColor}
+.tbtn.run{background:var(--accent);border-color:var(--accent);color:#fff}
+.timerbar{display:flex;align-items:center;gap:8px;background:var(--accent-bg);border-radius:12px;padding:8px 10px}
+.timerbar .clock{font-family:var(--mono);font-size:22px;color:var(--accent);min-width:78px}
+.addrow{display:flex;gap:6px;flex-wrap:wrap}
+.addrow button{border:1px dashed var(--ink3);background:var(--surface);border-radius:10px;padding:7px 11px;font-size:14px;min-height:38px}
+.item{display:grid;grid-template-columns:auto 1fr auto;gap:6px 8px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.item .it{font-size:13px;font-weight:600;white-space:nowrap}
+.item input{padding:6px 9px;font-size:15px}
+.item .cf{grid-column:1/-1}
+.x{border:0;background:transparent;color:var(--ink3);font-size:20px;width:32px;height:32px}
 
-/* 表格 */
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{padding:7px 6px;text-align:left;border-bottom:1px solid var(--line)}
 th{font-weight:600;color:var(--ink2);font-size:12.5px;white-space:nowrap}
@@ -126,21 +168,27 @@ td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-
 .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .bar{height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;display:flex}
 .bar i{display:block;height:100%}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
 
-/* 周网格 */
 .wk{display:grid;grid-template-columns:52px repeat(7,1fr) 62px;gap:3px;font-size:12.5px}
 .wk .hd{color:var(--ink3);text-align:center;padding:2px 0}
 .wk .sn{display:flex;align-items:center;gap:5px;font-weight:600;font-size:13px;overflow:hidden;white-space:nowrap}
 .wk .c{position:relative;height:34px;border-radius:6px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);color:var(--ink)}
 .wk .c.blank{background:transparent;color:var(--ink3)}
 .wk .c .intr{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--amber)}
-.wk .c .intr.early{box-shadow:0 0 0 2px var(--amber-bg)}
+.wk .c .e{position:absolute;bottom:1px;right:4px;font-size:9.5px;color:var(--amber);font-weight:600}
 .wk .tot{text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink2);display:flex;flex-direction:column;justify-content:center;line-height:1.25}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2);margin-top:8px}
-.legend span{display:inline-flex;align-items:center;gap:5px}
-.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
 
-/* 考试 */
+.redo{border-left:4px solid var(--line)}
+.redo.sure{border-left-color:var(--amber)}
+.redo .q{font-family:var(--serif);font-size:18px;margin:8px 0 4px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow)}
+.kpi b{display:block;font-family:var(--mono);font-size:24px;line-height:1.2}
+.kpi span{font-size:12.5px;color:var(--ink2)}
+
 .exam-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .exam-name{font-weight:700;font-size:16px}
 .tag{font-size:12px;border-radius:6px;padding:1px 7px;background:var(--surface2);color:var(--ink2)}
@@ -153,25 +201,28 @@ td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-
 .examform .loss{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;padding:0 0 8px 64px}
 .examform .loss label{font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:4px}
 .examform .loss input{width:52px;padding:5px 6px;font-size:14px}
+@media (max-width:520px){.examform .loss{padding-left:0}}
 
-/* 时间轴 */
 .terms{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
 .terms div{border-radius:8px;background:var(--surface2);padding:8px 4px;text-align:center;font-size:12.5px;color:var(--ink2)}
 .terms div.now{background:var(--accent);color:#fff}
 .terms div.past{background:var(--accent-bg);color:var(--accent)}
 .terms b{display:block;font-family:var(--mono);font-size:15px}
+.ms{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.ms .when{width:84px;flex:none;color:var(--ink2);font-size:13px}
 
-/* 底部 tab */
 #tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-.tabin{max-width:860px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr);height:var(--tabh)}
-.tabin button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--ink3)}
+.tabin{max-width:880px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr);height:var(--tabh)}
+.tabin button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--ink3);position:relative}
 .tabin button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tabin button.on{color:var(--accent)}
-
+.badge{position:absolute;top:6px;left:calc(50% + 6px);background:var(--amber);color:#fff;border-radius:999px;font-size:10.5px;min-width:17px;height:17px;line-height:17px;padding:0 4px;font-family:var(--mono);font-style:normal}
 #toast{position:fixed;left:50%;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:40;max-width:90vw}
 #toast.show{opacity:1}
 svg.chart text{font-family:var(--sans);fill:var(--ink2)}
+details>summary{cursor:pointer}
 .methods td:first-child{white-space:nowrap;font-weight:600}
+ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0}
 </style>
 </head>
 <body>
@@ -181,31 +232,36 @@ svg.chart text{font-family:var(--sans);fill:var(--ink2)}
 <div id="toast"></div>
 <script>
 'use strict';
-/* ---------------- 常量 ---------------- */
+/* ================= 常量 ================= */
 const ET = [{k:'calc',n:'计算错误',s:'计算'},{k:'concept',n:'概念混淆',s:'概念'},{k:'read',n:'审题失误',s:'审题'}];
 const ET_COLOR = {calc:'#c0822a',concept:'#8a5a9e',read:'#2f8a8a'};
+const ETN = Object.fromEntries(ET.map(t=>[t.k,t.n]));
+const CONF = [{k:'sure',n:'有把握'},{k:'unsure',n:'不太确定'},{k:'no',n:'不会'}];
+const CONFN = {sure:'做的时候有把握', unsure:'做的时候不太确定', no:'做的时候就不会'};
 const LOSS = ET.concat([{k:'time',n:'时间不够',s:'时间'},{k:'gap',n:'没复习到',s:'没复习'}]);
 const INTR = [{k:'none',n:'没中断'},{k:'early',n:'前15分钟'},{k:'mid',n:'中间'},{k:'late',n:'快结束'}];
 const MOOD = [{k:'tired',n:'困'},{k:'ok',n:'一般'},{k:'good',n:'精神好'}];
 const EXAM_T = ['单元测验','周测','月考','期中','期末','区质检','模拟考','其他'];
 const BIG = ['期中','期末','区质检','模拟考'];
-const DEF_SUBJ = [['yw','语文','#b5523b',30],['sx','数学','#2f5d8a',40],['yy','英语','#3d7a5c',30],['df','道法','#8a5a9e',10],['ls','历史','#9c7a2b',10],['dl','地理','#2f8a8a',10],['sw','生物','#6b8a2f',10]];
-const EXTRA_COLORS = ['#a0527a','#5a6fa0','#7a6b5a','#a06b3a','#4f8a6b'];
+const PREP = ['重做了错题','看了课本例题','刷了练习卷','背了知识点','没怎么准备'];
+const BOXES = [2, 7, 21];                 // 第 1/2/3 次重做的间隔天数；第 3 次做对 = 掌握
+const DAILY_REDO = 3;                     // 每天最多推 3 道，放得进 10 分钟
+/* id, 名称, 颜色, 默认锚点分钟, 深圳中考满分, 起始学期, 结束学期(0=七上…5=九下), 计入中考总分 */
+const DEF_SUBJ = [
+  ['yw','语文','#b5523b',30,120,0,5,true], ['sx','数学','#2f5d8a',40,100,0,5,true], ['yy','英语','#3d7a5c',30,100,0,5,true],
+  ['df','道法','#8a5a9e',10,50,0,5,true], ['ls','历史','#9c7a2b',10,70,0,5,true],
+  ['dl','地理','#2f8a8a',10,50,0,3,false], ['sw','生物','#6b8a2f',10,50,0,3,false],
+  ['wl','物理','#a0527a',30,70,2,5,true], ['hx','化学','#5a6fa0',20,50,4,5,true]];
+const TERM_N = ['七上','七下','八上','八下','九上','九下'];
+const EXTRA_COLORS = ['#7a6b5a','#a06b3a','#4f8a6b','#6b5aa0'];
 const QUESTIONS = [
-  '今天做的题里，哪一步你最不确定？',
-  '这道题卡在哪一步？（不问「为什么又错」）',
-  '今天哪一科做得最顺？顺在哪？',
-  '读的时候，哪一句最费劲？',
-  '选的时候，哪个空最犹豫？',
-  '做到哪一步开始想换别的科目？',
-  '最近做数学题，是不是觉得特别累？',
-  '今天有没有一道题，是一开始不会、后来弄明白的？',
-  '如果明天再做一遍，你会先改哪一步？',
-];
+  '今天做的题里，哪一步你最不确定？', '这道题卡在哪一步？（不问「为什么又错」）', '今天哪一科做得最顺？顺在哪？',
+  '读的时候，哪一句最费劲？', '选的时候，哪个空最犹豫？', '做到哪一步开始想换别的科目？',
+  '最近做数学题，是不是觉得特别累？', '今天有没有一道题，是一开始不会、后来弄明白的？', '如果明天再做一遍，你会先改哪一步？'];
 const TRIGGERS = ['看到走神','同一题型重复犯错','说「我知道了」但在敷衍','想到别人家孩子','成绩或排名出来','老师在群里点名','拖到很晚还没写完','顶嘴或不耐烦'];
 const MINS = [10,20,30,45,60,90];
 
-/* ---------------- 工具 ---------------- */
+/* ================= 工具 ================= */
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad = n => String(n).padStart(2,'0');
@@ -216,6 +272,8 @@ const today = () => ymd(new Date());
 const monOf = s => { const d = P(s); d.setDate(d.getDate() - (d.getDay()+6)%7); return ymd(d); };
 const mKey = s => s.slice(0,7);
 const addM = (m,n) => { const d = P(m+'-01'); d.setMonth(d.getMonth()+n); return ymd(d).slice(0,7); };
+const monthEnd = m => { const d = P(m+'-01'); d.setMonth(d.getMonth()+1); d.setDate(0); return ymd(d); };
+const dayDiff = (a,b) => Math.round((P(b)-P(a))/864e5);
 const WD = '日一二三四五六';
 const md = s => { const d = P(s); return (d.getMonth()+1)+'月'+d.getDate()+'日'; };
 const mdShort = s => { const d = P(s); return (d.getMonth()+1)+'/'+d.getDate(); };
@@ -224,118 +282,185 @@ const sum = a => a.reduce((x,y)=>x+y,0);
 const pct = (a,b) => b ? Math.round(a*100/b) : 0;
 const range = (from,to) => { const r=[]; for(let d=from; d<=to; d=addD(d,1)) r.push(d); return r; };
 const splitTags = s => String(s||'').split(/[,，、;；\s]+/).map(x=>x.trim()).filter(Boolean);
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),1800); }
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const now = () => Date.now();
+const topEntries = (o, n) => Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0, n||3);
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2000); }
+const hm = ts => { const d = new Date(ts); return pad(d.getHours())+':'+pad(d.getMinutes()); };
 
-/* 学段：9月–1月=上学期，2月–6月=下学期，7–8月=暑假 */
+/* 学段：9–1 月上学期，2–6 月下学期，7–8 月暑假 */
 function termOf(s, startYear){
-  const d = P(s), y = d.getFullYear(), m = d.getMonth()+1;
-  const G = ['七','八','九'];
+  const d = P(s), y = d.getFullYear(), m = d.getMonth()+1, G = ['七','八','九'];
   let g, t;
-  if (m >= 9) { g = y - startYear; t = '上'; }
-  else if (m <= 1) { g = y - 1 - startYear; t = '上'; }
-  else if (m <= 6) { g = y - 1 - startYear; t = '下'; }
-  else { g = y - 1 - startYear; t = '暑'; }
-  if (g < 0) return {idx:-1, label:'入学前'};
-  if (g > 2) return {idx:6, label:'初中毕业后'};
+  if (m >= 9) { g = y - startYear; t = '上'; } else if (m <= 1) { g = y-1-startYear; t = '上'; }
+  else if (m <= 6) { g = y-1-startYear; t = '下'; } else { g = y-1-startYear; t = '暑'; }
+  if (g < 0) return {idx:-1, cidx:0, label:'入学前'};
+  if (g > 2) return {idx:6, cidx:5, label:'初中毕业后'};
   const idx = g*2 + (t === '上' ? 0 : 1);
-  return {idx, label: t === '暑' ? G[g]+'年级暑假' : G[g]+'年级'+t+'学期', short: G[g]+t, summer: t==='暑'};
+  return {idx, cidx:idx, label: t === '暑' ? G[g]+'年级暑假' : G[g]+'年级'+t+'学期'};
 }
 
-/* ---------------- 存储 ---------------- */
+/* ================= 存储：IndexedDB 为主 + localStorage 镜像 ================= */
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.has('demo');
-const KEY = DEMO ? 'observer-demo-v1' : 'observer-v1';
-let DB;
+const K_DB = DEMO ? 'observer:db-demo' : 'observer:db';
+const K_SYNC = 'observer:sync';
+const LEGACY = 'observer-v1';
+let DB, SYNC = {};
+const IDB = {
+  db: null,
+  open(){ if (this.db) return Promise.resolve(this.db);
+    return new Promise((res, rej) => { try { const r = indexedDB.open('observer-app', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => { this.db = r.result; res(this.db); }; r.onerror = () => rej(r.error); } catch(e) { rej(e); } }); },
+  async get(k){ try { const db = await this.open(); return await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); } catch(e) { return undefined; } },
+  async set(k, v){ try { const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); return true; } catch(e) { return false; } }
+};
+const lsGet = k => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; } catch(e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e) { return false; } };
+
 function fresh(){
-  return {v:1,
-    settings:{child:'儿子', startYear:2026, pin:'', lastBackup:null,
-      subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],hidden:false})),
+  return {v:2, u:0,
+    settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null,
+      subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, exams:[], emotions:[]};
+    days:{}, weeks:{}, months:{}, items:[], exams:[], emotions:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
-  x.settings = Object.assign(f.settings, x.settings||{});
-  for (const k of ['days','weeks','months']) x[k] = x[k] || {};
-  x.exams = x.exams || []; x.emotions = x.emotions || [];
+  x.settings = Object.assign({}, f.settings, x.settings||{});
+  x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
+  for (const k of ['days','weeks','months','del']) x[k] = x[k] || {};
+  for (const k of ['items','exams','emotions']) x[k] = x[k] || [];
+  // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
+  const subs = x.settings.subjects || [];
+  for (const s of subs) { const d = DEF_SUBJ.find(a=>a[0]===s.id);
+    if (s.mode == null) s.mode = s.hidden ? 'off' : 'auto'; delete s.hidden;
+    if (d) { if (s.zk == null) s.zk = d[4]; if (s.from == null) s.from = d[5]; if (s.to == null) s.to = d[6]; if (s.inTotal == null) s.inTotal = d[7]; }
+    else { if (s.from == null) s.from = 0; if (s.to == null) s.to = 5; if (s.zk == null) s.zk = 100; if (s.inTotal == null) s.inTotal = false; } }
+  for (const d of DEF_SUBJ) if (!subs.find(s=>s.id===d[0])) subs.push({id:d[0],name:d[1],color:d[2],zk:d[4],from:d[5],to:d[6],inTotal:d[7],mode:'auto'});
+  x.settings.subjects = subs;
+  // v1 错题计数 → v2 逐题条目（没有信心记录）
+  if ((x.v||1) < 2) {
+    for (const d in x.days) { const dd = x.days[d]; for (const sid in (dd.subj||{})) { const r = dd.subj[sid];
+      const tag = splitTags(r.tag)[0] || '';
+      if (r.errs) for (const t of ET) for (let i = 0; i < (r.errs[t.k]||0); i++)
+        x.items.push({id:uid('i'), d, sid, type:t.k, conf:null, tag, box:0, due:addD(d, BOXES[0]), hist:[], done:false, u:now()});
+      delete r.errs; delete r.tag; } }
+    x.v = 2;
+  }
+  x.u = x.u || 0;
   return x;
 }
-function load(){
-  try { const s = localStorage.getItem(KEY); if (s) { DB = migrate(JSON.parse(s)); return; } } catch(e) {}
-  DB = fresh();
-  if (DEMO) { seedDemo(); save(true); }
+async function load(){
+  const cands = [await IDB.get(K_DB), lsGet(K_DB)];
+  if (!DEMO) cands.push(lsGet(LEGACY));
+  const best = cands.filter(Boolean).sort((a,b)=>(b.u||0)-(a.u||0))[0];
+  if (best) DB = migrate(best);
+  else { DB = fresh(); if (DEMO) { seedDemo(); DB = migrate(DB); } }
+  SYNC = (await IDB.get(K_SYNC)) || lsGet(K_SYNC) || {};
+  if (DEMO) SYNC = {};
 }
-let savedAt = null;
-function save(quiet){
-  try { localStorage.setItem(KEY, JSON.stringify(DB)); savedAt = new Date(); }
-  catch(e) { toast('保存失败：浏览器存储不可用，请马上导出备份'); }
-  const el = $('#savedAt'); if (el && savedAt) el.textContent = '已保存 '+pad(savedAt.getHours())+':'+pad(savedAt.getMinutes());
+let writeT = null, pendingLocal = false;
+function save(){
+  DB.u = now(); pendingLocal = true;
+  clearTimeout(writeT); writeT = setTimeout(flush, 250);
+  scheduleSync();
 }
-const subjects = () => DB.settings.subjects.filter(s=>!s.hidden);
-const subjById = id => DB.settings.subjects.find(s=>s.id===id) || {id, name:id, color:'#888'};
+function flush(){
+  clearTimeout(writeT); if (!pendingLocal) return; pendingLocal = false;
+  const ok1 = lsSet(K_DB, DB);
+  IDB.set(K_DB, JSON.parse(JSON.stringify(DB))).then(ok2 => { if (!ok1 && !ok2) toast('保存失败：浏览器存储不可用，请马上导出备份'); });
+}
+const saveSync = () => { if (DEMO) return; IDB.set(K_SYNC, SYNC); lsSet(K_SYNC, SYNC); };
+window.addEventListener('pagehide', flush);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { flush(); if (syncT) syncNow(); } });
 
-function dayObj(d, create){ let x = DB.days[d]; if (!x && create) x = DB.days[d] = {subj:{}}; return x; }
+/* ================= 数据访问 ================= */
+const subjById = id => DB.settings.subjects.find(s=>s.id===id) || {id, name:id, color:'#888', zk:100};
+function subjActive(s, d){
+  if (s.mode === 'on') return true; if (s.mode === 'off') return false;
+  const t = termOf(d || today(), DB.settings.startYear).cidx; return t >= s.from && t <= s.to;
+}
+const subjects = d => DB.settings.subjects.filter(s => subjActive(s, d));
+function dayObj(d, create){ let x = DB.days[d]; if (!x && create) x = DB.days[d] = {subj:{}, u:now()}; return x; }
+function touchDay(d){ const x = dayObj(d, true); x.u = now(); return x; }
 function rec(d, sid, create){
-  const dd = dayObj(d, create); if (!dd) return null;
+  const dd = create ? touchDay(d) : dayObj(d); if (!dd) return null;
   let r = dd.subj[sid];
-  if (!r && create) r = dd.subj[sid] = {min:0, intr:'none', errs:{calc:0,concept:0,read:0}, tag:'', stuck:'', none:false};
+  if (!r && create) r = dd.subj[sid] = {min:0, intr:'none', stuck:'', none:false};
   return r;
 }
-const errTotal = r => r && r.errs ? sum(ET.map(t=>r.errs[t.k]||0)) : 0;
-function dayHasData(dd){
-  if (!dd) return false;
+let IDX = {};
+function reindex(){ IDX = {}; for (const it of DB.items) (IDX[it.d] = IDX[it.d] || []).push(it); }
+const itemsOn = (d, sid) => (IDX[d] || []).filter(it => !sid || it.sid === sid);
+function dayHasData(d){
+  if (itemsOn(d).length) return true;
+  const dd = DB.days[d]; if (!dd) return false;
   if (dd.mood || dd.answer || dd.note) return true;
-  return Object.values(dd.subj||{}).some(r => r.none || r.min>0 || errTotal(r)>0 || r.stuck || (r.intr && r.intr!=='none'));
+  return Object.values(dd.subj||{}).some(r => r.none || r.min>0 || r.stuck || (r.intr && r.intr!=='none'));
 }
-
-/* 锚点：取本周之前最近一次周复盘里定下的「下周锚点」，没有就用默认 */
 function anchorsFor(mon){
   const ks = Object.keys(DB.weeks).filter(k => k < mon && DB.weeks[k].next).sort();
   const k = ks.pop();
   return Object.assign({}, DB.settings.anchors, k ? DB.weeks[k].next : {});
 }
+function delRec(kind, id){ DB[kind] = DB[kind].filter(x => x.id !== id); DB.del[id] = now(); }
 
-/* ---------------- 统计 ---------------- */
+/* 记录节奏：指数平滑（半衰期 7 天），断一两天不会清零——借鉴 Loop Habit Tracker 的习惯强度 */
+function rhythm(){
+  const ds = Object.keys(DB.days).concat(Object.keys(IDX)).sort(); if (!ds.length) return null;
+  const first = ds[0], t = today(); if (dayDiff(first, t) < 2) return null;
+  const a = 1 - Math.pow(0.5, 1/7); let s = 0;
+  for (const d of range(first, t)) s = s*(1-a) + a*(dayHasData(d) ? 1 : 0);
+  return Math.round(s*100);
+}
+
+/* ================= 统计 ================= */
 function stats(from, to){
   const S = {}; const days = range(from, to);
   let recDays = 0; const mood = {tired:[], ok:[], good:[]}; const errByDay = {};
-  const tagsByType = {calc:{}, concept:{}, read:{}};
-  for (const s of DB.settings.subjects) S[s.id] = {min:0, days:0, intrN:0, intr:{early:0,mid:0,late:0}, errs:{calc:0,concept:0,read:0}, tags:{}, stuck:[], byDay:{}, noneDays:0, recOn:0};
+  const tagsByType = {calc:{}, concept:{}, read:{}}; const conf = {sure:0, unsure:0, no:0, none:0};
+  const dayMin = [];
+  for (const s of DB.settings.subjects) S[s.id] = {min:0, days:0, intrN:0, intr:{early:0,mid:0,late:0}, errs:{calc:0,concept:0,read:0}, tags:{}, stuck:[], byDay:{}, errDay:{}, recOn:0};
   for (const d of days) {
-    const dd = DB.days[d];
-    if (!dayHasData(dd)) continue;
+    if (!dayHasData(d)) continue;
     recDays++;
-    let e = 0;
+    const dd = DB.days[d] || {subj:{}};
+    let tot = 0;
     for (const sid in dd.subj) {
       const r = dd.subj[sid]; const x = S[sid]; if (!x) continue;
       x.byDay[d] = r;
-      if (r.none) { x.noneDays++; continue; }
+      if (r.none) continue;
       x.recOn++;
-      if (r.min > 0) { x.min += r.min; x.days++; }
+      if (r.min > 0) { x.min += r.min; x.days++; tot += r.min; }
       if (r.intr && r.intr !== 'none') { x.intrN++; x.intr[r.intr]++; }
-      const tags = splitTags(r.tag);
-      for (const t of ET) {
-        const n = r.errs && r.errs[t.k] || 0; x.errs[t.k] += n; e += n;
-        for (const tg of tags) if (n) { x.tags[tg] = (x.tags[tg]||0) + n; tagsByType[t.k][tg+'｜'+subjById(sid).name] = (tagsByType[t.k][tg+'｜'+subjById(sid).name]||0) + n; }
-      }
       if (r.stuck) x.stuck.push({d, sid, text:r.stuck});
+    }
+    if (tot) dayMin.push(tot);
+    let e = 0;
+    for (const it of itemsOn(d)) {
+      const x = S[it.sid]; if (!x) continue;
+      x.errs[it.type]++; e++; x.errDay[d] = (x.errDay[d]||0) + 1;
+      conf[it.conf || 'none']++;
+      for (const tg of splitTags(it.tag)) { x.tags[tg] = (x.tags[tg]||0) + 1; const key = tg+'｜'+subjById(it.sid).name; tagsByType[it.type][key] = (tagsByType[it.type][key]||0) + 1; }
     }
     errByDay[d] = e;
     if (dd.mood) mood[dd.mood].push(d);
   }
   const errs = {calc:0,concept:0,read:0};
   for (const sid in S) for (const t of ET) errs[t.k] += S[sid].errs[t.k];
-  return {S, days, recDays, mood, errByDay, errs, errN: sum(Object.values(errs)), tagsByType, from, to};
+  let redoN = 0, redoOk = 0;
+  for (const it of DB.items) for (const h of (it.hist||[])) if (h.d >= from && h.d <= to) { redoN++; if (h.ok) redoOk++; }
+  return {S, days, recDays, mood, errByDay, errs, errN: sum(Object.values(errs)), tagsByType, conf, from, to, dayMin, redoN, redoOk};
 }
-const topEntries = (o, n) => Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0, n||3);
 
-/* 观察发现：只描述模式，不下判决；比较对象是孩子自己的锚点和上一周期 */
-function findings(st, prev, anchors, days){
-  const out = []; const nDays = days || st.days.length;
-  const need = Math.ceil(nDays * 4/7);
+/* 观察发现：只描述模式不下判决；基准是孩子自己的锚点和上一周期 */
+function findings(st, prev, anchors, nDays, monthly){
+  const out = [];
   if (st.recDays === 0) return [{k:'info', t:'这段时间还没有记录。'}];
-  if (st.recDays < need) out.push({k:'info', t:`只记了 ${st.recDays} 天，下面的发现样本少，先当线索看，别当结论。`});
-  for (const s of subjects()) {
+  if (st.recDays < Math.ceil(nDays * 4/7)) out.push({k:'info', t:`只记了 ${st.recDays} 天，下面的发现样本少，先当线索看，别当结论。`});
+  for (const s of subjects(st.to)) {
     const x = st.S[s.id]; if (!x) continue;
     const a = anchors ? (anchors[s.id]||0) : 0;
     const avg = x.days ? x.min / x.days : 0;
@@ -345,39 +470,43 @@ function findings(st, prev, anchors, days){
     if (a && x.days >= 3 && avg < a*0.7) {
       if (intrRate >= 0.4) {
         let t = `${nm} 平均每天 ${Math.round(avg)} 分钟，锚点 ${a} 分钟，少了 ${pct(a-avg,a)}%；${x.recOn} 天里 ${x.intrN} 天中途中断。用时短可能是卡住就换科，不一定是做得快。`;
-        if (x.errs.concept >= Math.max(2, eN*0.4)) t += ` 这科的错题又以<b>概念混淆</b>为主（${x.errs.concept}/${eN}），两个信号指向同一处：概念没弄懂时就停下了。`;
-        t += ` 可以问：「做到哪一步开始想换别的？」`;
-        out.push({k:'signal', t});
-      } else if (eN <= 1) {
-        out.push({k:'good', t:`${nm} 平均 ${Math.round(avg)} 分钟，比锚点 ${a} 分钟少，没中断、错题也少——可能确实做得快。锚点可以不动，先观察一周。`});
-      } else {
-        out.push({k:'info', t:`${nm} 平均 ${Math.round(avg)} 分钟，比锚点 ${a} 分钟少 ${pct(a-avg,a)}%，但很少中断。可能锚点定高了，也可能作业量少。`});
-      }
+        if (x.errs.concept >= Math.max(2, eN*0.4)) t += ` 这科错题又以<b>概念混淆</b>为主（${x.errs.concept}/${eN}），两个信号指向同一处：概念没弄懂时就停下了。`;
+        out.push({k:'signal', t: t + ' 可以问：「做到哪一步开始想换别的？」'});
+      } else if (eN <= 1) out.push({k:'good', t:`${nm} 平均 ${Math.round(avg)} 分钟，比锚点 ${a} 分钟少，没中断、错题也少，可能确实做得快。锚点先不动。`});
+      else out.push({k:'info', t:`${nm} 平均 ${Math.round(avg)} 分钟，比锚点 ${a} 分钟少 ${pct(a-avg,a)}%，但很少中断。可能锚点定高了，也可能作业量少。`});
+    } else if (x.days >= 3 && /数学/.test(s.name) && avg > 60) {
+      out.push({k:'signal', t:`${nm} 平均每天 ${Math.round(avg)} 分钟。中国八年级的追踪研究里，数学作业时长和成绩是倒 U 形，最优约 45 分钟；超过 60 分钟更可能是卡住了，不是更努力。看看卡点记录。`});
     } else if (a && x.days >= 3 && avg > a*1.4) {
-      out.push({k:'info', t:`${nm} 平均 ${Math.round(avg)} 分钟，超出锚点 ${a} 分钟 ${pct(avg-a,a)}%。是作业量大，还是卡住了？看看卡点记录里有没有这科。`});
+      out.push({k:'info', t:`${nm} 平均 ${Math.round(avg)} 分钟，超出锚点 ${a} 分钟 ${pct(avg-a,a)}%。是作业量大，还是卡住了？`});
     }
-    const early = x.intr.early;
-    if (x.intrN >= 2 && early / x.intrN >= 0.6) {
-      out.push({k:'signal', t:`${nm} 的中断有 ${early}/${x.intrN} 次发生在<b>前 15 分钟</b>。可能是启动困难：开头先放一道肯定能做对的小题，拿到一次小成功再往下。`});
-    }
+    if (x.intrN >= 2 && x.intr.early / x.intrN >= 0.6)
+      out.push({k:'signal', t:`${nm} 的中断有 ${x.intr.early}/${x.intrN} 次在<b>前 15 分钟</b>。可能是启动困难：开头先放一道肯定能做对的小题，拿到一次小成功再往下。`});
   }
+  if (st.dayMin.length >= 3) {
+    const avgTot = sum(st.dayMin)/st.dayMin.length;
+    if (avgTot > 90) out.push({k:'signal', t:`有记录的日子平均每天作业 ${Math.round(avgTot)} 分钟，超过教育部规定的初中书面作业 90 分钟上限。持续这样，建议和老师沟通作业量，不要先当成拖拉。`});
+  }
+  if (st.conf.sure >= 2) out.push({k:'info', t:`有 <b>${st.conf.sure} 道</b>是「做的时候有把握」却错了。研究发现这类错误改正后最不容易再犯，已排在重做队列最前面。`});
   if (st.errN >= 4) {
     const top = ET.map(t=>[t, st.errs[t.k]]).sort((a,b)=>b[1]-a[1])[0];
     if (top[1] / st.errN >= 0.5) {
       const tg = topEntries(st.tagsByType[top[0].k], 2).filter(e=>e[1]>=2);
       let t = `错题 ${st.errN} 道，其中<b>${top[0].n}</b> ${top[1]} 道（${pct(top[1],st.errN)}%）`;
       if (tg.length) t += `，集中在 ` + tg.map(e=>{ const p=e[0].split('｜'); return `${esc(p[1])}「${esc(p[0])}」${e[1]} 道`; }).join('、');
-      t += top[0].k==='calc' ? '。计算错误多通常靠固定格式的小练习解决，不用加量。' : top[0].k==='concept' ? '。概念混淆光刷题没用，要回到课本例题把那个概念讲一遍。' : '。审题失误可以试试「圈条件」：做题前先把已知条件圈出来。';
+      if (top[0].k === 'concept') t += '。概念混淆光刷题没用，要回到课本例题把那个概念讲一遍。';
+      else if (top[0].k === 'read') t += '。审题失误可以试试「圈条件」：做题前先把已知条件圈出来。';
+      else t += monthly ? '。这三类分法没有经过研究验证，计算错误占大头时，抽两道和孩子确认：是真的算错，还是其实概念没懂。' : '。计算错误多，通常靠固定格式的小练习解决，不用加量。';
       out.push({k:'signal', t});
     }
   }
   if (prev && prev.recDays >= 3 && st.recDays >= 3) {
     for (const t of ET) {
       const a = st.errs[t.k] / st.recDays * 7, b = prev.errs[t.k] / prev.recDays * 7;
-      if (b >= 2 && a <= b * 0.5) out.push({k:'good', t:`<b>${t.n}</b>比上一段少了（按 7 天折算 ${b.toFixed(1)} → ${a.toFixed(1)} 道），这类错误在减少。`});
+      if (b >= 2 && a <= b * 0.5) out.push({k:'good', t:`<b>${t.n}</b>比上一段少了（按 7 天折算 ${b.toFixed(1)} → ${a.toFixed(1)} 道）。`});
       else if (a >= 3 && a >= b * 1.8 && a - b >= 2) out.push({k:'signal', t:`<b>${t.n}</b>比上一段多了（按 7 天折算 ${b.toFixed(1)} → ${a.toFixed(1)} 道）。先问是哪几道、卡在哪一步。`});
     }
   }
+  if (st.redoN >= 3) out.push({k: st.redoOk/st.redoN >= 0.6 ? 'good' : 'info', t:`重做了 ${st.redoN} 次，做对 ${st.redoOk} 次（${pct(st.redoOk, st.redoN)}%）。` + (st.redoOk/st.redoN < 0.5 ? ' 重做正确率偏低，说明这些题的概念还没补上，先回课本，别急着再做。' : '')});
   const tired = st.mood.tired, others = st.days.filter(d => d in st.errByDay && !tired.includes(d));
   if (tired.length >= 2 && others.length >= 2) {
     const a = sum(tired.map(d=>st.errByDay[d]||0))/tired.length, b = sum(others.map(d=>st.errByDay[d]||0))/others.length;
@@ -388,88 +517,285 @@ function findings(st, prev, anchors, days){
   if (!out.some(o=>o.k!=='info')) out.push({k:'good', t:'没有明显的异常信号。节奏稳住就是进展。'});
   return out;
 }
+const findingsHTML = fs => fs.map(f => `<div class="signal ${f.k}"><span class="k">${{signal:'信号',good:'好的变化',info:'说明'}[f.k]}</span>${f.t}</div>`).join('');
 
-/* ---------------- 状态 ---------------- */
-const state = {tab:'today', date:today(), week:monOf(today()), month:mKey(today()), review:'week',
-  errPeriod:'month', errSubj:'all', examEdit:null, trendBig:false, trendHide:{}, unlocked:false, showAnswer:false, open:{}};
+/* ================= 错题重做队列 ================= */
+function dueList(t){
+  t = t || today();
+  const due = DB.items.filter(it => !it.done && it.due <= t);
+  const pri = it => (it.conf === 'sure' ? 0 : it.conf === 'unsure' ? 1 : it.conf === 'no' ? 3 : 2);
+  due.sort((a,b) => pri(a)-pri(b) || (a.due < b.due ? -1 : 1));
+  // 交错：同一科目 / 知识点尽量不连着出
+  const out = []; const pool = due.slice();
+  while (pool.length) {
+    const last = out[out.length-1];
+    let i = pool.findIndex(x => !last || (x.sid !== last.sid && x.tag !== last.tag));
+    if (i < 0) i = 0; out.push(pool.splice(i,1)[0]);
+  }
+  return out;
+}
+function doneToday(){ const t = today(); return DB.items.filter(it => (it.hist||[]).some(h => h.d === t)).length; }
+function redoItem(id, ok){
+  const it = DB.items.find(x => x.id === id); if (!it) return;
+  const t = today(); it.hist = it.hist || []; it.hist.push({d:t, ok}); it.u = now();
+  if (ok) { it.box = (it.box||0) + 1; if (it.box >= BOXES.length) { it.done = true; toast('这道算掌握了'); } else { it.due = addD(t, BOXES[it.box]); toast(BOXES[it.box]+' 天后再做一次'); } }
+  else { it.box = 0; it.due = addD(t, 1); toast('明天再来一次，不着急'); }
+  save(); render();
+}
+
+/* ================= 计时器（借鉴 Baby Buddy：开始→结束自动成记录，比事后补填准） ================= */
+function timerElapsed(tm){ return (tm.acc||0) + (tm.start ? now() - tm.start : 0); }
+function timerStart(sid){
+  const tm = DB.timer;
+  if (tm && tm.sid !== sid) { if (!confirm(`「${subjById(tm.sid).name}」还在计时，结束它并开始「${subjById(sid).name}」？`)) return; timerStop(); }
+  if (DB.timer && DB.timer.sid === sid) DB.timer.start = now();
+  else DB.timer = {d: state.date, sid, start: now(), acc: 0, pauses: []};
+  save(); render();
+}
+function timerPause(){ const tm = DB.timer; if (!tm || !tm.start) return; tm.acc += now() - tm.start; tm.start = null; tm.pauses.push(tm.acc/60000); save(); render(); }
+function timerStop(){
+  const tm = DB.timer; if (!tm) return;
+  const ms = timerElapsed(tm), mins = Math.max(1, Math.round(ms/60000));
+  const r = rec(tm.d, tm.sid, true);
+  r.min = (r.min||0) + mins; r.none = false;
+  if (tm.pauses.length && (!r.intr || r.intr === 'none')) { const p = tm.pauses[0], total = ms/60000; r.intr = p < 15 ? 'early' : p > total*0.75 ? 'late' : 'mid'; }
+  DB.timer = null; toast(`记下 ${mins} 分钟` + (tm.pauses.length ? `，中途停了 ${tm.pauses.length} 次` : '')); save(); render();
+}
+const fmtClock = ms => { const s = Math.floor(ms/1000); return pad(Math.floor(s/60)) + ':' + pad(s%60); };
+setInterval(() => { if (!DB || !DB.timer) return; document.querySelectorAll('[data-clock]').forEach(el => el.textContent = fmtClock(timerElapsed(DB.timer))); }, 1000);
+
+/* ================= 同步：WebCrypto 加密 → GitHub 私有仓库 ================= */
+const b64e = bytes => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i+0x8000)); return btoa(s); };
+const b64d = str => Uint8Array.from(atob(str), c => c.charCodeAt(0));
+async function gzip(bytes, inflate){
+  const cs = inflate ? new DecompressionStream('gzip') : new CompressionStream('gzip');
+  return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer());
+}
+async function deriveKey(pass, salt, iter){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+async function encryptDB(obj, pass){
+  let bytes = new TextEncoder().encode(JSON.stringify(obj)); const gz = typeof CompressionStream !== 'undefined';
+  if (gz) bytes = await gzip(bytes);
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iter = 210000;
+  const key = await deriveKey(pass, salt, iter);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, bytes));
+  return JSON.stringify({app:'observer', v:1, alg:'AES-GCM', kdf:'PBKDF2-SHA256', iter, gz, salt:b64e(salt), iv:b64e(iv), ct:b64e(ct)});
+}
+async function decryptDB(text, pass){
+  const env = JSON.parse(text);
+  const key = await deriveKey(pass, b64d(env.salt), env.iter);
+  let bytes = new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(env.iv)}, key, b64d(env.ct)));
+  if (env.gz) bytes = await gzip(bytes, true);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+const syncReady = () => !DEMO && SYNC.repo && SYNC.token && SYNC.pass;
+function ghURL(){ return `https://api.github.com/repos/${SYNC.repo.trim()}/contents/${encodeURIComponent(SYNC.path || 'observer.enc.json')}`; }
+const ghHeaders = accept => ({Authorization:'Bearer ' + SYNC.token.trim(), Accept: accept || 'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28'});
+async function ghPull(){
+  const r = await fetch(ghURL() + '?t=' + now(), {headers: ghHeaders(), cache:'no-store'});
+  if (r.status === 404) return {text:null, sha:null};
+  if (r.status === 401 || r.status === 403) throw new Error('令牌无效或没有这个仓库的权限');
+  if (!r.ok) throw new Error('GitHub 返回 ' + r.status);
+  const j = await r.json();
+  let text = j.content ? new TextDecoder().decode(b64d(j.content.replace(/\n/g,''))) : null;
+  if (!text) { const r2 = await fetch(ghURL() + '?t=' + now(), {headers: ghHeaders('application/vnd.github.raw+json'), cache:'no-store'}); text = await r2.text(); }
+  return {text, sha:j.sha};
+}
+async function ghPush(text, sha){
+  const body = {message:'observer sync ' + new Date().toISOString(), content: btoa(text)}; if (sha) body.sha = sha;
+  const r = await fetch(ghURL(), {method:'PUT', headers: ghHeaders(), body: JSON.stringify(body)});
+  if (r.status === 409 || r.status === 422) return 'conflict';
+  if (!r.ok) throw new Error('上传失败：GitHub 返回 ' + r.status);
+  return 'ok';
+}
+/* 合并：按记录的 u（修改时间）取新；删除用墓碑 del 记录 */
+function mergeDB(L, R){
+  let lN = false, rN = false;
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const M = clone(L);
+  const Ld = L.del||{}, Rd = R.del||{};
+  M.del = Object.assign({}, Ld);
+  for (const id in Rd) if ((Rd[id]||0) > (M.del[id]||0)) { M.del[id] = Rd[id]; rN = true; }
+  for (const id in Ld) if (!Rd[id]) lN = true;
+  for (const k of ['days','weeks','months']) {
+    const a = L[k]||{}, b = R[k]||{};
+    for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
+      const x = a[key], y = b[key];
+      if (x && (!y || (x.u||0) > (y.u||0))) lN = true;
+      if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
+    }
+  }
+  for (const k of ['items','exams','emotions']) {
+    const a = new Map((L[k]||[]).map(x=>[x.id,x])), b = new Map((R[k]||[]).map(x=>[x.id,x]));
+    const out = [];
+    for (const id of new Set([...a.keys(), ...b.keys()])) {
+      const x = a.get(id), y = b.get(id);
+      if (M.del[id] && M.del[id] >= Math.max(x&&x.u||0, y&&y.u||0)) { if (x) rN = true; if (y) lN = true; continue; }
+      if (x && (!y || (x.u||0) > (y.u||0))) lN = true;
+      if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; out.push(clone(y)); } else out.push(clone(x));
+    }
+    M[k] = out;
+  }
+  if ((R.settings.u||0) > (L.settings.u||0)) { rN = true; M.settings = clone(R.settings); } else if ((L.settings.u||0) > (R.settings.u||0)) lN = true;
+  M.timer = L.timer; M.u = Math.max(L.u||0, R.u||0);
+  return {M, lN, rN};
+}
+let syncT = null, syncing = false, syncAgain = false;
+function scheduleSync(){ if (!syncReady()) return; clearTimeout(syncT); syncT = setTimeout(syncNow, 15000); renderSyncState(); }
+async function syncNow(manual, depth){
+  clearTimeout(syncT); syncT = null;
+  if (!syncReady()) return;
+  if (syncing) { syncAgain = true; return; }
+  syncing = true; SYNC.err = ''; renderSyncState();
+  try {
+    flush();
+    const {text, sha} = await ghPull();
+    let remote = null;
+    if (text) { try { remote = migrate(await decryptDB(text, SYNC.pass)); } catch(e) { throw new Error('口令不对，解不开云端数据'); } }
+    let target = DB, push = !remote, changedLocal = false;
+    if (remote) { const {M, lN, rN} = mergeDB(DB, remote); target = M; push = lN; changedLocal = rN; }
+    if (push) {
+      const res = await ghPush(await encryptDB(Object.assign({}, target, {timer:null}), SYNC.pass), sha);
+      if (res === 'conflict') { syncing = false; if ((depth||0) < 2) return syncNow(manual, (depth||0)+1); throw new Error('云端同时被改动，请稍后再同步'); }
+    }
+    if (changedLocal) { target.timer = DB.timer; DB = target; reindex(); pendingLocal = true; flush(); if (!isTyping()) render(); else pendingRender = true; }
+    SYNC.last = now(); saveSync();
+    if (manual) toast(push || changedLocal ? '已同步' : '已是最新');
+  } catch(e) { SYNC.err = e.message || String(e); saveSync(); if (manual) toast(SYNC.err); }
+  syncing = false; renderSyncState();
+  if (syncAgain) { syncAgain = false; scheduleSync(); }
+}
+const isTyping = () => { const a = document.activeElement; return a && /INPUT|TEXTAREA/.test(a.tagName); };
+let pendingRender = false;
+document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(() => { if (!isTyping()) render(); }, 50); } });
+function renderSyncState(){
+  const el = $('#syncst'); if (!el) return;
+  if (DEMO) { el.textContent = ''; return; }
+  if (!syncReady()) { el.textContent = '仅存本机'; el.className = 'syncst'; return; }
+  el.className = 'syncst' + (SYNC.err ? ' err' : '');
+  el.textContent = SYNC.err ? '同步失败' : syncing ? '同步中…' : syncT ? '待同步' : SYNC.last ? '已同步 ' + hm(SYNC.last) : '未同步';
+}
+
+/* ================= 状态 ================= */
+const state = {tab:'today', date:today(), week:monOf(today()), month:mKey(today()), review:'week', errView:'redo',
+  errPeriod:'month', examEdit:null, trendBig:false, trendHide:{}, unlocked:false, openSubj:null, showAllDue:false};
 try { const t = sessionStorage.getItem('obs-tab'); if (t) state.tab = t; } catch(e) {}
+if (QS.get('tab')) state.tab = QS.get('tab');
+const standalone = () => navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-/* ---------------- 顶栏 / 底栏 ---------------- */
+/* ================= 顶栏 / 底栏 ================= */
 const ICONS = {
   today:'<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg>',
-  errors:'<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6M9 18h3"/></svg>',
-  review:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>',
+  errors:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v4h4"/><path d="M12 8v5l3 2"/></svg>',
+  review:'<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6M9 18h3"/></svg>',
   exams:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16l2 2 4-4"/></svg>',
   trends:'<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-5 4 3 6-7"/></svg>',
   me:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'
 };
-const TABS = [['today','今天'],['errors','错题'],['review','复盘'],['exams','考试'],['trends','趋势'],['me','家长']];
+const TABS = [['today','今天'],['errors','重做'],['review','复盘'],['exams','考试'],['trends','趋势'],['me','家长']];
+function redoLeftToday(){ const dn = doneToday(), due = dueList().length; return Math.max(0, Math.min(DAILY_REDO - dn, due)); }
 function renderChrome(){
   const t = termOf(today(), DB.settings.startYear);
   $('#top').innerHTML = (DEMO ? '<div class="demo-banner">示例模式：数据是编的，只用来看效果。去掉网址里的 ?demo 回到正式版</div>' : '') +
-    `<div class="topin"><span class="brand">每日观察</span><span class="term">${esc(DB.settings.child)} · ${esc(t.label)}</span><span class="saved" id="savedAt"></span></div>`;
-  $('#tabs').innerHTML = '<div class="tabin">' + TABS.map(([k,n]) => `<button data-act="tab" data-v="${k}" class="${state.tab===k?'on':''}">${ICONS[k]}<span>${n}</span></button>`).join('') + '</div>';
+    `<div class="topin"><span class="brand">每日观察</span><span class="term">${esc(DB.settings.child)} · ${esc(t.label)}</span><button class="syncst" id="syncst" data-act="syncnow"></button></div>`;
+  const left = redoLeftToday();
+  $('#tabs').innerHTML = '<div class="tabin">' + TABS.map(([k,n]) => `<button data-act="tab" data-v="${k}" class="${state.tab===k?'on':''}">${ICONS[k]}<span>${n}</span>${k==='errors' && left ? `<i class="badge">${left}</i>` : ''}</button>`).join('') + '</div>';
+  renderSyncState();
 }
 function render(){
+  reindex();
   renderChrome();
   const v = {today:vToday, errors:vErrors, review:vReview, exams:vExams, trends:vTrends, me:vMe}[state.tab] || vToday;
   $('#main').innerHTML = v();
-  if (savedAt) save(true);
 }
 
-/* ---------------- 视图：今天 ---------------- */
-function backupBanner(){
+/* ================= 今天 ================= */
+function banners(){
+  let h = '';
+  if (!DEMO && isIOS && !standalone() && !lsGet('observer:hideInstall')) h += `<div class="signal info"><span class="k">第一步</span>在 Safari 里点「分享」→「添加到主屏幕」，以后从主屏幕的图标打开。这样 Safari 不会自动清理数据，也能离线用。<div class="row" style="margin-top:6px"><button class="btn sm ghost" data-act="hideinstall">知道了</button></div></div>`;
   const n = Object.keys(DB.days).length;
-  if (DEMO || n < 3) return '';
-  const lb = DB.settings.lastBackup;
-  const gap = lb ? Math.floor((Date.now() - new Date(lb).getTime())/864e5) : 999;
-  if (gap < 7) return '';
-  return `<div class="signal"><span class="k">备份提醒</span>${lb ? gap+' 天没备份了' : '还没备份过'}。数据只存在这台设备的浏览器里，Safari 长时间不打开会被清掉。<div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="export">导出备份</button></div></div>`;
+  if (!DEMO && n >= 3 && !syncReady()) {
+    const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
+    if (gap >= 7) h += `<div class="signal"><span class="k">备份提醒</span>${lb ? gap+' 天没备份了' : '还没备份过'}。数据只存在这台设备里。在「家长」页开启云同步，就不用再手动备份。<div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="export">导出备份</button><button class="btn sm" data-act="tab" data-v="me">去开同步</button></div></div>`;
+  }
+  // 家长情绪连续偏高 → 今晚只听不讲（Maloney 2015：焦虑高 + 辅导多 → 孩子学得更少）
+  const recent = DB.emotions.filter(e => e.date >= addD(today(), -3));
+  if (recent.filter(e => +e.level >= 4).length >= 2) h += `<div class="tip">今晚建议：<b>只听孩子说卡点，不讲题</b>。</div>`;
+  const ex = DB.exams.filter(e => e.oneThing && e.date >= addD(today(), -45)).sort((a,b)=>a.date<b.date?1:-1)[0];
+  if (ex) h += `<div class="tip">「${esc(ex.name)}」考后定的一件事：<b>${esc(ex.oneThing)}</b></div>`;
+  return h;
 }
 function vToday(){
   const d = state.date, isToday = d === today();
   const dd = dayObj(d) || {subj:{}};
-  const qi = (P(d).getTime()/864e5|0) % QUESTIONS.length;
-  const q = dd.q || QUESTIONS[qi];
-  let h = backupBanner();
-  h += `<div class="datebar"><button class="navbtn" data-act="day" data-v="-1">‹</button>
-    <div><div class="d">${md(d)}</div><div class="w">${wd(d)}${isToday?' · 今天':''}</div></div>
+  const subs = subjects(d);
+  const filled = subs.filter(s => { const r = dd.subj[s.id]; return r && (r.none || r.min > 0); }).length;
+  const due = dueList(), dn = doneToday(), left = redoLeftToday();
+  const mon = monOf(d), rh = rhythm();
+  let h = isToday ? banners() : '';
+  h += `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="day" data-v="-1">‹</button>
+    <div style="flex:1;min-width:0"><div class="d">${md(d)}</div><div class="w">${wd(d)}${isToday?' · 今天':' · <a href="#" data-act="day" data-v="0" style="color:var(--accent)">回到今天</a>'}</div></div>
     <button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
-    <span class="spacer"></span>${isToday?'':'<button class="btn sm" data-act="day" data-v="0">回到今天</button>'}</div>`;
-  h += `<div class="tip">这张表<b>让孩子自己填</b>，你只看。只记实际发生的：用了多久、中途停没停。没有「计划用时」和「完成质量」，它是观察，不是考核。</div>`;
-  h += `<div class="card"><div class="row"><h3 style="margin:0">今晚状态</h3><span class="spacer"></span><div class="seg">` +
-    MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div></div>`;
-  for (const s of subjects()) h += subjCard(d, s, dd.subj[s.id]);
-  h += `<div class="card"><h3>今晚只问一句</h3>
-    <div class="row" style="align-items:flex-start"><div style="flex:1;font-family:var(--serif);font-size:17px">「${esc(q)}」</div><button class="btn sm ghost" data-act="nextq">换一句</button></div>
+    ${rh != null ? `<div class="rhythm" style="margin-left:6px"><b>${rh}</b><span>记录节奏</span></div>` : ''}</div>
+    <div class="wstrip">` + range(mon, addD(mon,6)).map(x => `<button data-act="goday" data-v="${x}" class="${dayHasData(x)?'rec':''} ${x===d?'sel':''} ${x>today()?'fut':''}" ${x>today()?'disabled':''}>${WD[P(x).getDay()]}<i>${P(x).getDate()}</i></button>`).join('') + `</div></div>`;
+  if (isToday) {
+    h += `<div class="steps" style="margin-bottom:12px">
+      <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="scroll" data-v="slist"><span class="n">① 孩子填</span><span class="t">各科记录</span><span class="s">${filled}/${subs.length} 科</span></button>
+      <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">② 孩子做</span><span class="t">错题重做</span><span class="s">${left ? '还有 '+left+' 道' : dn ? '今天做了 '+dn+' 道' : '今天没有到期'}</span></button>
+      <button class="step ${dd.answer ? 'done' : ''}" data-act="scroll" data-v="askq"><span class="n">③ 家长问</span><span class="t">只问一句</span><span class="s">${dd.answer ? '已记下' : '还没问'}</span></button></div>`;
+  }
+  h += `<div class="cols"><div>`;
+  h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
+    <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
+  for (const s of subs) h += subjRow(d, s, dd.subj[s.id]);
+  h += `</div><p class="small faint" style="margin:-4px 4px 12px">让孩子自己点 ▶ 开始、做完点「做完了」；中途离开就点暂停，会自动记成中断。只记实际发生的，没有「计划用时」。</p></div><div>`;
+  const qi = (P(d).getTime()/864e5|0) % QUESTIONS.length, q = dd.q || QUESTIONS[qi];
+  h += `<div class="card" id="askq"><h3>今晚只问一句</h3>
+    <div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div style="flex:1;font-family:var(--serif);font-size:17px">「${esc(q)}」</div><button class="btn sm ghost" data-act="nextq">换一句</button></div>
     <label class="f">孩子怎么回答的（原话就好）</label>
     <textarea data-in="day" data-f="answer" placeholder="比如：第二题第三步，不确定用相遇还是追及">${esc(dd.answer||'')}</textarea>
-    <p class="small faint" style="margin:8px 0 0">问「卡在哪一步」，不问「为什么又错」。前者是复盘，后者是审判。</p></div>`;
+    <p class="small faint" style="margin:8px 0 0">问「卡在哪一步」，不问「为什么又错」。只听，不批改。</p></div>`;
   h += `<div class="card"><h3>家长观察</h3><textarea data-in="day" data-f="note" placeholder="只写看到的事实，比如：21:10 开始数学，21:18 起身倒水">${esc(dd.note||'')}</textarea></div>`;
+  h += `</div></div>`;
   return h;
 }
-function subjCard(d, s, r){
-  r = r || {min:0, intr:'none', errs:{calc:0,concept:0,read:0}, tag:'', stuck:''};
-  const eN = errTotal(r);
-  const sumTxt = r.none ? '今天没有作业' : [r.min ? r.min+' 分钟' : '', r.intr && r.intr!=='none' ? '中断' : '', eN ? '错 '+eN : ''].filter(Boolean).join(' · ');
-  const hasMore = eN || r.tag || r.stuck;
-  let h = `<div class="card subj ${r.none?'none':''}"><div class="subj-h"><span class="dot" style="background:${s.color}"></span><span class="subj-name">${esc(s.name)}</span>
-    <span class="subj-sum">${sumTxt}</span>
-    <button class="chip ${r.none?'on':''}" data-act="none" data-s="${s.id}" style="margin-left:8px">没作业</button></div>`;
-  if (r.none) return h + '</div>';
-  h += `<div class="line"><span class="lab">实际用时</span>
-    <span class="stepper"><button data-act="min" data-s="${s.id}" data-v="-5">−</button><span class="v mins">${r.min||0}′</span><button data-act="min" data-s="${s.id}" data-v="5">+</button></span>` +
-    MINS.map(m => `<button class="chip soft ${r.min===m?'on':''}" data-act="minset" data-s="${s.id}" data-v="${m}">${m}</button>`).join('') + `</div>`;
-  h += `<div class="line"><span class="lab">中途中断</span><div class="seg">` +
-    INTR.map(i => `<button data-act="intr" data-s="${s.id}" data-v="${i.k}" class="${(r.intr||'none')===i.k?'on':''}">${i.n}</button>`).join('') + `</div></div>`;
-  h += `<details class="more" data-open="${s.id}" ${hasMore||state.open[s.id]?'open':''}><summary>错题与卡点</summary>
-    <div class="errs">` + ET.map(t => `<div class="e"><span class="stepper"><button data-act="err" data-s="${s.id}" data-t="${t.k}" data-v="-1">−</button><span class="v">${r.errs&&r.errs[t.k]||0}</span><button data-act="err" data-s="${s.id}" data-t="${t.k}" data-v="1">+</button></span>${t.n}</div>`).join('') + `</div>
-    <label class="f">错在哪个知识点（可选，多个用逗号隔开）</label>
-    <input type="text" list="tags-${s.id}" data-in="rec" data-s="${s.id}" data-f="tag" value="${esc(r.tag||'')}" placeholder="比如：分式运算">
-    ${tagList(s.id)}
-    <label class="f">${esc(stuckQ(s.name))}</label>
-    <input type="text" data-in="rec" data-s="${s.id}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="孩子的原话"></details></div>`;
-  return h;
+const PLAY = '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>', PAUSE = '<svg viewBox="0 0 16 16"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>';
+function subjRow(d, s, r){
+  r = r || {min:0, intr:'none', stuck:''};
+  const its = itemsOn(d, s.id), open = state.openSubj === s.id;
+  const tm = DB.timer && DB.timer.sid === s.id && DB.timer.d === d ? DB.timer : null;
+  let meta = '';
+  if (r.none) meta = '<span class="pill">没作业</span>';
+  else {
+    if (r.intr && r.intr !== 'none') meta += '<span class="pill amber">中断</span>';
+    if (its.length) meta += `<span class="pill amber">错 ${its.length}</span>`;
+    if (r.stuck) meta += '<span class="pill accent">卡点</span>';
+    meta += `<span class="sr-min">${r.min ? r.min+'′' : '<span class="faint">–</span>'}</span>`;
+  }
+  const tbtn = r.none ? '' : tm ? (tm.start ? `<button class="tbtn run" data-act="tpause" aria-label="暂停">${PAUSE}</button>` : `<button class="tbtn" data-act="tstart" data-s="${s.id}" aria-label="继续">${PLAY}</button>`) : (d === today() ? `<button class="tbtn" data-act="tstart" data-s="${s.id}" aria-label="开始计时">${PLAY}</button>` : '');
+  let h = `<div class="sr ${r.none?'none':''} ${open?'open':''}"><div class="sr-h" data-act="sopen" data-s="${s.id}"><span class="dot" style="background:${s.color}"></span><span class="sr-name">${esc(s.name)}</span><span class="sr-meta">${meta}</span>${tbtn}</div>`;
+  if (tm) h += `<div style="padding:0 16px 10px"><div class="timerbar"><span class="clock" data-clock>${fmtClock(timerElapsed(tm))}</span><span class="small muted">${tm.start ? '计时中' : '已暂停（记一次中断）'}${tm.pauses.length ? ' · 停过 '+tm.pauses.length+' 次' : ''}</span><span class="spacer"></span><button class="btn sm primary" data-act="tstop">做完了</button></div></div>`;
+  if (!open) return h + '</div>';
+  h += `<div class="sr-body"><div class="line"><button class="chip ${r.none?'on':''}" data-act="none" data-s="${s.id}">今天没有这科作业</button></div>`;
+  if (!r.none) {
+    h += `<div class="line"><span class="lab">实际用时</span>
+      <span class="stepper"><button data-act="min" data-s="${s.id}" data-v="-5">−</button><span class="v">${r.min||0}′</span><button data-act="min" data-s="${s.id}" data-v="5">+</button></span>` +
+      MINS.map(m => `<button class="chip soft ${r.min===m?'on':''}" data-act="minset" data-s="${s.id}" data-v="${m}">${m}</button>`).join('') + `</div>`;
+    h += `<div class="line"><span class="lab">中途中断</span><div class="seg">` + INTR.map(i => `<button data-act="intr" data-s="${s.id}" data-v="${i.k}" class="${(r.intr||'none')===i.k?'on':''}">${i.n}</button>`).join('') + `</div></div>`;
+    h += `<div class="line" style="align-items:flex-start"><span class="lab">错题</span><div style="flex:1;min-width:0">
+      <div class="addrow">` + ET.map(t => `<button data-act="additem" data-s="${s.id}" data-t="${t.k}"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> + ${t.n}</button>`).join('') + `</div>`;
+    for (const it of its) h += `<div class="item"><span class="it"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${ETN[it.type]}</span>
+      <input type="text" list="tags-${s.id}" data-in="item" data-id="${it.id}" data-f="tag" value="${esc(it.tag||'')}" placeholder="知识点，比如：去括号">
+      <button class="x" data-act="delitem" data-v="${it.id}" aria-label="删除">×</button>
+      <div class="cf row"><span class="small faint">做的时候：</span><div class="seg sm">` + CONF.map(c => `<button data-act="conf" data-v="${it.id}" data-c="${c.k}" class="${it.conf===c.k?'on':''}">${c.n}</button>`).join('') + `</div></div></div>`;
+    if (its.length) h += tagList(s.id) + `<p class="small faint" style="margin:6px 0 0">每道错题会在 2 天、7 天、21 天后回到「重做」里。</p>`;
+    h += `</div></div>`;
+    h += `<label class="f">${esc(stuckQ(s.name))}</label><input type="text" data-in="rec" data-s="${s.id}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="孩子的原话">`;
+  }
+  return h + `</div></div>`;
 }
 function stuckQ(name){
   if (/数学|物理|化学|科学/.test(name)) return '哪一步最不确定？';
@@ -478,263 +804,297 @@ function stuckQ(name){
   return '哪个地方最没把握？';
 }
 function tagList(sid){
-  const set = {};
-  for (const d in DB.days) { const r = DB.days[d].subj && DB.days[d].subj[sid]; if (r) for (const t of splitTags(r.tag)) set[t] = (set[t]||0)+1; }
-  return `<datalist id="tags-${sid}">` + topEntries(set, 30).map(e=>`<option value="${esc(e[0])}">`).join('') + '</datalist>';
+  const set = {}; for (const it of DB.items) if (it.sid === sid) for (const t of splitTags(it.tag)) set[t] = (set[t]||0)+1;
+  return `<datalist id="tags-${sid}">` + topEntries(set, 40).map(e=>`<option value="${esc(e[0])}">`).join('') + '</datalist>';
 }
 
-/* ---------------- 视图：错题索引 ---------------- */
+/* ================= 重做 / 错题索引 ================= */
+function vErrors(){
+  let h = `<div class="row" style="margin-bottom:10px"><h2 style="margin:0">错题</h2><span class="spacer"></span><div class="seg">
+    <button data-act="ev" data-v="redo" class="${state.errView==='redo'?'on':''}">重做</button><button data-act="ev" data-v="index" class="${state.errView==='index'?'on':''}">索引</button></div></div>`;
+  return h + (state.errView === 'redo' ? vRedo() : vIndex());
+}
+function vRedo(){
+  const due = dueList(), dn = doneToday();
+  const mastered = DB.items.filter(it => it.done && !it.skipped).length, active = DB.items.filter(it => !it.done).length;
+  const wk = stats(monOf(today()), today());
+  const quotaAll = Math.min(DAILY_REDO, due.length + dn);
+  let h = `<div class="kpis"><div class="kpi"><b>${dn}<span class="faint" style="font-size:16px">/${quotaAll || DAILY_REDO}</span></b><span>今天做了</span></div><div class="kpi"><b>${active}</b><span>还在队列里</span></div><div class="kpi"><b>${mastered}</b><span>已掌握</span></div></div>`;
+  h += `<p class="sub">翻到错题本上的原题，<b>盖住答案重做一遍</b>，再对答案。自己回忆一遍比重看答案管用得多。</p>`;
+  const quota = Math.max(0, DAILY_REDO - dn);
+  const shown = state.showAllDue ? due : due.slice(0, quota);
+  if (!due.length) h += `<div class="card empty">${dn ? `今天重做了 ${dn} 道，够了。` : DB.items.length ? '今天没有到期的题。' : '还没有错题。在「今天」页点开科目，点「+ 计算错误」这类按钮记一道。'}</div>`;
+  else if (!shown.length) h += `<div class="card empty">今天做了 ${dn} 道，够了。剩下 ${due.length} 道明天再说。<div style="margin-top:8px"><button class="btn sm" data-act="alldue">还想做就继续</button></div></div>`;
+  for (const it of shown) {
+    const s = subjById(it.sid); const r = DB.days[it.d] && DB.days[it.d].subj[it.sid];
+    const nth = (it.hist||[]).length + 1;
+    h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${ETN[it.type]}</span>${it.conf==='sure'?'<span class="pill amber">有把握却错了 · 优先</span>':''}<span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
+      <div class="q">${it.tag ? esc(it.tag) : '（没标知识点）'}</div>
+      <div class="small muted">${md(it.d)}的${esc(s.name)}作业${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
+      <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button><span class="spacer"></span><button class="btn sm ghost" data-act="skipitem" data-v="${it.id}">找不到原题</button></div></div>`;
+  }
+  if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">另外还有 ${due.length - shown.length} 道到期，每天最多 ${DAILY_REDO} 道，明天再排。<a href="#" data-act="alldue" style="color:var(--accent)">全部显示</a></p>`;
+  const up = {}; for (const it of DB.items) if (!it.done && it.due > today() && it.due <= addD(today(), 7)) up[it.due] = (up[it.due]||0) + 1;
+  if (Object.keys(up).length) h += `<div class="card"><h3>接下来 7 天</h3><div class="row">` + Object.keys(up).sort().map(d => `<span class="pill">${mdShort(d)} ${wd(d)} · ${up[d]} 道</span>`).join('') + `</div></div>`;
+  if (wk.redoN) h += `<div class="card"><h3>本周重做</h3><p style="margin:0">做了 ${wk.redoN} 次，做对 ${wk.redoOk} 次（${pct(wk.redoOk, wk.redoN)}%）。</p></div>`;
+  return h;
+}
 function periodRange(p){
   const t = today();
   if (p === 'week') return [monOf(t), t, '本周'];
   if (p === 'month') return [mKey(t)+'-01', t, '本月'];
   if (p === 'term') { const d = P(t), m = d.getMonth()+1, y = d.getFullYear();
-    const from = m >= 9 ? y+'-09-01' : m <= 1 ? (y-1)+'-09-01' : y+'-02-01'; return [from, t, '本学期']; }
-  const ks = Object.keys(DB.days).sort(); return [ks[0] || t, t, '全部'];
+    return [m >= 9 ? y+'-09-01' : m <= 1 ? (y-1)+'-09-01' : y+'-02-01', t, '本学期']; }
+  const ks = Object.keys(DB.days).concat(Object.keys(IDX)).sort(); return [ks[0] || t, t, '全部'];
 }
-function vErrors(){
+function vIndex(){
   const [from, to, lab] = periodRange(state.errPeriod);
   const st = stats(from, to);
-  let h = `<h2>错题索引</h2><p class="sub">按错误类型看，不按时间翻。按时间翻看到的是「又错了」，按类型看到的是「哪一类在增加、哪一类已经很少出现」。</p>`;
+  let h = `<p class="sub">按错误类型看，不按时间翻。按时间翻看到的是「又错了」，按类型看到的是「哪一类在增加、哪一类已经很少出现」。</p>`;
   h += `<div class="row" style="margin-bottom:12px"><div class="seg">` + [['week','本周'],['month','本月'],['term','本学期'],['all','全部']].map(([k,n]) => `<button data-act="errp" data-v="${k}" class="${state.errPeriod===k?'on':''}">${n}</button>`).join('') + `</div></div>`;
-  if (!st.errN) return h + `<div class="card empty">${lab}还没有记录错题。在「今天」页每科的「错题与卡点」里点 +。</div>`;
+  if (!st.errN) return h + `<div class="card empty">${lab}还没有记录错题。</div>`;
   h += `<div class="card"><h3>${lab}共 ${st.errN} 道 <span class="small faint">${md(from)}–${md(to)}</span></h3>
     <div class="bar" style="height:14px;margin:6px 0 8px">` + ET.map(t => `<i style="width:${pct(st.errs[t.k],st.errN)}%;background:${ET_COLOR[t.k]}"></i>`).join('') + `</div>
-    <div class="legend">` + ET.map(t => `<span><i class="sw" style="background:${ET_COLOR[t.k]}"></i>${t.n} ${st.errs[t.k]}（${pct(st.errs[t.k],st.errN)}%）</span>`).join('') + `</div></div>`;
+    <div class="legend">` + ET.map(t => `<span><i class="sw" style="background:${ET_COLOR[t.k]}"></i>${t.n} ${st.errs[t.k]}（${pct(st.errs[t.k],st.errN)}%）</span>`).join('') + `</div>
+    <p class="small muted" style="margin:10px 0 0">做的时候：有把握 ${st.conf.sure} · 不太确定 ${st.conf.unsure} · 不会 ${st.conf.no}${st.conf.none ? ' · 没记 '+st.conf.none : ''}。「不会」多，要回课本补概念；「有把握却错」多，说明有个错误理解很牢，要专门纠正。</p></div>`;
   h += `<div class="card"><h3>科目 × 错误类型</h3><div class="tablewrap"><table><tr><th>科目</th>` + ET.map(t=>`<th class="n">${t.s}</th>`).join('') + `<th class="n">合计</th><th>常错知识点</th></tr>`;
-  for (const s of subjects()) {
+  for (const s of DB.settings.subjects) {
     const x = st.S[s.id]; const n = sum(Object.values(x.errs)); if (!n) continue;
-    h += `<tr><td><span class="dot" style="background:${s.color};display:inline-block;margin-right:6px"></span>${esc(s.name)}</td>` + ET.map(t=>`<td class="n">${x.errs[t.k]||'·'}</td>`).join('') + `<td class="n"><b>${n}</b></td><td class="small wrap">${topEntries(x.tags,3).map(e=>esc(e[0])+' '+e[1]).join('、') || '<span class="faint">未标</span>'}</td></tr>`;
+    h += `<tr><td><span class="dot" style="background:${s.color};margin-right:6px"></span>${esc(s.name)}</td>` + ET.map(t=>`<td class="n">${x.errs[t.k]||'·'}</td>`).join('') + `<td class="n"><b>${n}</b></td><td class="small wrap">${topEntries(x.tags,3).map(e=>esc(e[0])+' '+e[1]).join('、') || '<span class="faint">未标</span>'}</td></tr>`;
   }
-  h += `</table></div></div>`;
-  h += `<div class="card"><h3>每类错误集中在哪</h3>`;
+  h += `</table></div></div><div class="card"><h3>每类错误集中在哪</h3>`;
   for (const t of ET) {
     if (!st.errs[t.k]) continue;
-    const tg = topEntries(st.tagsByType[t.k], 4);
-    const tagged = sum(tg.map(e=>e[1]));
+    const tg = topEntries(st.tagsByType[t.k], 4), tagged = sum(tg.map(e=>e[1]));
     h += `<p style="margin:6px 0"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> <b>${t.n} ${st.errs[t.k]} 次</b>` +
       (tg.length ? '：' + tg.map(e=>{const p=e[0].split('｜'); return `${esc(p[1])}·${esc(p[0])} ${e[1]}`;}).join('，') + (st.errs[t.k] > tagged ? `，其余 ${st.errs[t.k]-tagged} 次未标或分散` : '') : '<span class="faint">（没标知识点）</span>') + `</p>`;
   }
   h += `</div>`;
-  // 8 周走势
-  const weeks = []; let m = monOf(today());
-  for (let i=7;i>=0;i--) weeks.push(addD(m, -7*i));
-  const wst = weeks.map(w => stats(w, addD(w,6)));
-  const maxN = Math.max(1, ...wst.map(x=>x.errN));
+  const weeks = []; const m0 = monOf(today()); for (let i=7;i>=0;i--) weeks.push(addD(m0, -7*i));
+  const wst = weeks.map(w => stats(w, addD(w,6))); const maxN = Math.max(1, ...wst.map(x=>x.errN));
   h += `<div class="card"><h3>近 8 周，每周错题按类型</h3>
     <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;align-items:end;height:130px">` +
-    wst.map(x => `<div style="display:flex;flex-direction:column-reverse;height:100%;justify-content:flex-start">` +
-      ET.map(t => `<i style="display:block;height:${x.errs[t.k]/maxN*100}%;background:${ET_COLOR[t.k]}"></i>`).join('') + `</div>`).join('') + `</div>
+    wst.map(x => `<div style="display:flex;flex-direction:column-reverse;height:100%">` + ET.map(t => `<i style="display:block;height:${x.errs[t.k]/maxN*100}%;background:${ET_COLOR[t.k]}"></i>`).join('') + `</div>`).join('') + `</div>
     <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:4px">` + wst.map((x,i)=>`<div class="small faint" style="text-align:center">${mdShort(weeks[i])}<br><span class="num">${x.recDays?x.errN:'–'}</span></div>`).join('') + `</div>
-    <p class="small faint" style="margin:8px 0 0">「–」表示那周没记录。某一类的色块越来越薄，说明它在减少。</p></div>`;
-  // 最近卡点
+    <p class="small faint" style="margin:8px 0 0">「–」表示那周没记录。</p></div>`;
   const stuck = []; for (const sid in st.S) stuck.push(...st.S[sid].stuck);
   stuck.sort((a,b)=>a.d<b.d?1:-1);
   h += `<div class="card"><h3>孩子说的卡点</h3>` + (stuck.length ? stuck.slice(0,20).map(x=>`<p style="margin:6px 0"><span class="small faint num">${mdShort(x.d)}</span> <b>${esc(subjById(x.sid).name)}</b> ${esc(x.text)}</p>`).join('') : '<div class="empty">还没有</div>') + `</div>`;
   return h;
 }
 
-/* ---------------- 视图：复盘（周 / 月） ---------------- */
+/* ================= 复盘 ================= */
 function vReview(){
-  let h = `<div class="row" style="margin-bottom:6px"><h2 style="margin:0">复盘</h2><span class="spacer"></span><div class="seg">
+  let h = `<div class="row" style="margin-bottom:10px"><h2 style="margin:0">复盘</h2><span class="spacer"></span><div class="seg">
     <button data-act="rv" data-v="week" class="${state.review==='week'?'on':''}">周</button><button data-act="rv" data-v="month" class="${state.review==='month'?'on':''}">月</button></div></div>`;
   return h + (state.review === 'week' ? vWeek() : vMonth());
 }
 function weekGrid(st, mon, anchors){
   const ds = range(mon, addD(mon,6)); const t = today();
   let h = `<div class="tablewrap"><div class="wk" style="min-width:420px"><div></div>` + ds.map(d=>`<div class="hd">${WD[P(d).getDay()]}<br>${P(d).getDate()}</div>`).join('') + `<div class="hd">均 / 锚</div>`;
-  for (const s of subjects()) {
+  for (const s of subjects(mon)) {
     const x = st.S[s.id], a = anchors[s.id]||0;
     h += `<div class="sn"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</div>`;
     for (const d of ds) {
-      const r = x.byDay[d];
-      if (d > t || !dayHasData(DB.days[d])) { h += `<div class="c blank">·</div>`; continue; }
-      if (!r) { h += `<div class="c blank">?</div>`; continue; }
+      const r = x.byDay[d], e = x.errDay[d] || 0;
+      if (d > t || !dayHasData(d)) { h += `<div class="c blank">·</div>`; continue; }
+      if (!r) { h += `<div class="c blank">${e ? `<span class="e">×${e}</span>` : '?'}</div>`; continue; }
       if (r.none) { h += `<div class="c blank">—</div>`; continue; }
       const ratio = a ? Math.min(1.4, (r.min||0)/a) : 0.6;
-      const bg = `color-mix(in srgb, ${s.color} ${Math.round(12 + ratio*45)}%, var(--surface))`;
-      const intr = r.intr && r.intr !== 'none' ? `<span class="intr ${r.intr}"></span>` : '';
-      h += `<div class="c" style="background:${bg}">${r.min||0}${intr}</div>`;
+      h += `<div class="c" style="background:color-mix(in srgb, ${s.color} ${Math.round(12 + ratio*45)}%, var(--surface))">${r.min||0}${r.intr && r.intr !== 'none' ? '<span class="intr"></span>' : ''}${e ? `<span class="e">×${e}</span>` : ''}</div>`;
     }
     const avg = x.days ? Math.round(x.min/x.days) : 0;
     h += `<div class="tot"><span>${avg||'–'}</span><span class="faint">/${a}</span></div>`;
   }
-  h += `</div></div><div class="legend"><span><i class="sw" style="background:var(--amber);border-radius:50%"></i>中途中断</span><span>数字 = 实际分钟</span><span>— 没作业</span><span>? 当天有记录但这科没填</span></div>`;
-  return h;
+  return h + `</div></div><div class="legend"><span><i class="sw" style="background:var(--amber);border-radius:50%"></i>中途中断</span><span>×2 = 错 2 道</span><span>— 没作业</span><span>? 当天没填这科</span></div>`;
 }
 function vWeek(){
-  const mon = state.week, sun = addD(mon,6), t = today();
-  const st = stats(mon, sun < t ? sun : t);
-  const prev = stats(addD(mon,-7), addD(mon,-1));
-  const anchors = anchorsFor(mon);
-  const w = DB.weeks[mon] || {};
-  const passed = Math.min(7, range(mon, sun < t ? sun : t).length);
-  let h = `<div class="datebar"><button class="navbtn" data-act="wk" data-v="-7">‹</button><div><div class="d" style="font-size:19px">${md(mon)} – ${md(sun)}</div><div class="w">记录 ${st.recDays}/${passed} 天</div></div>
-    <button class="navbtn" data-act="wk" data-v="7" ${addD(mon,7) > t ? 'disabled':''}>›</button></div>`;
+  const mon = state.week, sun = addD(mon,6), t = today(), end = sun < t ? sun : t;
+  const st = stats(mon, end), prev = stats(addD(mon,-7), addD(mon,-1));
+  const anchors = anchorsFor(mon), w = DB.weeks[mon] || {};
+  const passed = range(mon, end).length;
+  let h = `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="wk" data-v="-7">‹</button><div style="flex:1"><div class="d" style="font-size:20px">${md(mon)} – ${md(sun)}</div><div class="w">记录 ${st.recDays}/${passed} 天 · 错题 ${st.errN} · 重做 ${st.redoN}</div></div>
+    <button class="navbtn" data-act="wk" data-v="7" ${addD(mon,7) > t ? 'disabled':''}>›</button></div></div>`;
+  const pw = DB.weeks[addD(mon,-7)];
+  if (pw && pw.adjust) h += `<div class="tip">上周定的调整：<b>${esc(pw.adjust)}</b>。这周看起来有没有用？</div>`;
   h += `<div class="card"><h3>这一周的节奏</h3>${weekGrid(st, mon, anchors)}</div>`;
-  h += `<div class="card"><h3>观察到的模式</h3>` + findings(st, prev, anchors, passed).map(f => `<div class="signal ${f.k}"><span class="k">${{signal:'信号',good:'好的变化',info:'说明'}[f.k]}</span>${f.t}</div>`).join('') + `</div>`;
+  h += `<div class="card"><h3>观察到的模式</h3>${findingsHTML(findings(st, prev, anchors, passed))}</div>`;
   const stuck = []; for (const sid in st.S) stuck.push(...st.S[sid].stuck);
   const ans = st.days.filter(d => DB.days[d] && DB.days[d].answer).map(d => ({d, text:DB.days[d].answer}));
   h += `<div class="card"><h3>本周孩子说的卡点</h3>` + (stuck.length + ans.length ? stuck.concat(ans).sort((a,b)=>a.d<b.d?-1:1).map(x=>`<p style="margin:5px 0"><span class="small faint num">${wd(x.d)}</span> ${x.sid?'<b>'+esc(subjById(x.sid).name)+'</b> ':''}${esc(x.text)}</p>`).join('') : '<div class="empty">本周没有记录卡点</div>') + `</div>`;
   const emo = DB.emotions.filter(e => e.date >= mon && e.date <= sun);
   if (emo.length) h += `<div class="card"><h3>我的情绪标记（本周 ${emo.length} 次）</h3><p class="small muted" style="margin:0">停住了 ${emo.filter(e=>e.paused).length} 次。详情在「家长」页。</p></div>`;
-  // 调整表单
   const next = Object.assign({}, anchors, w.next||{});
   h += `<div class="card"><h3>本周复盘 → 下周调整</h3>
     <label class="f">这周发现了什么（一两句话）</label>
-    <textarea data-in="week" data-f="found" placeholder="比如：数学中断都在前15分钟，卡在分式通分">${esc(w.found||'')}</textarea>
+    <textarea data-in="week" data-f="found" placeholder="比如：数学中断都在前15分钟，卡在去括号">${esc(w.found||'')}</textarea>
     <label class="f">下周只调一件事</label>
-    <textarea data-in="week" data-f="adjust" placeholder="比如：数学开头先做一道会做的通分小题">${esc(w.adjust||'')}</textarea>
+    <textarea data-in="week" data-f="adjust" placeholder="比如：数学开头先做一道会做的去括号小题">${esc(w.adjust||'')}</textarea>
     <label class="f">下周每科的固定锚点（每天最少练几分钟，定了就不轻易动）</label>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">` +
-    subjects().map(s => `<div class="row" style="gap:6px;flex-wrap:nowrap"><span class="dot" style="background:${s.color}"></span><span style="width:36px">${esc(s.name)}</span><input type="number" inputmode="numeric" min="0" step="5" data-in="anchor" data-s="${s.id}" value="${next[s.id]||0}" style="width:70px;padding:6px 8px"></div>`).join('') + `</div>
-    <p class="small faint" style="margin:8px 0 0">锚点改动会从下周开始生效，本周的比较不变。每次最多动一科，才看得出是哪个调整起了作用。</p></div>`;
-  // 历史周
+    subjects(addD(mon,7)).map(s => `<div class="row" style="gap:6px;flex-wrap:nowrap"><span class="dot" style="background:${s.color}"></span><span style="width:36px">${esc(s.name)}</span><input type="number" inputmode="numeric" min="0" step="5" data-in="anchor" data-s="${s.id}" value="${next[s.id]||0}" style="width:70px;padding:6px 8px"></div>`).join('') + `</div>
+    <p class="small faint" style="margin:8px 0 0">锚点改动从下周开始生效。每次最多动一科，才看得出是哪个调整起了作用。</p></div>`;
   const past = Object.keys(DB.weeks).filter(k => DB.weeks[k].found || DB.weeks[k].adjust).sort().reverse();
   if (past.length) h += `<div class="card"><h3>历次周调整</h3>` + past.slice(0,12).map(k => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><a href="#" data-act="wkgo" data-v="${k}" class="small num" style="color:var(--accent)">${md(k)} 那周</a><div>${esc(DB.weeks[k].found||'')}</div>${DB.weeks[k].adjust?`<div class="small muted">→ ${esc(DB.weeks[k].adjust)}</div>`:''}</div>`).join('') + `</div>`;
   return h;
 }
-function monthEnd(m){ const d = P(m+'-01'); d.setMonth(d.getMonth()+1); d.setDate(0); return ymd(d); }
 function vMonth(){
-  const m = state.month, from = m+'-01', end = monthEnd(m), t = today();
-  const to = end < t ? end : t;
-  const st = stats(from, to);
-  const pm = addM(m,-1), prev = stats(pm+'-01', monthEnd(pm));
-  const mo = DB.months[m] || {};
-  const n = range(from, to).length;
-  let h = `<div class="datebar"><button class="navbtn" data-act="mo" data-v="-1">‹</button><div><div class="d" style="font-size:19px">${+m.slice(0,4)} 年 ${+m.slice(5)} 月</div><div class="w">记录 ${st.recDays}/${n} 天 · ${esc(termOf(from, DB.settings.startYear).label)}</div></div>
-    <button class="navbtn" data-act="mo" data-v="1" ${addM(m,1) > mKey(t) ? 'disabled':''}>›</button></div>`;
-  // 各科对比
+  const m = state.month, from = m+'-01', end = monthEnd(m), t = today(), to = end < t ? end : t;
+  const st = stats(from, to), pm = addM(m,-1), prev = stats(pm+'-01', monthEnd(pm));
+  const mo = DB.months[m] || {}, n = range(from, to).length;
+  let h = `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="mo" data-v="-1">‹</button><div style="flex:1"><div class="d" style="font-size:20px">${+m.slice(0,4)} 年 ${+m.slice(5)} 月</div><div class="w">记录 ${st.recDays}/${n} 天 · ${esc(termOf(from, DB.settings.startYear).label)}</div></div>
+    <button class="navbtn" data-act="mo" data-v="1" ${addM(m,1) > mKey(t) ? 'disabled':''}>›</button></div></div>`;
+  if (DB.months[pm] && DB.months[pm].goal) h += `<div class="tip">上个月定的目标：<b>${esc(DB.months[pm].goal)}</b></div>`;
   h += `<div class="card"><h3>各科：本月 vs 上月</h3><div class="tablewrap"><table><tr><th>科目</th><th class="n">日均分钟</th><th class="n">中断率</th><th class="n">错题</th><th class="n">上月错题</th></tr>`;
-  for (const s of subjects()) {
+  for (const s of subjects(from)) {
     const x = st.S[s.id], y = prev.S[s.id];
     const avg = x.days ? Math.round(x.min/x.days) : 0, pavg = y.days ? Math.round(y.min/y.days) : 0;
-    const e = sum(Object.values(x.errs)), pe = sum(Object.values(y.errs));
-    h += `<tr><td><span class="dot" style="background:${s.color};display:inline-block;margin-right:6px"></span>${esc(s.name)}</td><td class="n">${avg||'–'}${pavg?` <span class="faint">(${pavg})</span>`:''}</td><td class="n">${x.recOn?pct(x.intrN,x.recOn)+'%':'–'}</td><td class="n">${e||'·'}</td><td class="n faint">${prev.recDays?pe:'–'}</td></tr>`;
+    h += `<tr><td><span class="dot" style="background:${s.color};margin-right:6px"></span>${esc(s.name)}</td><td class="n">${avg||'–'}${pavg?` <span class="faint">(${pavg})</span>`:''}</td><td class="n">${x.recOn?pct(x.intrN,x.recOn)+'%':'–'}</td><td class="n">${sum(Object.values(x.errs))||'·'}</td><td class="n faint">${prev.recDays?sum(Object.values(y.errs)):'–'}</td></tr>`;
   }
   h += `</table></div><p class="small faint" style="margin:6px 0 0">括号里是上月日均。</p></div>`;
   h += `<div class="card"><h3>错误类型的分布变化</h3>`;
-  for (const [lab, x] of [['上月', prev], ['本月', st]]) {
-    h += `<div class="row" style="margin:6px 0;flex-wrap:nowrap"><span style="width:36px" class="small">${lab}</span><div class="bar" style="flex:1;height:14px">` + (x.errN ? ET.map(t => `<i style="width:${pct(x.errs[t.k],x.errN)}%;background:${ET_COLOR[t.k]}"></i>`).join('') : '') + `</div><span class="small num" style="width:40px;text-align:right">${x.recDays?x.errN:'–'}</span></div>`;
-  }
+  for (const [lab, x] of [['上月', prev], ['本月', st]]) h += `<div class="row" style="margin:6px 0;flex-wrap:nowrap"><span style="width:36px" class="small">${lab}</span><div class="bar" style="flex:1;height:14px">` + (x.errN ? ET.map(t => `<i style="width:${pct(x.errs[t.k],x.errN)}%;background:${ET_COLOR[t.k]}"></i>`).join('') : '') + `</div><span class="small num" style="width:40px;text-align:right">${x.recDays?x.errN:'–'}</span></div>`;
   h += `<div class="legend">` + ET.map(t=>`<span><i class="sw" style="background:${ET_COLOR[t.k]}"></i>${t.n}</span>`).join('') + `</div></div>`;
-  h += `<div class="card"><h3>本月观察到的模式</h3>` + findings(st, prev, anchorsFor(from), n).map(f => `<div class="signal ${f.k}"><span class="k">${{signal:'信号',good:'好的变化',info:'说明'}[f.k]}</span>${f.t}</div>`).join('') + `</div>`;
-  // 本月的周调整轨迹
+  h += `<div class="card"><h3>本月观察到的模式</h3>${findingsHTML(findings(st, prev, anchorsFor(from), n, true))}</div>`;
   const wks = Object.keys(DB.weeks).filter(k => k >= addD(from,-6) && k <= end && (DB.weeks[k].found || DB.weeks[k].adjust)).sort();
   h += `<div class="card"><h3>本月每周做过的调整</h3>` + (wks.length ? wks.map(k => `<p style="margin:6px 0"><span class="small faint num">${md(k)}</span> ${esc(DB.weeks[k].adjust || DB.weeks[k].found)}</p>`).join('') : '<div class="empty">本月还没写周复盘</div>') + `</div>`;
   const ex = DB.exams.filter(e => e.date >= from && e.date <= end);
-  if (ex.length) h += `<div class="card"><h3>本月考试</h3>` + ex.map(examSummaryLine).join('') + `</div>`;
+  if (ex.length) h += `<div class="card"><h3>本月考试</h3>` + ex.map(e => { const z = zkRate(e); return `<p style="margin:5px 0"><span class="small faint num">${mdShort(e.date)}</span> <b>${esc(e.name)}</b> ${z ? '中考口径得分率 '+z.rate+'%' : ''}${e.oneThing ? ' · 定的一件事：'+esc(e.oneThing) : ''}</p>`; }).join('') + `</div>`;
   const emo = DB.emotions.filter(e => e.date >= from && e.date <= end);
   if (emo.length) { const c = {}; emo.forEach(e => c[e.trigger] = (c[e.trigger]||0)+1);
     h += `<div class="card"><h3>我的情绪（本月 ${emo.length} 次，停住 ${emo.filter(e=>e.paused).length} 次）</h3><p class="small muted" style="margin:0">最常被触发：${topEntries(c,3).map(e=>esc(e[0])+' '+e[1]+' 次').join('、')}</p></div>`; }
   h += `<div class="card"><h3>本月复盘</h3>
     <label class="f">这个月最重要的发现</label><textarea data-in="month" data-f="found">${esc(mo.found||'')}</textarea>
     <label class="f">下个月调整什么（节奏 / 锚点 / 问法）</label><textarea data-in="month" data-f="adjust">${esc(mo.adjust||'')}</textarea>
-    <label class="f">下个月想看到的一个变化（可观察的，比如「数学中断从每周 3 次降到 1 次」）</label><textarea data-in="month" data-f="goal">${esc(mo.goal||'')}</textarea></div>`;
-  if (DB.months[pm] && DB.months[pm].goal) h += `<div class="tip">上个月定的目标：<b>${esc(DB.months[pm].goal)}</b></div>`;
+    <label class="f">下个月想看到的一个变化（能观察到的，比如「数学中断从每周 3 次降到 1 次」）</label><textarea data-in="month" data-f="goal">${esc(mo.goal||'')}</textarea></div>`;
   return h;
 }
 
-/* ---------------- 视图：考试 ---------------- */
-function examTotal(e){ let s=0, f=0; for (const k in e.scores) { const x = e.scores[k]; if (x.s !== '' && x.s != null) { s += +x.s; f += +(x.full||100); } } return {s, f}; }
+/* ================= 考试 ================= */
+const hasScore = x => x && x.s !== '' && x.s != null;
+function examTotal(e){ let s=0, f=0; for (const k in e.scores) { const x = e.scores[k]; if (hasScore(x)) { s += +x.s; f += +(x.full||100); } } return {s, f}; }
+/* 中考口径：各科得分率 × 深圳中考满分（只算本次考了的、计入总分的科目） */
+function zkRate(e){
+  let got = 0, full = 0;
+  for (const s of DB.settings.subjects) { const x = e.scores[s.id]; if (!s.inTotal || !hasScore(x)) continue; got += x.s/(x.full||100)*s.zk; full += s.zk; }
+  return full ? {got:Math.round(got), full, rate:Math.round(got/full*100)} : null;
+}
 function prevScore(e, sid){
-  const list = DB.exams.filter(x => x.date < e.date && x.scores[sid] && x.scores[sid].s !== '' && x.scores[sid].s != null).sort((a,b)=>a.date<b.date?1:-1);
+  const list = DB.exams.filter(x => x.id !== e.id && x.date < e.date && hasScore(x.scores[sid])).sort((a,b)=>a.date<b.date?1:-1);
   return list[0] ? list[0].scores[sid] : null;
 }
-function examSummaryLine(e){ const t = examTotal(e); return `<p style="margin:5px 0"><span class="small faint num">${mdShort(e.date)}</span> <b>${esc(e.name)}</b> 总分 <span class="num">${t.s}/${t.f}</span></p>`; }
 function vExams(){
   if (state.examEdit) return examForm();
   let h = `<div class="row"><h2 style="margin:0">考试成绩</h2><span class="spacer"></span><button class="btn primary" data-act="examnew">＋ 记一次考试</button></div>
-    <p class="sub" style="margin-top:6px">每次考试都记下来，趋势页会画出三年的变化。失分原因可以不填，填了就能和平时的错题类型对上。</p>`;
+    <p class="sub" style="margin-top:6px">每次考试都记下来，并填考后反思三段：考前怎么准备的、丢分归到哪类、下次改哪一件事。第三段会出现在首页提醒。</p>`;
   if (!DB.exams.length) return h + `<div class="card empty">还没有考试记录</div>`;
-  const ex = DB.exams.slice().sort((a,b)=>a.date<b.date?1:-1);
   let lastTerm = null;
-  for (const e of ex) {
+  for (const e of DB.exams.slice().sort((a,b)=>a.date<b.date?1:-1)) {
     const tl = termOf(e.date, DB.settings.startYear).label;
     if (tl !== lastTerm) { h += `<h3 style="margin:18px 0 8px">${esc(tl)}</h3>`; lastTerm = tl; }
-    const t = examTotal(e);
+    const t = examTotal(e), z = zkRate(e);
     h += `<div class="card" data-act="examedit" data-v="${e.id}" style="cursor:pointer"><div class="exam-h"><span class="exam-name">${esc(e.name)}</span><span class="tag ${BIG.includes(e.type)?'big':''}">${esc(e.type)}</span><span class="small faint num">${e.date}</span><span class="spacer"></span><span class="num">${t.s}<span class="faint">/${t.f}</span></span></div><div class="scores">`;
     for (const s of DB.settings.subjects) {
-      const x = e.scores[s.id]; if (!x || x.s === '' || x.s == null) continue;
+      const x = e.scores[s.id]; if (!hasScore(x)) continue;
       const p = prevScore(e, s.id); let delta = '';
       if (p) { const dr = Math.round((x.s/(x.full||100) - p.s/(p.full||100))*100); if (dr) delta = `<span class="small ${dr>0?'up':'down'}">${dr>0?'▲':'▼'}${Math.abs(dr)}</span>`; }
       h += `<span class="sc"><span class="dot" style="background:${s.color}"></span>${esc(s.name)} <span class="v">${x.s}</span><span class="faint small">/${x.full||100}</span>${delta}</span>`;
     }
-    h += `</div>` + ((e.rankClass || e.rankGrade) ? `<div class="small muted" style="margin-top:6px">${e.rankClass?'班级第 '+esc(e.rankClass)+' 名 ':''}${e.rankGrade?'年级第 '+esc(e.rankGrade)+' 名':''}</div>` : '') +
-      (e.adjust ? `<div class="small muted" style="margin-top:4px">→ ${esc(e.adjust)}</div>` : '') + `</div>`;
+    h += `</div><div class="small muted" style="margin-top:6px">` + [z ? `中考口径 ${z.got}/${z.full}（${z.rate}%）` : '', e.rankClass ? '班级第 '+esc(e.rankClass)+' 名' : '', e.rankGrade ? '年级第 '+esc(e.rankGrade)+' 名' : ''].filter(Boolean).join(' · ') + `</div>` +
+      (e.oneThing ? `<div class="small" style="margin-top:4px">→ 下次改：${esc(e.oneThing)}</div>` : '') + `</div>`;
   }
-  return h + `<p class="small faint">▲▼ 是和这科上一次考试比的得分率变化（百分点），不同满分也能比。</p>`;
+  return h + `<p class="small faint">▲▼ 是和这科上一次考试比的得分率变化（百分点）。中考口径 = 各科得分率按深圳中考满分折算，只算本次考了的科目。</p>`;
 }
 function examForm(){
   const isNew = state.examEdit === 'new';
-  const e = isNew ? {date:today(), name:'', type:'单元测验', scores:{}} : DB.exams.find(x => x.id === state.examEdit);
+  const e = isNew ? {id:'new', date:today(), name:'', type:'单元测验', scores:{}, prep:[]} : DB.exams.find(x => x.id === state.examEdit);
   if (!e) { state.examEdit = null; return vExams(); }
+  if (state._examType == null) state._examType = e.type;
+  if (state._prep == null) state._prep = (e.prep||[]).slice();
   const emo = {}; DB.emotions.forEach(x => { if (!emo[x.trigger]) emo[x.trigger] = {n:0, lv:0}; emo[x.trigger].n++; emo[x.trigger].lv += +x.level; });
   const topT = Object.entries(emo).sort((a,b)=>b[1].lv/b[1].n - a[1].lv/a[1].n)[0];
   let h = `<div class="row"><button class="btn sm ghost" data-act="examcancel">‹ 返回</button><h2 style="margin:0">${isNew?'记一次考试':'编辑考试'}</h2></div>`;
-  h += `<div class="tip">和孩子聊成绩之前：${topT ? `你标记过最强的触发点是<b>「${esc(topT[0])}」</b>。` : ''}先问「哪道题最可惜？」，不问「为什么才考这么点」。成绩是诊断材料，不是判决书。</div>`;
+  h += `<div class="tip" style="margin-top:10px">和孩子聊成绩之前：${topT ? `你标记过最强的触发点是<b>「${esc(topT[0])}」</b>。` : ''}先问「哪道题最可惜？」，不问「为什么才考这么点」。</div>`;
   h += `<div class="card examform"><div class="grid2"><div><label class="f">考试名称</label><input type="text" id="ex-name" value="${esc(e.name)}" placeholder="比如：第一单元测验"></div>
     <div><label class="f">日期</label><input type="date" id="ex-date" value="${e.date}"></div></div>
-    <label class="f">类型</label><div class="row" id="ex-type">` + EXAM_T.map(t => `<button class="chip ${e.type===t?'on':''}" data-act="extype" data-v="${t}">${t}</button>`).join('') + `</div>
-    <label class="f" style="margin-top:14px">各科分数（没考的留空）</label>
+    <label class="f">类型</label><div class="row" id="ex-type">` + EXAM_T.map(t => `<button class="chip ${state._examType===t?'on':''}" data-act="extype" data-v="${t}">${t}</button>`).join('') + `</div>
+    <label class="f" style="margin-top:14px">各科分数（没考的留空；满分默认按深圳中考，学校卷不一样就改，下次会记住）</label>
     <div class="srow small faint"><span></span><span>得分</span><span>满分</span></div>`;
-  for (const s of subjects()) {
-    const x = e.scores[s.id] || {};
-    const p = prevScore(Object.assign({}, e, {date: e.date || today()}), s.id);
-    const full = x.full || (p && p.full) || 100;
-    h += `<div class="srow"><span><span class="dot" style="background:${s.color};display:inline-block;margin-right:5px"></span>${esc(s.name)}</span>
+  for (const s of subjects(e.date)) {
+    const x = e.scores[s.id] || {}; const p = prevScore(e, s.id);
+    h += `<div class="srow"><span><span class="dot" style="background:${s.color};margin-right:5px"></span>${esc(s.name)}</span>
       <input type="number" inputmode="decimal" data-ex="s" data-s="${s.id}" value="${x.s ?? ''}">
-      <input type="number" inputmode="decimal" data-ex="full" data-s="${s.id}" value="${full}">
-      <div class="loss"><span class="small faint" style="width:100%">失分（分，可选）</span>` + LOSS.map(l => `<label>${l.s}<input type="number" inputmode="decimal" data-ex="loss" data-s="${s.id}" data-t="${l.k}" value="${x.loss && x.loss[l.k] || ''}"></label>`).join('') + `</div></div>`;
+      <input type="number" inputmode="decimal" data-ex="full" data-s="${s.id}" value="${x.full || (p && p.full) || s.zk || 100}">
+      <div class="loss"><span class="small faint" style="width:100%">丢分归类（分，可选）</span>` + LOSS.map(l => `<label>${l.s}<input type="number" inputmode="decimal" data-ex="loss" data-s="${s.id}" data-t="${l.k}" value="${x.loss && x.loss[l.k] || ''}"></label>`).join('') + `</div></div>`;
   }
   h += `<div class="grid2"><div><label class="f">班级排名（可选）</label><input type="text" id="ex-rc" value="${esc(e.rankClass||'')}"></div><div><label class="f">年级排名（可选）</label><input type="text" id="ex-rg" value="${esc(e.rankGrade||'')}"></div></div>
-    <label class="f">孩子说哪道题最可惜</label><textarea id="ex-talk">${esc(e.talk||'')}</textarea>
-    <label class="f">下一阶段调整什么</label><textarea id="ex-adj">${esc(e.adjust||'')}</textarea>
+    <h3 style="margin:18px 0 0">考后反思</h3>
+    <label class="f">① 考前怎么准备的</label><div class="row" id="ex-prep">` + PREP.map(p => `<button class="chip soft ${state._prep.includes(p)?'on':''}" data-act="exprep" data-v="${p}">${p}</button>`).join('') + `</div>
+    <label class="f">② 孩子说哪道题最可惜（丢分归类填在上面各科里）</label><textarea id="ex-talk">${esc(e.talk||'')}</textarea>
+    <label class="f">③ 下次改哪一件事（只写一件，会出现在首页）</label><input type="text" id="ex-one" value="${esc(e.oneThing||'')}" placeholder="比如：数学先做计算题，做完回头检查一遍符号">
     <div class="row" style="margin-top:14px"><button class="btn primary" data-act="examsave">保存</button><button class="btn ghost" data-act="examcancel">取消</button><span class="spacer"></span>${isNew?'':'<button class="btn danger sm" data-act="examdel">删除</button>'}</div></div>`;
-  state._examType = e.type;
   return h;
 }
 
-/* ---------------- 视图：趋势 ---------------- */
+/* ================= 趋势 ================= */
 function vTrends(){
-  const W = Math.max(300, Math.min(828, (document.documentElement.clientWidth||360) - 64));
-  let h = `<h2>三年趋势</h2><p class="sub">看方法有没有用，看的是方向，不是某一次的高低。</p>`;
-  // 时间轴
+  const W = Math.max(300, Math.min(848, (document.documentElement.clientWidth||360) - 64));
+  let h = `<h2>三年趋势</h2><p class="sub">看方法有没有用，看方向，不看某一次的高低。</p>`;
   const cur = termOf(today(), DB.settings.startYear);
-  const names = ['七上','七下','八上','八下','九上','九下'];
   const cnt = [0,0,0,0,0,0], dcnt = [0,0,0,0,0,0];
   DB.exams.forEach(e => { const t = termOf(e.date, DB.settings.startYear); if (t.idx>=0 && t.idx<6) cnt[t.idx]++; });
-  Object.keys(DB.days).forEach(d => { const t = termOf(d, DB.settings.startYear); if (t.idx>=0 && t.idx<6 && dayHasData(DB.days[d])) dcnt[t.idx]++; });
-  h += `<div class="card"><h3>初中三年</h3><div class="terms">` + names.map((n,i) => `<div class="${i===cur.idx?'now':i<cur.idx?'past':''}">${n}<b>${dcnt[i]||'·'}</b>${cnt[i]?cnt[i]+'次考试':''}</div>`).join('') + `</div><p class="small faint" style="margin:8px 0 0">格子里的数字 = 记录天数</p></div>`;
-  // 考试得分率
+  Object.keys(DB.days).forEach(d => { const t = termOf(d, DB.settings.startYear); if (t.idx>=0 && t.idx<6 && dayHasData(d)) dcnt[t.idx]++; });
+  const y0 = DB.settings.startYear;
+  h += `<div class="card"><h3>初中三年</h3><div class="terms">` + TERM_N.map((n,i) => `<div class="${i===cur.idx?'now':i<cur.idx?'past':''}">${n}<b>${dcnt[i]||'·'}</b>${cnt[i]?cnt[i]+'次考试':'&nbsp;'}</div>`).join('') + `</div>
+    <p class="small faint" style="margin:8px 0 10px">格子里的数字 = 记录天数</p>
+    <div class="ms"><span class="when">${y0+1} 秋 八上</span><span>物理开课（科目自动出现）</span></div>
+    <div class="ms"><span class="when">${y0+2} 春 八下</span><span><b>生物学 + 地理合卷考</b>：各 50 分，不计中考总分，但总分相同时排第一位比较，没有成绩不能投档</span></div>
+    <div class="ms"><span class="when">${y0+2} 秋 九上</span><span>化学开课</span></div>
+    <div class="ms"><span class="when">${y0+3} 4–6月</span><span>体育现场考 4 月 · 英语听说 5 月 · 理化实验 5 月 · 笔试 6 月下旬（按 2026 年安排推算，以当年通知为准）</span></div>
+    <p class="small faint" style="margin:8px 0 0">深圳中考 630 分：语文 120 · 数学 100 · 英语 100（含听说 25）· 物理 70 · 化学 50 · 理化实验 20 · 历史 70 · 道法 50 · 体育 50。</p></div>`;
+  const room = [];
+  for (const s of DB.settings.subjects) {
+    if (!s.inTotal) continue;
+    const ex = DB.exams.filter(e => hasScore(e.scores[s.id])).sort((a,b)=>a.date<b.date?1:-1).slice(0,2);
+    if (!ex.length) continue;
+    const rate = sum(ex.map(e => e.scores[s.id].s/(e.scores[s.id].full||100)))/ex.length;
+    room.push({s, rate, lost: s.zk*(1-rate)});
+  }
+  if (room.length) {
+    room.sort((a,b)=>b.lost-a.lost); const mx = Math.max(...room.map(r=>r.lost), 1);
+    h += `<div class="card"><h3>提分空间（按中考分值）</h3><p class="small muted" style="margin:0 0 8px">最近两次考试的平均得分率，折成中考分数后还差多少。差得多不等于最好提，但能看出每科的分量。</p>` +
+      room.map(r => `<div class="row" style="flex-wrap:nowrap;margin:6px 0"><span style="width:48px;white-space:nowrap"><span class="dot" style="background:${r.s.color}"></span> ${esc(r.s.name)}</span><div class="bar" style="flex:1;height:12px"><i style="width:${r.lost/mx*100}%;background:${r.s.color}"></i></div><span class="small num" style="width:112px;text-align:right">${Math.round(r.rate*100)}% · 差 ${Math.round(r.lost)} 分</span></div>`).join('') +
+      `<p class="small faint" style="margin:8px 0 0">得分率每提高 10 个百分点：语文 +12 分，数学、英语 +10 分，历史 +7 分，道法 +5 分。</p></div>`;
+  }
   let ex = DB.exams.slice().sort((a,b)=>a.date<b.date?-1:1);
   if (state.trendBig) ex = ex.filter(e => BIG.includes(e.type));
-  h += `<div class="card"><div class="row"><h3 style="margin:0">考试得分率</h3><span class="spacer"></span><div class="seg"><button data-act="tbig" data-v="0" class="${!state.trendBig?'on':''}">全部</button><button data-act="tbig" data-v="1" class="${state.trendBig?'on':''}">只看大考</button></div></div>`;
-  h += `<div class="row" style="margin:10px 0 4px">` + subjects().map(s => `<button class="chip soft ${state.trendHide[s.id]?'':'on'}" data-act="thide" data-v="${s.id}"><span class="dot" style="background:${s.color};display:inline-block;margin-right:5px"></span>${esc(s.name)}</button>`).join('') + `</div>`;
+  h += `<div class="card"><div class="row"><h3 style="margin:0">考试得分率</h3><span class="spacer"></span><div class="seg sm"><button data-act="tbig" data-v="0" class="${!state.trendBig?'on':''}">全部</button><button data-act="tbig" data-v="1" class="${state.trendBig?'on':''}">只看大考</button></div></div>`;
+  const shownSubs = DB.settings.subjects.filter(s => DB.exams.some(e => hasScore(e.scores[s.id])));
+  h += `<div class="row" style="margin:10px 0 4px">` + shownSubs.map(s => `<button class="chip soft ${state.trendHide[s.id]?'':'on'}" data-act="thide" data-v="${s.id}"><span class="dot" style="background:${s.color};margin-right:5px"></span>${esc(s.name)}</button>`).join('') + `<button class="chip soft ${state.trendHide.__zk?'':'on'}" data-act="thide" data-v="__zk">中考口径</button></div>`;
   if (ex.length < 2) h += `<div class="empty">至少要 2 次考试才画得出线</div>`;
   else {
-    const series = subjects().filter(s => !state.trendHide[s.id]).map(s => ({color:s.color, name:s.name, pts: ex.map((e,i) => { const x = e.scores[s.id]; return x && x.s !== '' && x.s != null ? {i, y: x.s/(x.full||100)*100, v:x.s} : null; }).filter(Boolean)}));
+    const series = shownSubs.filter(s => !state.trendHide[s.id]).map(s => ({color:s.color, name:s.name, pts: ex.map((e,i) => { const x = e.scores[s.id]; return hasScore(x) ? {i, y: x.s/(x.full||100)*100, v:x.s} : null; }).filter(Boolean)}));
+    if (!state.trendHide.__zk) series.push({color:'var(--ink)', name:'中考口径', dash:true, pts: ex.map((e,i) => { const z = zkRate(e); return z ? {i, y:z.rate, v:z.got+'/'+z.full} : null; }).filter(Boolean)});
     h += lineChart(series, ex.map(e => mdShort(e.date)), W, 240);
   }
   h += `</div>`;
-  // 月度：日均用时 & 错题类型
-  const months = []; const allD = Object.keys(DB.days).sort();
+  const months = []; const allD = Object.keys(DB.days).concat(Object.keys(IDX)).sort();
   if (allD.length) { let m = mKey(allD[0]); const end = mKey(today()); while (m <= end) { months.push(m); m = addM(m,1); } }
   const ms = months.slice(-12).map(m => ({m, st: stats(m+'-01', monthEnd(m) < today() ? monthEnd(m) : today())}));
-  h += `<div class="card"><h3>每月日均学习分钟（按科目）</h3>` + (ms.length ? stackBars(ms.map(x => ({label: +x.m.slice(5)+'月', parts: subjects().map(s => ({c:s.color, v: x.st.recDays ? x.st.S[s.id].min / x.st.recDays : 0}))})), W, 190, false) +
-    `<div class="legend">` + subjects().map(s=>`<span><i class="sw" style="background:${s.color}"></i>${esc(s.name)}</span>`).join('') + `</div>` : '<div class="empty">还没有记录</div>') + `</div>`;
+  const subsNow = subjects();
+  h += `<div class="card"><h3>每月日均学习分钟（按科目）</h3>` + (ms.length ? stackBars(ms.map(x => ({label: +x.m.slice(5)+'月', parts: subsNow.map(s => ({c:s.color, v: x.st.recDays ? x.st.S[s.id].min / x.st.recDays : 0}))})), W, 190, false, 90) +
+    `<div class="legend">` + subsNow.map(s=>`<span><i class="sw" style="background:${s.color}"></i>${esc(s.name)}</span>`).join('') + `</div><p class="small faint" style="margin:6px 0 0">琥珀色虚线是教育部规定的初中书面作业上限 90 分钟。</p>` : '<div class="empty">还没有记录</div>') + `</div>`;
   h += `<div class="card"><h3>每月错题类型占比</h3>` + (ms.length ? stackBars(ms.map(x => ({label: +x.m.slice(5)+'月', top: x.st.errN, parts: ET.map(t => ({c:ET_COLOR[t.k], v: x.st.errs[t.k]}))})), W, 190, true) +
-    `<div class="legend">` + ET.map(t=>`<span><i class="sw" style="background:${ET_COLOR[t.k]}"></i>${t.n}</span>`).join('') + `</div><p class="small faint" style="margin:6px 0 0">柱顶数字是当月错题数。看颜色比例的变化：概念混淆的占比在缩小，比错题总数下降更说明问题。</p>` : '<div class="empty">还没有记录</div>') + `</div>`;
-  // 中断率
+    `<div class="legend">` + ET.map(t=>`<span><i class="sw" style="background:${ET_COLOR[t.k]}"></i>${t.n}</span>`).join('') + `</div><p class="small faint" style="margin:6px 0 0">柱顶数字是当月错题数。概念混淆的占比缩小，比错题总数下降更说明问题。</p>` : '<div class="empty">还没有记录</div>') + `</div>`;
   if (ms.length) {
     h += `<div class="card"><h3>每月中断率</h3><div class="tablewrap"><table><tr><th>科目</th>` + ms.map(x=>`<th class="n">${+x.m.slice(5)}月</th>`).join('') + `</tr>`;
-    for (const s of subjects()) h += `<tr><td>${esc(s.name)}</td>` + ms.map(x => { const y = x.st.S[s.id]; return `<td class="n">${y.recOn ? pct(y.intrN, y.recOn)+'%' : '·'}</td>`; }).join('') + `</tr>`;
+    for (const s of subsNow) h += `<tr><td>${esc(s.name)}</td>` + ms.map(x => { const y = x.st.S[s.id]; return `<td class="n">${y.recOn ? pct(y.intrN, y.recOn)+'%' : '·'}</td>`; }).join('') + `</tr>`;
     h += `</table></div></div>`;
   }
   return h;
 }
 function lineChart(series, xl, W, H){
-  const L = 34, R = 12, T = 12, B = 28, n = xl.length;
+  const L = 34, R = 14, T = 12, B = 28, n = xl.length;
   const X = i => L + (n === 1 ? (W-L-R)/2 : i*(W-L-R)/(n-1)), Y = v => T + (100 - v)*(H-T-B)/100;
   let s = `<svg class="chart" width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="考试得分率折线图">`;
   for (const g of [0,20,40,60,80,100]) s += `<line x1="${L}" x2="${W-R}" y1="${Y(g)}" y2="${Y(g)}" stroke="var(--line)" ${g===60?'stroke-dasharray="4 3"':''}/><text x="${L-6}" y="${Y(g)+4}" font-size="11" text-anchor="end">${g}</text>`;
@@ -742,45 +1102,39 @@ function lineChart(series, xl, W, H){
   xl.forEach((l,i) => { if (i % step === 0 || i === n-1) s += `<text x="${X(i)}" y="${H-8}" font-size="11" text-anchor="middle">${esc(l)}</text>`; });
   for (const se of series) {
     if (!se.pts.length) continue;
-    s += `<polyline fill="none" stroke="${se.color}" stroke-width="2.2" stroke-linejoin="round" points="${se.pts.map(p=>X(p.i)+','+Y(p.y)).join(' ')}"/>`;
-    for (const p of se.pts) s += `<circle cx="${X(p.i)}" cy="${Y(p.y)}" r="3.5" fill="${se.color}"><title>${esc(se.name)} ${xl[p.i]}：${p.v}（${Math.round(p.y)}%）</title></circle>`;
-    const last = se.pts[se.pts.length-1];
-    if (W > 420) s += `<text x="${Math.min(X(last.i)+6, W-R)}" y="${Y(last.y)-6}" font-size="11" style="fill:${se.color}">${esc(se.name)}</text>`;
+    s += `<polyline fill="none" stroke="${se.color}" stroke-width="${se.dash?1.6:2.2}" ${se.dash?'stroke-dasharray="5 4"':''} stroke-linejoin="round" points="${se.pts.map(p=>X(p.i)+','+Y(p.y)).join(' ')}"/>`;
+    for (const p of se.pts) s += `<circle cx="${X(p.i)}" cy="${Y(p.y)}" r="${se.dash?2.5:3.5}" fill="${se.color}"><title>${esc(se.name)} ${xl[p.i]}：${p.v}（${Math.round(p.y)}%）</title></circle>`;
   }
   return s + `</svg>`;
 }
-function stackBars(groups, W, H, share){
+function stackBars(groups, W, H, share, refLine){
   const L = 42, R = 8, T = 16, B = 24, n = groups.length;
   const bw = Math.min(40, (W-L-R)/n*0.62), gap = (W-L-R)/n;
-  const max = share ? 100 : Math.max(10, ...groups.map(g => sum(g.parts.map(p=>p.v))));
+  const max = share ? 100 : Math.max(refLine||10, ...groups.map(g => sum(g.parts.map(p=>p.v))));
   const niceMax = share ? 100 : Math.ceil(max/30)*30;
   const Y = v => T + (niceMax - v)*(H-T-B)/niceMax;
   let s = `<svg class="chart" width="100%" viewBox="0 0 ${W} ${H}" role="img">`;
-  const ticks = share ? [0,50,100] : [0, niceMax/2, niceMax];
-  for (const g of ticks) s += `<line x1="${L}" x2="${W-R}" y1="${Y(g)}" y2="${Y(g)}" stroke="var(--line)"/><text x="${L-6}" y="${Y(g)+4}" font-size="11" text-anchor="end">${Math.round(g)}${share?'%':''}</text>`;
+  for (const g of (share ? [0,50,100] : [0, niceMax/2, niceMax])) s += `<line x1="${L}" x2="${W-R}" y1="${Y(g)}" y2="${Y(g)}" stroke="var(--line)"/><text x="${L-6}" y="${Y(g)+4}" font-size="11" text-anchor="end">${Math.round(g)}${share?'%':''}</text>`;
+  if (refLine && !share) s += `<line x1="${L}" x2="${W-R}" y1="${Y(refLine)}" y2="${Y(refLine)}" stroke="var(--amber)" stroke-dasharray="5 4"/>`;
   groups.forEach((g, i) => {
-    const x = L + gap*i + (gap-bw)/2; const tot = sum(g.parts.map(p=>p.v));
-    let acc = 0;
+    const x = L + gap*i + (gap-bw)/2; const tot = sum(g.parts.map(p=>p.v)); let acc = 0;
     for (const p of g.parts) { if (!p.v) continue; const v = share ? p.v/tot*100 : p.v; s += `<rect x="${x}" y="${Y(acc+v)}" width="${bw}" height="${Math.max(0, Y(acc)-Y(acc+v)-1)}" fill="${p.c}" rx="2"/>`; acc += v; }
     s += `<text x="${x+bw/2}" y="${H-7}" font-size="11" text-anchor="middle">${esc(g.label)}</text>`;
-    const top = share ? g.top : Math.round(tot);
-    if (tot) s += `<text x="${x+bw/2}" y="${Y(acc)-4}" font-size="10.5" text-anchor="middle">${top}</text>`;
+    if (tot) s += `<text x="${x+bw/2}" y="${Y(acc)-4}" font-size="10.5" text-anchor="middle">${share ? g.top : Math.round(tot)}</text>`;
   });
   return s + `</svg>`;
 }
 
-/* ---------------- 视图：家长 ---------------- */
+/* ================= 家长 ================= */
 function vMe(){
   let h = `<h2>家长区</h2>`;
-  if (DB.settings.pin && !state.unlocked) {
-    return h + `<div class="card"><p class="muted">情绪标记是写给自己看的，输入 4 位密码进入。</p><div class="row"><input type="password" inputmode="numeric" maxlength="4" id="pin" style="width:140px"><button class="btn primary" data-act="unlock">进入</button></div></div>` + methodCard();
-  }
-  // 情绪标记
+  if (DB.settings.pin && !state.unlocked) return h + `<div class="card"><p class="muted">情绪标记和设置是写给自己看的，输入 4 位密码进入。</p><div class="row"><input type="password" inputmode="numeric" maxlength="4" id="pin" style="width:140px"><button class="btn primary" data-act="unlock">进入</button></div></div>` + methodCard();
   const emo = DB.emotions.slice().sort((a,b)=>a.date<b.date?1:-1);
-  h += `<div class="card"><h3>情绪标记</h3><p class="small muted" style="margin:0 0 8px">记的是<b>我自己</b>什么时候被触发，不是孩子做错了什么。标记过的触发点，下次出现时会多一个停顿。</p>
-    <label class="f">什么情境</label><div class="row" id="emo-tr">` + TRIGGERS.map(t => `<button class="chip ${state._tr===t?'on':''}" data-act="emotr" data-v="${esc(t)}">${esc(t)}</button>`).join('') + `</div>
+  h += `<div class="cols"><div>`;
+  h += `<div class="card"><h3>情绪标记</h3><p class="small muted" style="margin:0 0 8px">记的是<b>我自己</b>什么时候被触发，不是孩子做错了什么。家长焦虑高、又经常辅导时，孩子学得更少（Maloney 2015）。标记过的触发点，下次出现时会多一个停顿。</p>
+    <label class="f">什么情境</label><div class="row">` + TRIGGERS.map(t => `<button class="chip ${state._tr===t?'on':''}" data-act="emotr" data-v="${esc(t)}">${esc(t)}</button>`).join('') + `</div>
     <input type="text" id="emo-custom" placeholder="或者自己写" style="margin-top:8px" value="${esc(state._trc||'')}">
-    <label class="f">情绪强度</label><div class="seg" id="emo-lv">` + [1,2,3,4,5].map(n => `<button data-act="emolv" data-v="${n}" class="${state._lv===n?'on':''}">${n}</button>`).join('') + `</div>
+    <label class="f">情绪强度</label><div class="seg">` + [1,2,3,4,5].map(n => `<button data-act="emolv" data-v="${n}" class="${state._lv===n?'on':''}">${n}</button>`).join('') + `</div>
     <label class="f">当时停住了吗（从焦虑到开口之间，有没有停一下）</label><div class="seg">` + [['1','停住了'],['0','没停住']].map(([k,n]) => `<button data-act="emops" data-v="${k}" class="${state._ps===k?'on':''}">${n}</button>`).join('') + `</div>
     <label class="f">备注（可选）</label><input type="text" id="emo-note">
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="emoadd">记下</button></div></div>`;
@@ -788,78 +1142,110 @@ function vMe(){
     const agg = {}; emo.forEach(e => { const a = agg[e.trigger] = agg[e.trigger] || {n:0, lv:0, p:0}; a.n++; a.lv += +e.level; a.p += e.paused?1:0; });
     h += `<div class="card"><h3>我的触发点</h3><div class="tablewrap"><table><tr><th>情境</th><th class="n">次数</th><th class="n">平均强度</th><th class="n">停住</th></tr>` +
       Object.entries(agg).sort((a,b)=>b[1].lv/b[1].n - a[1].lv/a[1].n).map(([k,a]) => `<tr><td>${esc(k)}</td><td class="n">${a.n}</td><td class="n">${(a.lv/a.n).toFixed(1)}</td><td class="n">${a.p}/${a.n}</td></tr>`).join('') + `</table></div>
-      <p class="small faint" style="margin:6px 0 0">「停住」的比例在上升，比强度下降更早出现，也更重要。</p></div>`;
+      <p class="small faint" style="margin:6px 0 0">「停住」的比例上升，比强度下降出现得更早。</p></div>`;
     h += `<div class="card"><h3>最近记录</h3>` + emo.slice(0,10).map(e => `<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="small faint num">${mdShort(e.date)}</span><span>${esc(e.trigger)}</span><span class="small muted">强度 ${e.level}${e.paused?' · 停住了':''}</span>${e.note?`<span class="small faint">${esc(e.note)}</span>`:''}<span class="spacer"></span><button class="btn sm ghost" data-act="emodel" data-v="${e.id}">删</button></div>`).join('') + `</div>`;
   }
-  h += methodCard();
-  // 设置
+  h += methodCard() + `</div><div>`;
+  h += syncCard();
   const s = DB.settings;
   h += `<div class="card"><h3>设置</h3>
     <div class="grid2"><div><label class="f">孩子的称呼</label><input type="text" data-in="set" data-f="child" value="${esc(s.child)}"></div>
     <div><label class="f">七年级入学年份</label><input type="number" data-in="set" data-f="startYear" value="${s.startYear}"></div></div>
-    <label class="f">科目（点名字改名，可隐藏；隐藏不会删除历史）</label>` +
-    s.subjects.map(x => `<div class="row" style="margin:5px 0;flex-wrap:nowrap"><span class="dot" style="background:${x.color}"></span><input type="text" data-in="sname" data-s="${x.id}" value="${esc(x.name)}" style="flex:1"><button class="chip ${x.hidden?'':'on'}" data-act="shide" data-v="${x.id}">${x.hidden?'已隐藏':'显示中'}</button></div>`).join('') +
-    `<div class="row" style="margin-top:8px"><input type="text" id="newsubj" placeholder="新科目，比如：物理" style="flex:1"><button class="btn sm" data-act="saddsub">添加</button></div>
+    <label class="f">科目（「自动」按学段出现：物理八上起、化学九上起、生地到八下会考为止）</label>` +
+    s.subjects.map(x => `<div class="row" style="margin:5px 0;flex-wrap:nowrap"><span class="dot" style="background:${x.color}"></span><input type="text" data-in="sname" data-s="${x.id}" value="${esc(x.name)}" style="flex:1;min-width:0;padding:6px 9px"><span class="small faint" style="white-space:nowrap">${TERM_N[x.from]||''}–${TERM_N[x.to]||''}</span><div class="seg sm">` +
+      [['auto','自动'],['on','显示'],['off','隐藏']].map(([k,n]) => `<button data-act="smode" data-s="${x.id}" data-v="${k}" class="${(x.mode||'auto')===k?'on':''}">${n}</button>`).join('') + `</div></div>`).join('') +
+    `<div class="row" style="margin-top:8px"><input type="text" id="newsubj" placeholder="新科目" style="flex:1"><button class="btn sm" data-act="saddsub">添加</button></div>
     <label class="f">家长区密码（4 位数字，留空=不设）</label><div class="row"><input type="password" inputmode="numeric" maxlength="4" id="newpin" style="width:140px" placeholder="${s.pin?'已设置':''}"><button class="btn sm" data-act="setpin">保存密码</button></div></div>`;
-  // 数据
-  h += `<div class="card"><h3>数据与备份</h3>
-    <p class="small muted" style="margin:0 0 8px">所有记录只存在这台设备的浏览器里。三年很长，换设备、清缓存都会丢——<b>每周导出一次</b>，把文件发到飞书私聊存档。iPad 上请在 Safari 里点「分享 → 添加到主屏幕」，从主屏幕打开，Safari 就不会自动清理数据。</p>
-    <p class="small">上次备份：${s.lastBackup ? esc(s.lastBackup.slice(0,10)) : '从未'} · 已记录 ${Object.keys(DB.days).filter(d=>dayHasData(DB.days[d])).length} 天 · ${DB.exams.length} 次考试</p>
-    <div class="row"><button class="btn primary" data-act="export">导出备份文件</button><button class="btn" data-act="copy">复制备份文本</button><label class="btn" style="display:inline-flex;align-items:center">从文件恢复<input type="file" accept=".json,application/json" id="importf" style="display:none"></label></div>
+  const nDays = Object.keys(DB.days).filter(d=>dayHasData(d)).length;
+  h += `<div class="card"><h3>备份文件</h3>
+    <p class="small muted" style="margin:0 0 8px">已记录 ${nDays} 天 · ${DB.items.length} 道错题 · ${DB.exams.length} 次考试 · 上次导出：${s.lastBackup ? esc(s.lastBackup.slice(0,10)) : '从未'}。开了云同步也建议每学期导出一份留底。</p>
+    <div class="row"><button class="btn" data-act="export">导出备份文件</button><button class="btn" data-act="copy">复制备份文本</button><label class="btn" style="display:inline-flex;align-items:center">从文件恢复<input type="file" accept=".json,application/json" id="importf" style="display:none"></label></div>
     <details style="margin-top:10px"><summary class="small muted">粘贴备份文本恢复</summary><textarea id="importt" placeholder="把备份文本粘贴在这里"></textarea><button class="btn sm" data-act="importtext" style="margin-top:6px">恢复</button></details>
-    <div class="row" style="margin-top:14px"><a class="small" href="?demo" style="color:var(--accent)">打开示例模式看看效果</a><span class="spacer"></span>${DEMO?'':'<button class="btn danger sm" data-act="wipe">清空全部数据</button>'}</div></div>`;
-  return h;
+    <p class="small faint" style="margin:10px 0 0">iPad 主屏幕上的图标和 Safari 里的网页是两份独立的存储。装到主屏幕之前在 Safari 里记过的数据，要先在 Safari 里「复制备份文本」，再到主屏幕 app 里粘贴恢复；开了云同步则会自动合并。</p>
+    <div class="row" style="margin-top:12px"><a class="small" href="?demo" style="color:var(--accent)">打开示例模式看看效果</a><span class="spacer"></span>${DEMO?'':'<button class="btn danger sm" data-act="wipe">清空本机数据</button>'}</div></div>`;
+  return h + `</div></div>`;
+}
+function syncCard(){
+  if (DEMO) return `<div class="card"><h3>云同步</h3><p class="small muted" style="margin:0">示例模式不同步。</p></div>`;
+  const on = syncReady();
+  return `<div class="card"><h3>云同步 ${on ? `<span class="pill ${SYNC.err?'amber':'good'}">${SYNC.err ? '出错' : '已开启'}</span>` : '<span class="pill">未开启</span>'}</h3>
+    <p class="small muted" style="margin:0 0 8px">加密后存进你自己的 GitHub 私有仓库。iPad 和电脑填同一套设置，数据自动合并；每次同步都留一个版本，三年都能回看。口令只在你的设备上，GitHub 上只有看不懂的密文。</p>
+    ${SYNC.err ? `<div class="signal"><span class="k">上次同步失败</span>${esc(SYNC.err)}</div>` : on && SYNC.last ? `<p class="small">上次同步：${new Date(SYNC.last).toLocaleString('zh-CN')}</p>` : ''}
+    <label class="f">仓库（用户名/仓库名）</label><input type="text" id="sy-repo" value="${esc(SYNC.repo||'')}" placeholder="cditlimei/observer-data" autocapitalize="off" autocorrect="off">
+    <label class="f">访问令牌（fine-grained token）</label><input type="password" id="sy-token" value="${esc(SYNC.token||'')}" placeholder="github_pat_…" autocomplete="off">
+    <label class="f">加密口令（每台设备填一样的；忘了就解不开，请记在别处）</label><input type="password" id="sy-pass" value="${esc(SYNC.pass||'')}" autocomplete="off">
+    <div class="row" style="margin-top:12px"><button class="btn primary" data-act="syncsave">保存并同步</button>${on ? '<button class="btn" data-act="syncnow">立即同步</button><button class="btn ghost danger" data-act="syncoff">关闭同步</button>' : ''}</div>
+    <details style="margin-top:12px"><summary class="small muted">怎么拿到仓库和令牌（一次性，约 5 分钟）</summary><ol class="guide">
+      <li>登录 github.com → 右上角「+」→ New repository，名字填 <b>observer-data</b>，选 <b>Private</b>，创建。</li>
+      <li>头像 → Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token。</li>
+      <li>Expiration 选 1 年；Repository access 选 <b>Only select repositories</b> → observer-data。</li>
+      <li>Permissions → Repository permissions → <b>Contents</b> 选 Read and write，其他不动，生成后复制。</li>
+      <li>把仓库名、令牌、自己定的口令填进上面三格。电脑和 iPad 各填一次。</li></ol>
+      <p class="small faint">令牌只能读写这一个私有仓库。到期前 GitHub 会发邮件，重新生成一个填进来即可。</p></details></div>`;
 }
 function methodCard(){
   return `<details class="card"><summary><h3 style="display:inline">这套方法怎么用</h3></summary>
-  <p class="small muted">来自《陪考手记》第 12 章。四件工具都不需要懂学科，也不直接讲任何一道题。它们把家长从「第二个老师」换到「学习管理者」的位置。</p>
+  <p class="small muted">来自《陪考手记》第 12 章，并按 2026 年 9 月查到的研究证据做了调整。家长的位置从「第二个老师」换到「学习管理者」。</p>
   <table class="methods small"><tr><th>工具</th><th>把这句话…</th><th>…翻译成</th></tr>
   <tr><td>错题索引</td><td>又错了</td><td>哪一类错误在增加</td></tr>
+  <tr><td>错题重做</td><td>讲过多少遍了</td><td>盖住答案，隔几天自己再做一遍</td></tr>
   <tr><td>时间记录</td><td>学习不认真</td><td>实际用时和锚点差多少、在哪里中断</td></tr>
   <tr><td>复盘对话</td><td>你就是不努力</td><td>你卡在哪一步</td></tr>
   <tr><td>情绪标记</td><td>我快被气死了</td><td>我的哪个触发点被激活了</td></tr></table>
-  <p class="small"><b>每天</b>：孩子自己填两分钟，你只问一句「哪一步最不确定」。<br><b>每周日</b>：看「复盘 → 周」，写一句发现，下周只调一件事。<br><b>每月底</b>：看「复盘 → 月」和「趋势」，定一个下个月能观察到的变化。<br><b>每次考试</b>：先看家长区自己的触发点，再和孩子聊。</p>
-  <p class="small faint">工具一旦用来监控和审判，就会变成对抗的导火索。错题本用来诊断，时间表用来观察，对话用来提问，情绪表用来自我觉察。</p></details>`;
+  <p class="small"><b>每天</b>：孩子自己计时、自己填，再重做 3 道到期错题；你只问一句。<br><b>每周日</b>：看「复盘 → 周」，写一句发现，下周只调一件事。<br><b>每月底</b>：看「复盘 → 月」和「趋势」，定一个下个月能观察到的变化。<br><b>每次考试</b>：先看自己的触发点，再和孩子聊；填完三段反思。</p>
+  <p class="small"><b>刻意不做的</b>：家长批改打分（初中阶段家长干涉型参与和数学成绩负相关）、积分徽章和鼓励语打卡（成长型思维干预总体效应很小）、把「学得更久」当进步（数学作业时长和成绩是倒 U 形）。</p>
+  <p class="small faint">工具一旦用来监控和审判，就会变成对抗的导火索。</p></details>`;
 }
 
-/* ---------------- 事件 ---------------- */
-function setTab(t){ state.tab = t; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0); }
+/* ================= 事件 ================= */
+function setTab(t){ state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0); }
 const ACT = {
   tab: el => setTab(el.dataset.v),
-  day: el => { const v = +el.dataset.v; state.date = v === 0 ? today() : addD(state.date, v); if (state.date > today()) state.date = today(); render(); },
-  mood: el => { const dd = dayObj(state.date, true); dd.mood = dd.mood === el.dataset.v ? '' : el.dataset.v; save(); render(); },
-  nextq: () => { const dd = dayObj(state.date, true); const cur = dd.q || QUESTIONS[(P(state.date).getTime()/864e5|0) % QUESTIONS.length]; dd.q = QUESTIONS[(QUESTIONS.indexOf(cur)+1) % QUESTIONS.length]; save(); render(); },
-  none: el => { const r = rec(state.date, el.dataset.s, true); r.none = !r.none; save(); render(); },
+  day: (el, e) => { e.preventDefault(); const v = +el.dataset.v; state.date = v === 0 ? today() : addD(state.date, v); if (state.date > today()) state.date = today(); state.openSubj = null; render(); },
+  goday: el => { state.date = el.dataset.v; state.openSubj = null; render(); },
+  scroll: el => { const t = document.getElementById(el.dataset.v); if (t) window.scrollTo({top: t.getBoundingClientRect().top + scrollY - 70, behavior:'smooth'}); },
+  sopen: el => { state.openSubj = state.openSubj === el.dataset.s ? null : el.dataset.s; render(); },
+  mood: el => { const dd = touchDay(state.date); dd.mood = dd.mood === el.dataset.v ? '' : el.dataset.v; save(); render(); },
+  nextq: () => { const dd = touchDay(state.date); const cur = dd.q || QUESTIONS[(P(state.date).getTime()/864e5|0) % QUESTIONS.length]; dd.q = QUESTIONS[(QUESTIONS.indexOf(cur)+1) % QUESTIONS.length]; save(); render(); },
+  none: el => { const r = rec(state.date, el.dataset.s, true); r.none = !r.none; if (r.none) state.openSubj = null; save(); render(); },
   min: el => { const r = rec(state.date, el.dataset.s, true); r.min = Math.max(0, (r.min||0) + +el.dataset.v); save(); render(); },
   minset: el => { const r = rec(state.date, el.dataset.s, true); const v = +el.dataset.v; r.min = r.min === v ? 0 : v; save(); render(); },
   intr: el => { const r = rec(state.date, el.dataset.s, true); r.intr = el.dataset.v; save(); render(); },
-  err: el => { const r = rec(state.date, el.dataset.s, true); r.errs = r.errs || {}; r.errs[el.dataset.t] = Math.max(0, (r.errs[el.dataset.t]||0) + +el.dataset.v); save(); render(); },
+  additem: el => { touchDay(state.date); DB.items.push({id:uid('i'), d:state.date, sid:el.dataset.s, type:el.dataset.t, conf:null, tag:'', box:0, due:addD(state.date, BOXES[0]), hist:[], done:false, u:now()}); save(); render(); },
+  delitem: el => { delRec('items', el.dataset.v); touchDay(state.date); save(); render(); },
+  conf: el => { const it = DB.items.find(x => x.id === el.dataset.v); it.conf = it.conf === el.dataset.c ? null : el.dataset.c; it.u = now(); save(); render(); },
+  tstart: el => timerStart(el.dataset.s),
+  tpause: () => timerPause(),
+  tstop: () => timerStop(),
+  ev: el => { state.errView = el.dataset.v; render(); },
+  redo: el => redoItem(el.dataset.v, el.dataset.ok === '1'),
+  skipitem: el => { if (!confirm('找不到原题，就把这道移出重做队列？')) return; const it = DB.items.find(x => x.id === el.dataset.v); it.done = true; it.skipped = true; it.u = now(); save(); render(); },
+  alldue: (el, e) => { e.preventDefault(); state.showAllDue = true; render(); },
   errp: el => { state.errPeriod = el.dataset.v; render(); },
   rv: el => { state.review = el.dataset.v; render(); },
   wk: el => { state.week = addD(state.week, +el.dataset.v); render(); },
   wkgo: (el, e) => { e.preventDefault(); state.week = el.dataset.v; state.review = 'week'; render(); window.scrollTo(0,0); },
   mo: el => { state.month = addM(state.month, +el.dataset.v); render(); },
-  examnew: () => { state.examEdit = 'new'; render(); window.scrollTo(0,0); },
-  examedit: el => { state.examEdit = el.dataset.v; render(); window.scrollTo(0,0); },
+  examnew: () => { state.examEdit = 'new'; state._examType = null; state._prep = null; render(); window.scrollTo(0,0); },
+  examedit: el => { state.examEdit = el.dataset.v; state._examType = null; state._prep = null; render(); window.scrollTo(0,0); },
   examcancel: () => { state.examEdit = null; render(); },
   extype: el => { state._examType = el.dataset.v; document.querySelectorAll('#ex-type .chip').forEach(c => c.classList.toggle('on', c.dataset.v === el.dataset.v)); },
+  exprep: el => { const p = el.dataset.v, a = state._prep; const i = a.indexOf(p); if (i >= 0) a.splice(i,1); else a.push(p); el.classList.toggle('on', i < 0); },
   examsave: () => {
     const name = $('#ex-name').value.trim(), date = $('#ex-date').value;
     if (!date) return toast('请填日期');
     const scores = {};
     document.querySelectorAll('[data-ex]').forEach(inp => {
-      const sid = inp.dataset.s, f = inp.dataset.ex; const x = scores[sid] = scores[sid] || {loss:{}};
-      const v = inp.value.trim();
+      const sid = inp.dataset.s, f = inp.dataset.ex; const x = scores[sid] = scores[sid] || {loss:{}}; const v = inp.value.trim();
       if (f === 'loss') { if (v !== '') x.loss[inp.dataset.t] = +v; } else x[f] = v === '' ? '' : +v;
     });
-    for (const k in scores) if (scores[k].s === '' || scores[k].s == null) delete scores[k];
+    for (const k in scores) if (!hasScore(scores[k])) delete scores[k];
     if (!Object.keys(scores).length) return toast('至少填一科分数');
-    const obj = {date, name: name || state._examType, type: state._examType, scores, rankClass: $('#ex-rc').value.trim(), rankGrade: $('#ex-rg').value.trim(), talk: $('#ex-talk').value.trim(), adjust: $('#ex-adj').value.trim()};
-    if (state.examEdit === 'new') DB.exams.push(Object.assign({id: 'e'+Date.now()}, obj));
-    else Object.assign(DB.exams.find(x => x.id === state.examEdit), obj);
+    const obj = {date, name: name || state._examType, type: state._examType, scores, prep: state._prep.slice(), rankClass: $('#ex-rc').value.trim(), rankGrade: $('#ex-rg').value.trim(), talk: $('#ex-talk').value.trim(), oneThing: $('#ex-one').value.trim(), u: now()};
+    if (state.examEdit === 'new') DB.exams.push(Object.assign({id: uid('e')}, obj)); else Object.assign(DB.exams.find(x => x.id === state.examEdit), obj);
     save(); state.examEdit = null; toast('考试已保存'); render();
   },
-  examdel: () => { if (!confirm('删除这次考试记录？')) return; DB.exams = DB.exams.filter(x => x.id !== state.examEdit); save(); state.examEdit = null; render(); },
+  examdel: () => { if (!confirm('删除这次考试记录？')) return; delRec('exams', state.examEdit); save(); state.examEdit = null; render(); },
   tbig: el => { state.trendBig = el.dataset.v === '1'; render(); },
   thide: el => { state.trendHide[el.dataset.v] = !state.trendHide[el.dataset.v]; render(); },
   unlock: () => { if ($('#pin').value === DB.settings.pin) { state.unlocked = true; render(); } else toast('密码不对'); },
@@ -868,125 +1254,129 @@ const ACT = {
   emops: el => { state._ps = el.dataset.v; state._trc = $('#emo-custom').value; render(); },
   emoadd: () => {
     const tr = $('#emo-custom').value.trim() || state._tr;
-    if (!tr) return toast('选一个情境，或者自己写');
-    if (!state._lv) return toast('选一下强度');
-    DB.emotions.push({id:'m'+Date.now(), date: today(), trigger: tr, level: state._lv, paused: state._ps === '1', note: $('#emo-note').value.trim()});
-    state._tr = null; state._lv = null; state._ps = null; state._trc = '';
-    save(); toast('记下了'); render();
+    if (!tr) return toast('选一个情境，或者自己写'); if (!state._lv) return toast('选一下强度');
+    DB.emotions.push({id:uid('m'), date: today(), trigger: tr, level: state._lv, paused: state._ps === '1', note: $('#emo-note').value.trim(), u: now()});
+    state._tr = null; state._lv = null; state._ps = null; state._trc = ''; save(); toast('记下了'); render();
   },
-  emodel: el => { if (!confirm('删除这条？')) return; DB.emotions = DB.emotions.filter(e => e.id !== el.dataset.v); save(); render(); },
-  shide: el => { const x = DB.settings.subjects.find(s => s.id === el.dataset.v); x.hidden = !x.hidden; save(); render(); },
-  saddsub: () => { const n = $('#newsubj').value.trim(); if (!n) return; const used = DB.settings.subjects.length;
-    DB.settings.subjects.push({id:'c'+Date.now(), name:n, color: EXTRA_COLORS[used % EXTRA_COLORS.length], hidden:false}); save(); render(); },
-  setpin: () => { const v = $('#newpin').value.trim(); if (v && !/^\d{4}$/.test(v)) return toast('请输入 4 位数字');
-    DB.settings.pin = v; save(); toast(v ? '密码已设置' : '密码已取消'); render(); },
+  emodel: el => { if (!confirm('删除这条？')) return; delRec('emotions', el.dataset.v); save(); render(); },
+  smode: el => { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); x.mode = el.dataset.v; DB.settings.u = now(); save(); render(); },
+  saddsub: () => { const n = $('#newsubj').value.trim(); if (!n) return;
+    DB.settings.subjects.push({id:uid('c'), name:n, color: EXTRA_COLORS[DB.settings.subjects.length % EXTRA_COLORS.length], zk:100, from:0, to:5, inTotal:false, mode:'on'}); DB.settings.u = now(); save(); render(); },
+  setpin: () => { const v = $('#newpin').value.trim(); if (v && !/^\d{4}$/.test(v)) return toast('请输入 4 位数字'); DB.settings.pin = v; DB.settings.u = now(); save(); toast(v ? '密码已设置' : '密码已取消'); render(); },
+  hideinstall: () => { lsSet('observer:hideInstall', true); render(); },
+  syncsave: () => {
+    const repo = $('#sy-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/+$/,''), token = $('#sy-token').value.trim(), pass = $('#sy-pass').value;
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return toast('仓库格式：用户名/仓库名'); if (!token) return toast('请填访问令牌'); if (pass.length < 6) return toast('口令至少 6 位');
+    SYNC = Object.assign(SYNC, {repo, token, pass, err:''}); saveSync(); syncNow(true).then(render);
+  },
+  syncnow: () => { if (syncReady()) syncNow(true); else if (!DEMO) setTab('me'); },
+  syncoff: () => { if (!confirm('关闭同步？本机数据保留，云端数据也保留。')) return; SYNC = {}; saveSync(); render(); },
   export: () => {
-    const txt = JSON.stringify(DB, null, 1);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([txt], {type:'application/json'}));
-    a.download = '每日观察备份-' + today() + '.json';
-    document.body.appendChild(a); a.click(); a.remove();
+    flush(); const txt = JSON.stringify(Object.assign({}, DB, {timer:null}), null, 1);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type:'application/json'}));
+    a.download = '每日观察备份-' + today() + '.json'; document.body.appendChild(a); a.click(); a.remove();
     if (!DEMO) { DB.settings.lastBackup = new Date().toISOString(); save(); }
-    toast('已导出。把文件发到飞书私聊存档'); render();
+    toast('已导出，把文件发到飞书私聊存档'); render();
   },
   copy: () => {
-    const txt = JSON.stringify(DB);
+    const txt = JSON.stringify(Object.assign({}, DB, {timer:null}));
     (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => {
-      if (!DEMO) { DB.settings.lastBackup = new Date().toISOString(); save(); }
-      toast('已复制，粘贴到飞书发给自己'); render();
+      if (!DEMO) { DB.settings.lastBackup = new Date().toISOString(); save(); } toast('已复制'); render();
     }).catch(() => { const t = $('#importt'); t.value = txt; t.closest('details').open = true; t.select(); toast('请手动全选复制'); });
   },
   importtext: () => importData($('#importt').value),
-  wipe: () => { if (!confirm('清空全部数据？这一步不能撤销。')) return; if (!confirm('真的清空？建议先导出备份。')) return; DB = fresh(); save(); render(); },
+  wipe: () => { if (!confirm('清空本机数据？开了云同步的话，云端数据不受影响。')) return; if (!confirm('真的清空？建议先导出备份。')) return; DB = fresh(); pendingLocal = true; flush(); render(); },
 };
 function importData(txt){
   try {
-    const x = JSON.parse(txt);
-    if (!x || !x.days || !x.settings) throw 0;
-    if (!confirm('用这份备份覆盖当前数据？（' + Object.keys(x.days).length + ' 天记录，' + (x.exams||[]).length + ' 次考试）')) return;
-    DB = migrate(x); save(); toast('已恢复'); render();
+    const x = migrate(JSON.parse(txt)); if (!x || !x.days || !x.settings) throw 0;
+    if (!confirm(`备份里有 ${Object.keys(x.days).length} 天记录、${x.items.length} 道错题、${x.exams.length} 次考试。\n\n确定后会和本机数据合并（同一条记录取较新的）。`)) return;
+    DB = mergeDB(DB, x).M; save(); toast('已合并导入'); render();
   } catch(e) { toast('这不是有效的备份'); }
 }
-document.addEventListener('click', e => {
-  const el = e.target.closest('[data-act]'); if (!el) return;
-  const f = ACT[el.dataset.act]; if (f) f(el, e);
-});
-function onInput(e){
+document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.stopPropagation(); f(el, e); } });
+document.addEventListener('input', e => {
   const el = e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
-  if (k === 'day') dayObj(state.date, true)[f] = v;
+  if (k === 'day') touchDay(state.date)[f] = v;
   else if (k === 'rec') rec(state.date, el.dataset.s, true)[f] = v;
-  else if (k === 'week') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w[f] = v; }
-  else if (k === 'anchor') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.next = Object.assign({}, anchorsFor(state.week), w.next||{}); w.next[el.dataset.s] = Math.max(0, +v||0); }
-  else if (k === 'month') { const m = DB.months[state.month] = DB.months[state.month] || {}; m[f] = v; }
-  else if (k === 'set') { DB.settings[f] = f === 'startYear' ? (+v || 2026) : v; }
-  else if (k === 'sname') { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); if (x && v.trim()) x.name = v.trim(); }
+  else if (k === 'item') { const it = DB.items.find(x => x.id === el.dataset.id); if (it) { it[f] = v; it.u = now(); } }
+  else if (k === 'week') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w[f] = v; w.u = now(); }
+  else if (k === 'anchor') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.next = Object.assign({}, anchorsFor(state.week), w.next||{}); w.next[el.dataset.s] = Math.max(0, +v||0); w.u = now(); }
+  else if (k === 'month') { const m = DB.months[state.month] = DB.months[state.month] || {}; m[f] = v; m.u = now(); }
+  else if (k === 'set') { DB.settings[f] = f === 'startYear' ? (+v || 2026) : v; DB.settings.u = now(); }
+  else if (k === 'sname') { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); if (x && v.trim()) { x.name = v.trim(); DB.settings.u = now(); } }
   save();
-}
-document.addEventListener('input', onInput);
+});
 document.addEventListener('change', e => {
   if (e.target.id === 'importf' && e.target.files[0]) { const r = new FileReader(); r.onload = () => importData(r.result); r.readAsText(e.target.files[0]); return; }
   if (e.target.closest('[data-in="set"],[data-in="sname"]')) renderChrome();
 });
-document.addEventListener('toggle', e => { const k = e.target.dataset && e.target.dataset.open; if (k) state.open[k] = e.target.open; }, true);
 let rt; window.addEventListener('resize', () => { if (state.tab !== 'trends') return; clearTimeout(rt); rt = setTimeout(render, 200); });
 
-/* ---------------- 示例数据（只在 ?demo 下生成，存独立的 key） ---------------- */
+/* ================= 示例数据（只在 ?demo 下生成，独立存储） ================= */
 function seedDemo(){
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const pick = a => a[Math.floor(rnd()*a.length)];
-  const t = today(); const start = addD(t, -48);
+  const t = today(), start = addD(t, -48);
   DB.settings.child = '小周';
+  const act = ['yw','sx','yy','df','ls','dl','sw'];
   for (const d of range(start, t)) {
     if (rnd() < 0.12) continue;
-    const dd = DB.days[d] = {subj:{}, mood: pick(['ok','ok','good','tired'])};
-    const wk = Math.floor((P(d) - P(start)) / 864e5 / 7);
-    for (const s of DB.settings.subjects) {
-      if (['df','ls','dl','sw'].includes(s.id) && rnd() < 0.5) { dd.subj[s.id] = {none:true, min:0, intr:'none', errs:{calc:0,concept:0,read:0}}; continue; }
-      const base = DB.settings.anchors[s.id];
-      let min = Math.round((base * (0.8 + rnd()*0.5))/5)*5, intr = 'none';
-      const e = {calc:0,concept:0,read:0}; let tag = '', stuck = '';
-      if (s.id === 'sx') {
+    const dd = DB.days[d] = {subj:{}, mood: pick(['ok','ok','good','tired']), u:1};
+    const wk = Math.floor(dayDiff(start, d) / 7);
+    for (const sid of act) {
+      if (['df','ls','dl','sw'].includes(sid) && rnd() < 0.5) { dd.subj[sid] = {none:true, min:0, intr:'none'}; continue; }
+      const base = DB.settings.anchors[sid];
+      let min = Math.round((base * (0.8 + rnd()*0.5))/5)*5, intr = 'none', stuck = '';
+      const add = (type, tag, conf) => { const it = {id:uid('i'), d, sid, type, conf, tag, box:0, due:addD(d, BOXES[0]), hist:[], done:false, u:1};
+        if (it.due < t && rnd() < 0.7) { const ok = rnd() < 0.65; it.hist.push({d:it.due, ok}); if (ok) { it.box = 1; it.due = addD(it.due, BOXES[1]); if (it.due < t && rnd() < 0.7) { it.hist.push({d:it.due, ok:true}); it.box = 2; it.due = addD(it.due, BOXES[2]); } } else it.due = addD(it.due, 1); }
+        DB.items.push(it); };
+      if (sid === 'sx') {
         const improving = wk >= 4;
         if (rnd() < (improving ? 0.25 : 0.6)) { intr = rnd() < 0.75 ? 'early' : 'mid'; min = Math.round(base*(0.45+rnd()*0.2)/5)*5; }
-        e.concept = rnd() < (improving ? 0.3 : 0.7) ? 1 + Math.floor(rnd()*2) : 0;
-        e.calc = rnd() < 0.5 ? 1 : 0;
-        tag = pick(['有理数混合运算','去括号','有理数混合运算','一元一次方程移项']);
+        if (rnd() < (improving ? 0.3 : 0.7)) add('concept', pick(['去括号','有理数混合运算','一元一次方程移项']), pick(['sure','unsure','no','no']));
+        if (rnd() < 0.5) add('calc', pick(['有理数混合运算','负数乘方']), pick(['sure','unsure']));
         if (rnd() < 0.4) stuck = pick(['去括号的时候后面的项要不要变号','负数乘方那一步','移项不知道要不要变号','行程题不知道用相遇还是追及']);
-      } else if (s.id === 'yy') {
-        e.read = rnd() < 0.4 ? 1 : 0; e.calc = 0; e.concept = rnd() < 0.3 ? 1 : 0;
-        tag = pick(['一般现在时三单','完形填空','be动词']);
+      } else if (sid === 'yy') {
+        if (rnd() < 0.4) add('read', pick(['完形填空','阅读理解']), pick(['sure','unsure']));
+        if (rnd() < 0.3) add('concept', pick(['一般现在时三单','be动词']), 'unsure');
         if (rnd() < 0.2) stuck = '第 5 空在 which 和 that 之间犹豫';
-      } else if (s.id === 'yw') {
-        e.read = rnd() < 0.35 ? 1 : 0; tag = pick(['阅读理解','古诗默写']);
+      } else if (sid === 'yw') {
+        if (rnd() < 0.35) add('read', pick(['阅读理解','古诗默写']), pick(['unsure','sure']));
         if (rnd() < 0.2) stuck = '说明方法那道题看不出是举例子还是列数字';
-      } else { e.concept = rnd() < 0.15 ? 1 : 0; }
-      dd.subj[s.id] = {min, intr, errs:e, tag: (e.calc+e.concept+e.read) ? tag : '', stuck};
+      } else if (rnd() < 0.15) add('concept', '', 'no');
+      dd.subj[sid] = {min, intr, stuck};
     }
     if (rnd() < 0.3) dd.answer = pick(['数学第三题第二步','英语作文开头不会写','今天都还行','去括号那里']);
   }
   const m0 = monOf(start);
-  DB.weeks[addD(m0,7)] = {found:'数学中断都在前15分钟，错题以概念混淆为主，卡在去括号', adjust:'数学开头先做 2 道会做的去括号小题', next:{sx:40}};
-  DB.weeks[addD(m0,21)] = {found:'数学中断从 4 次降到 2 次', adjust:'锚点不动，继续观察', next:{sx:40}};
+  DB.weeks[addD(m0,7)] = {found:'数学中断都在前15分钟，错题以概念混淆为主，卡在去括号', adjust:'数学开头先做 2 道会做的去括号小题', next:{sx:40}, u:1};
+  DB.weeks[addD(m0,21)] = {found:'数学中断从 4 次降到 2 次', adjust:'锚点不动，继续观察', next:{sx:40}, u:1};
   DB.exams = [
-    {id:'e1', date:addD(start,5), name:'开学摸底', type:'单元测验', scores:{yw:{s:78,full:100},sx:{s:52,full:100,loss:{calc:12,concept:26,read:10}},yy:{s:81,full:100}}},
-    {id:'e2', date:addD(start,24), name:'第一单元测验', type:'单元测验', scores:{yw:{s:80,full:100},sx:{s:58,full:100,loss:{calc:10,concept:20,read:12}},yy:{s:84,full:100}}},
-    {id:'e3', date:addD(start,40), name:'第一次月考', type:'月考', scores:{yw:{s:82,full:100},sx:{s:66,full:100,loss:{calc:10,concept:14,read:10}},yy:{s:83,full:100},df:{s:41,full:50},ls:{s:43,full:50}}, rankClass:'28', adjust:'数学概念题回到课本例题；英语保持'},
+    {id:'e1', date:addD(start,5), name:'开学摸底', type:'单元测验', scores:{yw:{s:88,full:120},sx:{s:52,full:100,loss:{calc:12,concept:26,read:10}},yy:{s:81,full:100}}, u:1},
+    {id:'e2', date:addD(start,24), name:'第一单元测验', type:'单元测验', scores:{yw:{s:92,full:120},sx:{s:58,full:100,loss:{calc:10,concept:20,read:12}},yy:{s:84,full:100}}, u:1},
+    {id:'e3', date:addD(start,40), name:'第一次月考', type:'月考', scores:{yw:{s:95,full:120},sx:{s:66,full:100,loss:{calc:10,concept:14,read:10}},yy:{s:83,full:100},df:{s:41,full:50},ls:{s:52,full:70}}, rankClass:'28', prep:['重做了错题','看了课本例题'], oneThing:'数学先做计算题，做完回头检查一遍符号', u:1},
   ];
   DB.emotions = [
-    {id:'m1', date:addD(start,3), trigger:'同一题型重复犯错', level:5, paused:false},
-    {id:'m2', date:addD(start,9), trigger:'看到走神', level:4, paused:false},
-    {id:'m3', date:addD(start,20), trigger:'同一题型重复犯错', level:4, paused:true},
-    {id:'m4', date:addD(start,33), trigger:'想到别人家孩子', level:3, paused:true},
-    {id:'m5', date:addD(start,41), trigger:'说「我知道了」但在敷衍', level:4, paused:true},
+    {id:'m1', date:addD(start,3), trigger:'同一题型重复犯错', level:5, paused:false, u:1},
+    {id:'m2', date:addD(start,9), trigger:'看到走神', level:4, paused:false, u:1},
+    {id:'m3', date:addD(start,20), trigger:'同一题型重复犯错', level:4, paused:true, u:1},
+    {id:'m4', date:addD(start,33), trigger:'想到别人家孩子', level:3, paused:true, u:1},
+    {id:'m5', date:addD(start,41), trigger:'说「我知道了」但在敷衍', level:4, paused:true, u:1},
   ];
+  DB.v = 2;
 }
 
-/* ---------------- 启动 ---------------- */
-load();
-try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e) {}
-if (QS.get('tab')) state.tab = QS.get('tab');
-render();
+/* ================= 启动 ================= */
+(async function boot(){
+  await load();
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e) {}
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+  render();
+  if (!DEMO && lsGet(LEGACY) && !lsGet(K_DB)) { pendingLocal = true; flush(); }
+  if (syncReady()) syncNow();
+})();
 </script>
 </body>
 </html>
