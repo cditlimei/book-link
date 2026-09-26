@@ -94,6 +94,8 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--surface3)}
 .stepper button{border:0;background:transparent;width:38px;height:38px;font-size:20px;line-height:1;color:var(--ink2)}
 .stepper .v{min-width:44px;text-align:center;font-family:var(--mono);font-size:16px}
+.minin{width:84px !important;text-align:center;font-family:var(--mono);font-size:18px !important;padding:7px 8px !important}
+.timein{width:136px !important;min-width:136px;padding:7px 8px !important;font-family:var(--mono)}
 .tip{background:var(--accent-bg);border-radius:var(--r);padding:12px 14px;font-size:14px;margin-bottom:12px}
 .tip b{color:var(--accent)}
 .signal{background:var(--amber-bg);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14.5px}
@@ -689,6 +691,7 @@ function timerStop(){
   if (tm.pauses.length && (!r.intr || r.intr === 'none')) { const p = tm.pauses[0], total = ms/60000; r.intr = p < 15 ? 'early' : p > total*0.75 ? 'late' : 'mid'; }
   DB.timer = null; toast(`记下 ${mins} 分钟` + (tm.pauses.length ? `，中途停了 ${tm.pauses.length} 次` : '')); save(); render();
 }
+const spanMin = (a, b) => { if (!a || !b) return null; const [h1,m1] = a.split(':').map(Number), [h2,m2] = b.split(':').map(Number); let d = (h2*60+m2) - (h1*60+m1); if (d < 0) d += 1440; return d; };
 const fmtClock = ms => { const s = Math.floor(ms/1000); return pad(Math.floor(s/60)) + ':' + pad(s%60); };
 setInterval(() => { if (!DB || !DB.timer) return; document.querySelectorAll('[data-clock]').forEach(el => el.textContent = fmtClock(timerElapsed(DB.timer))); }, 1000);
 
@@ -961,6 +964,7 @@ function subjRow(d, s, r){
     if (r.intr && r.intr !== 'none') meta += '<span class="pill amber">中断</span>';
     if (its.length) meta += `<span class="pill amber">错 ${its.length}</span>`;
     if (r.stuck) meta += '<span class="pill accent">卡点</span>';
+    if (r.start && r.end) meta += `<span class="small faint num">${r.start}–${r.end}</span>`;
     meta += `<span class="sr-min">${r.min ? r.min+'′' : '<span class="faint">–</span>'}</span>`;
   }
   const tbtn = r.none ? '' : tm ? (tm.start ? `<button class="tbtn run" data-act="tpause" aria-label="暂停">${PAUSE}</button>` : `<button class="tbtn" data-act="tstart" data-s="${s.id}" aria-label="继续">${PLAY}</button>`) : (d === today() ? `<button class="tbtn" data-act="tstart" data-s="${s.id}" aria-label="开始计时">${PLAY}</button>` : '');
@@ -970,8 +974,9 @@ function subjRow(d, s, r){
   h += `<div class="sr-body"><div class="line"><button class="chip ${r.none?'on':''}" data-act="none" data-s="${s.id}">今天没有这科作业</button></div>`;
   if (!r.none) {
     h += `<div class="line"><span class="lab">实际用时</span>
-      <span class="stepper"><button data-act="min" data-s="${s.id}" data-v="-5">−</button><span class="v">${r.min||0}′</span><button data-act="min" data-s="${s.id}" data-v="5">+</button></span>` +
-      MINS.map(m => `<button class="chip soft ${r.min===m?'on':''}" data-act="minset" data-s="${s.id}" data-v="${m}">${m}</button>`).join('') + `</div>`;
+      <input type="number" inputmode="numeric" min="0" max="600" class="minin" data-in="recmin" data-s="${s.id}" value="${r.min || ''}" placeholder="分钟" aria-label="实际用时（分钟）"><span class="small muted">分钟</span>` +
+      MINS.map(m => `<button class="chip soft ${r.min===m?'on':''}" data-act="minset" data-s="${s.id}" data-v="${m}">${m}</button>`).join('') + `</div>
+      <div class="line"><span class="lab">或几点到几点</span><input type="time" class="timein" data-in="rectime" data-s="${s.id}" data-f="start" value="${r.start||''}" aria-label="开始时间"><span class="muted">到</span><input type="time" class="timein" data-in="rectime" data-s="${s.id}" data-f="end" value="${r.end||''}" aria-label="结束时间"><span class="small faint">填了会自动算分钟</span></div>`;
     h += `<div class="line"><span class="lab">中途中断</span><div class="seg">` + INTR.map(i => `<button data-act="intr" data-s="${s.id}" data-v="${i.k}" class="${(r.intr||'none')===i.k?'on':''}">${i.n}</button>`).join('') + `</div></div>`;
     h += `<div class="line" style="align-items:flex-start"><span class="lab">错题</span><div style="flex:1;min-width:0">
       <div class="addrow">` + ET.map(t => `<button data-act="additem" data-s="${s.id}" data-t="${t.k}"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> + ${typeNameS(s.id, t.k)}</button>`).join('') + `</div>`;
@@ -1200,9 +1205,12 @@ function vWiz(){
     if (r.min && !WIZ_MIN.includes(r.min)) h += `<button class="wide on" data-act="wizmin" data-v="keep">${r.min} 分钟<small>计时器 / 已填</small></button>`;
     h += WIZ_MIN.map(m => `<button class="${r.min === m && !r.none ? 'on' : ''}" data-act="wizmin" data-v="${m}">${m}<small>分钟</small></button>`).join('');
     h += `<button class="wide soft ${r.none ? 'on' : ''}" data-act="wizmin" data-v="none">今天没有${esc(s.name)}作业</button></div>
-      <div class="row" style="margin-top:16px;justify-content:center"><span class="small muted">都不对？</span><span class="stepper"><button data-act="wizadj" data-v="-5">−</button><span class="v">${r.min||0}′</span><button data-act="wizadj" data-v="5">+</button></span>${r.min ? '<button class="btn sm" data-act="wizmin" data-v="keep">就这么多</button>' : ''}</div>`;
+      <div class="card" style="margin-top:16px;padding:12px 14px"><div class="small muted" style="margin-bottom:8px">都不对？自己填</div>
+        <div class="row"><input type="number" inputmode="numeric" min="0" max="600" id="w-min" class="minin" value="${r.min && !WIZ_MIN.includes(r.min) ? r.min : ''}" placeholder="37"><span class="muted">分钟</span></div>
+        <div class="row" style="margin-top:10px"><span class="small muted">或者</span><input type="time" id="w-start" class="timein" value="${r.start||''}" aria-label="开始时间"><span class="muted">到</span><input type="time" id="w-end" class="timein" value="${r.end||''}" aria-label="结束时间"></div>
+        <button class="btn primary sm" style="margin-top:10px" data-act="wizmanual">用我填的</button></div>`;
     const rest = w.list.slice(w.i).filter(x => !filledRec(dd.subj[x])).length;
-    if (rest > 1 && w.list.slice(0, w.i).some(x => filledRec(dd.subj[x]))) foot += `<button class="btn ghost" data-act="wizrest">剩下 ${rest} 科都没作业</button>`;
+    if (rest > 1 && w.list.slice(0, w.i).some(x => filledRec(dd.subj[x]))) foot += `<button class="btn ghost" style="white-space:nowrap" data-act="wizrest">其余 ${rest} 科没作业</button>`;
   } else if (w.step === 'intr') {
     h += `<div class="wiz-q">中途停下来过吗？</div><div class="big two">` +
       [['none','没停过','一口气做完'],['early','开头就停了','前 15 分钟'],['mid','做到中间停了',''],['late','快结束时停了','']].map(([k,n,sm]) => `<button data-act="wizintr" data-v="${k}">${n}${sm ? `<small>${sm}</small>` : ''}</button>`).join('') + `</div>
@@ -1747,6 +1755,12 @@ const ACT = {
   delitem: el => { delRec('items', el.dataset.v); touchDay(state.date); save(); render(); },
   conf: el => { const it = DB.items.find(x => x.id === el.dataset.v); it.conf = it.conf === el.dataset.c ? null : el.dataset.c; it.u = now(); save(); render(); },
   wizstart: () => wizStart(),
+  wizmanual: () => { const a = $('#w-start').value, b = $('#w-end').value, n = +$('#w-min').value, r = rec(state.date, state.wiz.list[state.wiz.i], true);
+    const span = spanMin(a, b);
+    if (span != null) { if (span <= 0 || span > 600) return toast('时间段不对，看看开始和结束'); r.start = a; r.end = b; r.min = span; }
+    else if (n > 0 && n <= 600) { r.min = Math.round(n); }
+    else return toast('填分钟数，或者填开始和结束时间');
+    r.none = false; save(); toast(`记 ${r.min} 分钟`); wizGo('intr'); },
   photoopen: () => { state.photo = {kind:'error', sid: state.openSubj || null}; render(); },
   photoclose: () => { state.photo = null; render(); },
   pkind: el => { state.photo.kind = el.dataset.v; render(); },
@@ -1880,6 +1894,8 @@ document.addEventListener('input', e => {
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
   if (k === 'day') setDayField(state.date, f, v);
   else if (k === 'rec') rec(state.date, el.dataset.s, true)[f] = v;
+  else if (k === 'recmin') { const r = rec(state.date, el.dataset.s, true); r.min = Math.max(0, Math.min(600, Math.round(+v) || 0)); if (r.min) r.none = false; }
+  else if (k === 'rectime') { const r = rec(state.date, el.dataset.s, true); r[f] = v; const m = spanMin(r.start, r.end); if (m && m <= 600) { r.min = m; r.none = false; const mi = document.querySelector(`[data-in="recmin"][data-s="${el.dataset.s}"]`); if (mi) mi.value = m; } }
   else if (k === 'voice') { state.voice.text = v; const pv = $('#vqprev'); if (pv) pv.innerHTML = v ? speechPreview(parseSpeech(v, state.date)) : ''; return; }
   else if (k === 'item') { const it = DB.items.find(x => x.id === el.dataset.id); if (it) { it[f] = v; it.u = now(); } }
   else if (k === 'week') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w[f] = v; w.u = now(); }
@@ -1893,6 +1909,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'photoin' && e.target.files.length) { toast('正在压缩…'); addPhotos([...e.target.files]); return; }
   if (e.target.id === 'importf' && e.target.files[0]) { const r = new FileReader(); r.onload = () => importData(r.result); r.readAsText(e.target.files[0]); return; }
   if (e.target.closest('[data-in="set"],[data-in="sname"]')) renderChrome();
+  if (e.target.closest('[data-in="recmin"],[data-in="rectime"]')) render();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.wiz) { state.wiz = null; render(); } });
 let rt; window.addEventListener('resize', () => { if (state.tab !== 'trends') return; clearTimeout(rt); rt = setTimeout(render, 200); });
