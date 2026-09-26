@@ -223,12 +223,41 @@ svg.chart text{font-family:var(--sans);fill:var(--ink2)}
 details>summary{cursor:pointer}
 .methods td:first-child{white-space:nowrap;font-weight:600}
 ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0}
+
+/* 一步一步填：全屏、一次只问一件事、大按钮、点完自动下一步 */
+.wiz{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
+.wiz-top{display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) 16px 8px;max-width:680px;margin:0 auto;width:100%}
+.wiz-dots{display:flex;gap:4px;flex:1}
+.wiz-dots i{flex:1;height:6px;border-radius:3px;background:var(--surface2)}
+.wiz-dots i.done{background:var(--accent)} .wiz-dots i.cur{background:var(--ink)}
+.wiz-x{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:20px;color:var(--ink2)}
+.wiz-body{flex:1;overflow:auto;padding:8px 20px 20px;max-width:680px;margin:0 auto;width:100%;-webkit-overflow-scrolling:touch}
+.wiz-subj{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--ink2);margin:10px 0 2px}
+.wiz-subj .dot{width:12px;height:12px}
+.wiz-q{font-family:var(--serif);font-size:27px;font-weight:700;margin:2px 0 18px;line-height:1.3}
+.big{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.big.two{grid-template-columns:1fr 1fr}
+.big button{min-height:70px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);font-size:21px;font-weight:600;box-shadow:var(--shadow);color:var(--ink);padding:6px}
+.big button small{display:block;font-size:12.5px;font-weight:400;color:var(--ink3);margin-top:2px}
+.big button.on{border-color:var(--accent);background:var(--accent-bg);color:var(--accent)}
+.big button.wide{grid-column:1/-1;min-height:56px;font-size:18px}
+.big button.soft{color:var(--ink2);font-weight:500}
+.cnt{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.cnt .nm{flex:1;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
+.cnt button{width:54px;height:54px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface3);font-size:28px;line-height:1;color:var(--ink)}
+.cnt .v{font-family:var(--mono);font-size:28px;min-width:36px;text-align:center}
+.wiz-foot{display:flex;gap:10px;padding:10px 20px calc(14px + env(safe-area-inset-bottom));max-width:680px;margin:0 auto;width:100%}
+.wiz-foot .btn{flex:1;min-height:54px;font-size:17px}
+.wiz-in{font-size:19px !important;padding:14px !important;border-radius:14px !important}
+.wiz-sum{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:16px}
+.fillbtn{width:100%;min-height:56px;border-radius:var(--r);font-size:17px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
 </head>
 <body>
 <header id="top"></header>
 <main id="main"></main>
 <nav id="tabs"></nav>
+<div id="wiz"></div>
 <div id="toast"></div>
 <script>
 'use strict';
@@ -385,12 +414,21 @@ function subjActive(s, d){
   const t = termOf(d || today(), DB.settings.startYear).cidx; return t >= s.from && t <= s.to;
 }
 const subjects = d => DB.settings.subjects.filter(s => subjActive(s, d));
+/* 今天页和向导里：最近 3 周常有作业的科目排前面（稳定排序，没数据时保持原顺序） */
+function orderedSubjects(d){
+  const f = {};
+  for (const x of range(addD(d,-21), addD(d,-1))) { const dd = DB.days[x]; if (dd) for (const sid in dd.subj) { const r = dd.subj[sid]; if (!r.none && r.min > 0) f[sid] = (f[sid]||0) + 1; } }
+  return subjects(d).slice().sort((a,b) => (f[b.id]||0) - (f[a.id]||0));
+}
+const filledRec = r => r && (r.none || r.min > 0);
 function dayObj(d, create){ let x = DB.days[d]; if (!x && create) x = DB.days[d] = {subj:{}, u:now()}; return x; }
 function touchDay(d){ const x = dayObj(d, true); x.u = now(); return x; }
+function setDayField(d, f, v){ const x = touchDay(d); x[f] = v; x.fu = x.fu || {}; x.fu[f] = now(); return x; }
 function rec(d, sid, create){
   const dd = create ? touchDay(d) : dayObj(d); if (!dd) return null;
   let r = dd.subj[sid];
   if (!r && create) r = dd.subj[sid] = {min:0, intr:'none', stuck:'', none:false};
+  if (create) r.u = now();            // 调用 create=true 的地方都是要改这条记录
   return r;
 }
 let IDX = {};
@@ -642,6 +680,28 @@ async function ghPush(text, sha){
   if (!r.ok) throw new Error('上传失败：GitHub 返回 ' + r.status);
   return 'ok';
 }
+/* 同一天：各科记录按各自 u、当天字段按 fu 分别取新——两台设备同一天各填各的不会互相覆盖 */
+function mergeDay(x, y){
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const out = clone(x); out.fu = Object.assign({}, x.fu||{}); out.subj = Object.assign({}, x.subj||{});
+  let l = false, r = false;
+  const ft = (o, f) => o[f] === undefined ? -1 : ((o.fu && o.fu[f]) || o.u || 0);
+  for (const f of ['mood','q','answer','note']) {
+    if (x[f] === y[f]) continue;
+    const a = ft(x, f), b = ft(y, f);
+    if (b > a) { out[f] = y[f]; out.fu[f] = b; r = true; } else l = true;
+  }
+  for (const sid of new Set(Object.keys(x.subj||{}).concat(Object.keys(y.subj||{})))) {
+    const a = (x.subj||{})[sid], b = (y.subj||{})[sid];
+    if (a && !b) { l = true; continue; }
+    if (b && !a) { out.subj[sid] = clone(b); r = true; continue; }
+    if (JSON.stringify(a) === JSON.stringify(b)) continue;
+    const ta = a.u || x.u || 0, tb = b.u || y.u || 0;
+    if (tb > ta) { out.subj[sid] = clone(b); r = true; } else l = true;
+  }
+  out.u = Math.max(x.u||0, y.u||0);
+  return {v: out, l, r};
+}
 /* 合并：按记录的 u（修改时间）取新；删除用墓碑 del 记录 */
 function mergeDB(L, R){
   let lN = false, rN = false;
@@ -655,6 +715,7 @@ function mergeDB(L, R){
     const a = L[k]||{}, b = R[k]||{};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
+      if (k === 'days' && x && y) { const m = mergeDay(x, y); M[k][key] = m.v; lN = lN || m.l; rN = rN || m.r; continue; }
       if (x && (!y || (x.u||0) > (y.u||0))) lN = true;
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
@@ -742,6 +803,8 @@ function render(){
   renderChrome();
   const v = {today:vToday, errors:vErrors, review:vReview, exams:vExams, trends:vTrends, me:vMe}[state.tab] || vToday;
   $('#main').innerHTML = v();
+  $('#wiz').innerHTML = state.wiz ? vWiz() : '';
+  document.body.style.overflow = state.wiz ? 'hidden' : '';
 }
 
 /* ================= 今天 ================= */
@@ -765,8 +828,8 @@ function banners(){
 function vToday(){
   const d = state.date, isToday = d === today();
   const dd = dayObj(d) || {subj:{}};
-  const subs = subjects(d);
-  const filled = subs.filter(s => { const r = dd.subj[s.id]; return r && (r.none || r.min > 0); }).length;
+  const subs = orderedSubjects(d);
+  const filled = subs.filter(s => filledRec(dd.subj[s.id])).length;
   const due = dueList(), dn = doneToday(), left = redoLeftToday();
   const mon = monOf(d), rh = rhythm();
   let h = isToday ? banners() : '';
@@ -782,9 +845,11 @@ function vToday(){
       <button class="step ${dd.answer ? 'done' : ''}" data-act="scroll" data-v="askq"><span class="n">③ 家长问</span><span class="t">只问一句</span><span class="s">${dd.answer ? '已记下' : '还没问'}</span></button></div>`;
   }
   h += `<div class="cols"><div>`;
+  if (filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
   h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
     <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
   for (const s of subs) h += subjRow(d, s, dd.subj[s.id]);
+  if (filled && filled < subs.length) h += `<div class="sr" style="padding:10px 16px"><button class="btn sm ghost" data-act="restnone">其余 ${subs.length - filled} 科今天都没作业</button></div>`;
   h += `</div><p class="small faint" style="margin:-4px 4px 12px">让孩子自己点 ▶ 开始、做完点「做完了」；中途离开就点暂停，会自动记成中断。只记实际发生的，没有「计划用时」。</p></div><div>`;
   const qi = (P(d).getTime()/864e5|0) % QUESTIONS.length, q = dd.q || QUESTIONS[qi];
   h += `<div class="card" id="askq"><h3>今晚只问一句</h3>
@@ -830,6 +895,59 @@ function subjRow(d, s, r){
     h += `<label class="f">${esc(stuckQ(s.name))}</label><input type="text" data-in="rec" data-s="${s.id}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="孩子的原话">`;
   }
   return h + `</div></div>`;
+}
+/* ================= 一步一步填 ================= */
+const WIZ_MIN = [10,15,20,30,40,45,60,75,90];
+function wizStart(){
+  const subs = orderedSubjects(state.date), dd = dayObj(state.date) || {subj:{}};
+  let i = subs.findIndex(s => !filledRec(dd.subj[s.id])); if (i < 0) i = 0;
+  state.wiz = {list: subs.map(s => s.id), i, step:'min'}; render();
+}
+function wizGo(step){ const w = state.wiz; if (step === 'next') { w.i++; w.step = 'min'; } else w.step = step; render(); const b = $('.wiz-body'); if (b) b.scrollTop = 0; }
+function vWiz(){
+  const w = state.wiz, d = state.date, dd = dayObj(d) || {subj:{}};
+  const dots = w.list.map((sid, k) => `<i class="${k === w.i ? 'cur' : filledRec(dd.subj[sid]) ? 'done' : ''}"></i>`).join('');
+  let h = `<div class="wiz" role="dialog" aria-label="一步一步填"><div class="wiz-top"><div class="wiz-dots">${dots}</div><span class="small faint num">${Math.min(w.i+1, w.list.length)}/${w.list.length}</span><button class="wiz-x" data-act="wizclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (w.i >= w.list.length) {
+    h += `<div class="wiz-q" style="margin-top:24px">填完了 ✓</div>`;
+    for (const sid of w.list) { const s = subjById(sid), r = dd.subj[sid], n = itemsOn(d, sid).length;
+      h += `<div class="wiz-sum"><span class="dot" style="background:${s.color}"></span><b style="width:3em">${esc(s.name)}</b><span class="muted">${!r ? '没填' : r.none ? '没作业' : [r.min+' 分钟', r.intr && r.intr !== 'none' ? '停过' : '', n ? '错 '+n : ''].filter(Boolean).join(' · ')}</span></div>`; }
+    const left = redoLeftToday();
+    h += `</div><div class="wiz-foot">${left ? `<button class="btn good" data-act="wizredo">去重做 ${left} 道错题</button>` : ''}<button class="btn ${left ? '' : 'primary'}" data-act="wizclose">完成</button></div></div>`;
+    return h;
+  }
+  const sid = w.list[w.i], s = subjById(sid), r = (dd.subj[sid]) || {}, its = itemsOn(d, sid);
+  h += `<div class="wiz-subj"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</div>`;
+  let foot = w.i > 0 || w.step !== 'min' ? `<button class="btn ghost" data-act="wizback">‹ 上一步</button>` : '';
+  if (w.step === 'min') {
+    h += `<div class="wiz-q">${esc(s.name)}今天做了多久？</div><div class="big">`;
+    if (r.min && !WIZ_MIN.includes(r.min)) h += `<button class="wide on" data-act="wizmin" data-v="keep">${r.min} 分钟<small>计时器 / 已填</small></button>`;
+    h += WIZ_MIN.map(m => `<button class="${r.min === m && !r.none ? 'on' : ''}" data-act="wizmin" data-v="${m}">${m}<small>分钟</small></button>`).join('');
+    h += `<button class="wide soft ${r.none ? 'on' : ''}" data-act="wizmin" data-v="none">今天没有${esc(s.name)}作业</button></div>
+      <div class="row" style="margin-top:16px;justify-content:center"><span class="small muted">都不对？</span><span class="stepper"><button data-act="wizadj" data-v="-5">−</button><span class="v">${r.min||0}′</span><button data-act="wizadj" data-v="5">+</button></span>${r.min ? '<button class="btn sm" data-act="wizmin" data-v="keep">就这么多</button>' : ''}</div>`;
+    const rest = w.list.slice(w.i).filter(x => !filledRec(dd.subj[x])).length;
+    if (rest > 1 && w.list.slice(0, w.i).some(x => filledRec(dd.subj[x]))) foot += `<button class="btn ghost" data-act="wizrest">剩下 ${rest} 科都没作业</button>`;
+  } else if (w.step === 'intr') {
+    h += `<div class="wiz-q">中途停下来过吗？</div><div class="big two">` +
+      [['none','没停过','一口气做完'],['early','开头就停了','前 15 分钟'],['mid','做到中间停了',''],['late','快结束时停了','']].map(([k,n,sm]) => `<button data-act="wizintr" data-v="${k}">${n}${sm ? `<small>${sm}</small>` : ''}</button>`).join('') + `</div>
+      <p class="small faint" style="margin-top:14px">起身倒水、玩手机、换别的科目，都算停下来。</p>`;
+  } else if (w.step === 'err') {
+    h += `<div class="wiz-q">错了几道？</div>`;
+    for (const t of ET) { const n = its.filter(it => it.type === t.k).length;
+      h += `<div class="cnt"><span class="nm"><i class="sw" style="background:${ET_COLOR[t.k]};width:12px;height:12px"></i>${t.n}</span><button data-act="wizerr" data-t="${t.k}" data-v="-1" aria-label="减少">−</button><span class="v">${n}</span><button data-act="wizerr" data-t="${t.k}" data-v="1" aria-label="增加">+</button></div>`; }
+    h += `<p class="small faint">分不清就选「概念混淆」。老师批改后才知道对错的话，明天再补也行。</p>`;
+    foot += `<button class="btn primary" data-act="wiznext">${its.length ? '下一步' : '没有错题'}</button>`;
+  } else if (w.step === 'conf') {
+    h += `<div class="wiz-q">这${its.length > 1 ? ' '+its.length+' 道' : '道'}题，做的时候有把握吗？</div><div class="big two">` +
+      [['sure','有把握','以为自己做对了'],['unsure','不太确定','有点犹豫'],['no','不会','不知道怎么做'],['skip','每道不一样','之后再分别标']].map(([k,n,sm]) => `<button data-act="wizconf" data-v="${k}">${n}<small>${sm}</small></button>`).join('') + `</div>
+      <p class="small faint" style="margin-top:14px">「有把握却错了」的题会优先排进重做——这类错改正后最不容易再犯。</p>`;
+  } else if (w.step === 'stuck') {
+    h += `<div class="wiz-q">${esc(stuckQ(s.name))}</div>
+      <input type="text" class="wiz-in" data-in="rec" data-s="${sid}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="说一句就行，没有就跳过">`;
+    if (its.length) h += `<label class="f" style="margin-top:16px">错在哪个知识点（可选）</label>` + its.map(it => `<input type="text" class="wiz-in" style="margin-bottom:8px" list="tags-${sid}" data-in="item" data-id="${it.id}" data-f="tag" value="${esc(it.tag||'')}" placeholder="${ETN[it.type]}：比如 去括号">`).join('') + tagList(sid);
+    foot += `<button class="btn primary" data-act="wiznext">${w.i + 1 < w.list.length ? '下一科' : '完成'}</button>`;
+  }
+  return h + `</div><div class="wiz-foot">${foot}</div></div>`;
 }
 function stuckQ(name){
   if (/数学|物理|化学|科学/.test(name)) return '哪一步最不确定？';
@@ -1267,8 +1385,8 @@ const ACT = {
   goday: el => { state.date = el.dataset.v; state.openSubj = null; render(); },
   scroll: el => { const t = document.getElementById(el.dataset.v); if (t) window.scrollTo({top: t.getBoundingClientRect().top + scrollY - 70, behavior:'smooth'}); },
   sopen: el => { state.openSubj = state.openSubj === el.dataset.s ? null : el.dataset.s; render(); },
-  mood: el => { const dd = touchDay(state.date); dd.mood = dd.mood === el.dataset.v ? '' : el.dataset.v; save(); render(); },
-  nextq: () => { const dd = touchDay(state.date); const cur = dd.q || QUESTIONS[(P(state.date).getTime()/864e5|0) % QUESTIONS.length]; dd.q = QUESTIONS[(QUESTIONS.indexOf(cur)+1) % QUESTIONS.length]; save(); render(); },
+  mood: el => { const dd = dayObj(state.date) || {}; setDayField(state.date, 'mood', dd.mood === el.dataset.v ? '' : el.dataset.v); save(); render(); },
+  nextq: () => { const dd = dayObj(state.date) || {}; const cur = dd.q || QUESTIONS[(P(state.date).getTime()/864e5|0) % QUESTIONS.length]; setDayField(state.date, 'q', QUESTIONS[(QUESTIONS.indexOf(cur)+1) % QUESTIONS.length]); save(); render(); },
   none: el => { const r = rec(state.date, el.dataset.s, true); r.none = !r.none; if (r.none) state.openSubj = null; save(); render(); },
   min: el => { const r = rec(state.date, el.dataset.s, true); r.min = Math.max(0, (r.min||0) + +el.dataset.v); save(); render(); },
   minset: el => { const r = rec(state.date, el.dataset.s, true); const v = +el.dataset.v; r.min = r.min === v ? 0 : v; save(); render(); },
@@ -1276,6 +1394,32 @@ const ACT = {
   additem: el => { touchDay(state.date); DB.items.push({id:uid('i'), d:state.date, sid:el.dataset.s, type:el.dataset.t, conf:null, tag:'', box:0, due:addD(state.date, BOXES[0]), hist:[], done:false, u:now()}); save(); render(); },
   delitem: el => { delRec('items', el.dataset.v); touchDay(state.date); save(); render(); },
   conf: el => { const it = DB.items.find(x => x.id === el.dataset.v); it.conf = it.conf === el.dataset.c ? null : el.dataset.c; it.u = now(); save(); render(); },
+  wizstart: () => wizStart(),
+  wizclose: () => { state.wiz = null; render(); },
+  wizredo: () => { state.wiz = null; setTab('errors'); },
+  wizmin: el => { const w = state.wiz, sid = w.list[w.i], v = el.dataset.v, r = rec(state.date, sid, true);
+    if (v === 'none') { r.none = true; r.min = 0; r.intr = 'none'; save(); return wizGo('next'); }
+    r.none = false; if (v !== 'keep') r.min = +v; save(); wizGo('intr'); },
+  wizadj: el => { const r = rec(state.date, state.wiz.list[state.wiz.i], true); r.none = false; r.min = Math.max(0, (r.min||0) + +el.dataset.v); save(); render(); },
+  wizintr: el => { const r = rec(state.date, state.wiz.list[state.wiz.i], true); r.intr = el.dataset.v; save(); wizGo('err'); },
+  wizerr: el => { const sid = state.wiz.list[state.wiz.i], t = el.dataset.t;
+    if (+el.dataset.v > 0) { touchDay(state.date); DB.items.push({id:uid('i'), d:state.date, sid, type:t, conf:null, tag:'', box:0, due:addD(state.date, BOXES[0]), hist:[], done:false, u:now()}); }
+    else { const c = itemsOn(state.date, sid).filter(it => it.type === t && !(it.hist||[]).length).pop(); if (c) delRec('items', c.id); }
+    save(); render(); },
+  wiznext: () => { const w = state.wiz, sid = w.list[w.i];
+    if (w.step === 'err') return wizGo(itemsOn(state.date, sid).some(it => !it.conf) ? 'conf' : 'stuck');
+    wizGo('next'); },
+  wizconf: el => { const v = el.dataset.v; if (v !== 'skip') for (const it of itemsOn(state.date, state.wiz.list[state.wiz.i])) if (!it.conf) { it.conf = v; it.u = now(); } save(); wizGo('stuck'); },
+  wizback: () => { const w = state.wiz, order = ['min','intr','err','conf','stuck'];
+    if (w.step === 'min') { if (w.i > 0) { w.i--; w.step = 'min'; } }
+    else { let k = order.indexOf(w.step) - 1; if (order[k] === 'conf' && !itemsOn(state.date, w.list[w.i]).length) k--; w.step = order[k]; }
+    render(); },
+  wizrest: () => { const w = state.wiz, dd = dayObj(state.date) || {subj:{}};
+    for (const sid of w.list.slice(w.i)) if (!filledRec(dd.subj[sid])) { const r = rec(state.date, sid, true); r.none = true; r.min = 0; }
+    w.i = w.list.length; save(); render(); },
+  restnone: () => { const dd = dayObj(state.date) || {subj:{}};
+    for (const s of subjects(state.date)) if (!filledRec(dd.subj[s.id])) { const r = rec(state.date, s.id, true); r.none = true; r.min = 0; }
+    save(); toast('其余科目记为没作业'); render(); },
   tstart: el => timerStart(el.dataset.s),
   tpause: () => timerPause(),
   tstop: () => timerStop(),
@@ -1363,7 +1507,7 @@ document.addEventListener('click', e => { const el = e.target.closest('[data-act
 document.addEventListener('input', e => {
   const el = e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
-  if (k === 'day') touchDay(state.date)[f] = v;
+  if (k === 'day') setDayField(state.date, f, v);
   else if (k === 'rec') rec(state.date, el.dataset.s, true)[f] = v;
   else if (k === 'item') { const it = DB.items.find(x => x.id === el.dataset.id); if (it) { it[f] = v; it.u = now(); } }
   else if (k === 'week') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w[f] = v; w.u = now(); }
@@ -1377,6 +1521,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'importf' && e.target.files[0]) { const r = new FileReader(); r.onload = () => importData(r.result); r.readAsText(e.target.files[0]); return; }
   if (e.target.closest('[data-in="set"],[data-in="sname"]')) renderChrome();
 });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.wiz) { state.wiz = null; render(); } });
 let rt; window.addEventListener('resize', () => { if (state.tab !== 'trends') return; clearTimeout(rt); rt = setTimeout(render, 200); });
 
 /* ================= 示例数据（只在 ?demo 下生成，独立存储） ================= */
