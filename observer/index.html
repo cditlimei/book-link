@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f1e8">
 <meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://api.github.com; media-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
@@ -532,10 +533,20 @@ function dayHasData(d){
   if (dd.mood || dd.answer || dd.note) return true;
   return Object.values(dd.subj||{}).some(r => r.none || r.min>0 || r.stuck || (r.intr && r.intr!=='none'));
 }
+function autoAnchors(mon){
+  const out = {};
+  for (const s of DB.settings.subjects) {
+    const xs = [];
+    for (const d of range(addD(mon, -14), addD(mon, -1))) { const r = DB.days[d] && DB.days[d].subj[s.id]; if (r && !r.none && r.min > 0) xs.push(r.min); }
+    if (xs.length >= 4) { xs.sort((a,b) => a-b); out[s.id] = Math.max(10, Math.round(xs[Math.floor(xs.length/2)] / 5) * 5); }
+  }
+  return out;
+}
+/* 锚点：默认按孩子前两周实际用时自动定（数据驱动，家长不用猜）；家长在周复盘里改过的科目以家长为准 */
 function anchorsFor(mon){
   const ks = Object.keys(DB.weeks).filter(k => k < mon && DB.weeks[k].next).sort();
   const k = ks.pop();
-  return Object.assign({}, DB.settings.anchors, k ? DB.weeks[k].next : {});
+  return Object.assign({}, DB.settings.anchors, autoAnchors(mon), k ? DB.weeks[k].next : {});
 }
 function delRec(kind, id){ DB[kind] = DB[kind].filter(x => x.id !== id); DB.del[id] = now(); }
 
@@ -652,7 +663,7 @@ function findings(st, prev, anchors, nDays, monthly){
   if (!out.some(o=>o.k!=='info')) out.push({k:'good', t:'没有明显的异常信号。节奏稳住就是进展。'});
   return out;
 }
-const findingsHTML = fs => fs.map(f => `<div class="signal ${f.k}"><span class="k">${{signal:'信号',good:'好的变化',info:'说明'}[f.k]}</span>${f.t}</div>`).join('');
+const findingsHTML = (fs, adoptable) => fs.map((f, i) => `<div class="signal ${f.k}"><span class="k">${{signal:'信号',good:'好的变化',info:'说明'}[f.k]}</span>${f.t}${adoptable && f.k === 'signal' ? `<div style="margin-top:6px"><button class="btn sm ghost" data-act="adopt" data-v="${i}">就把这条定为下周只调的一件事</button></div>` : ''}</div>`).join('');
 
 /* ================= 拍照错题本（私有仓库 errors.enc.json，用同步口令解密；本机缓存一份离线用） =================
    题干/答案/讲题提示由 Claude 收录流程写入；这里只保存重做进度（DB.extReview），不改原文件 */
@@ -970,10 +981,22 @@ function installGuide(){
   if (android) return '点浏览器的<b>菜单</b>（右上角 ⋮ 或底部 ≡）→「添加到主屏幕」/「添加到桌面」/「安装应用」。华为、小米自带浏览器有的放在「工具箱」里。';
   return '';
 }
+function installBanner(){
+  const ig = installGuide();
+  return !DEMO && ig && !standalone() && !lsGet('observer:hideInstall') ? `<div class="signal info"><span class="k">加到桌面</span>${ig}<p class="small faint" style="margin:6px 0 0">加到桌面后从图标打开：数据不会被浏览器自动清理，也能离线用。</p><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copylink">复制链接</button><button class="btn sm ghost" data-act="hideinstall">已经加好了</button></div></div>` : '';
+}
+function welcomeCard(){
+  let h = '';
+  const everUsed = Object.keys(DB.days).some(dayHasData);
+  if (!DEMO && !everUsed && !lsGet('observer:welcomed')) h += `<div class="card" style="border-color:var(--accent)"><h3>第一次用，看这里</h3>
+    <p style="margin:0 0 6px"><b>孩子每天晚上</b>（约 10 分钟）：① 点下面的「一步一步填」记今天的作业 ② 做到期的重做题（一开始没有）③ 背几个单词。</p>
+    <p style="margin:0 0 6px"><b>家长每天</b>：问一句「哪一步最不确定」，只听不讲。<b>每周日</b>：到「家长 → 复盘」看一眼，定一件下周要调的事。</p>
+    <p class="small faint" style="margin:0 0 8px">记的是实际发生了什么，不是考核。头一两周只管记，模式会自己浮现。</p><button class="btn sm primary" data-act="welcomed">知道了</button></div>`;
+  return h;
+}
 function banners(){
   let h = '';
-  const ig = installGuide();
-  if (!DEMO && ig && !standalone() && !lsGet('observer:hideInstall')) h += `<div class="signal info"><span class="k">第一步：加到桌面</span>${ig}<p class="small faint" style="margin:6px 0 0">加到桌面后从图标打开：数据不会被浏览器自动清理，也能离线用。</p><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copylink">复制链接</button><button class="btn sm ghost" data-act="hideinstall">已经加好了</button></div></div>`;
+
   const ex = DB.exams.filter(e => e.oneThing && e.date >= addD(today(), -45)).sort((a,b)=>a.date<b.date?1:-1)[0];
   if (ex) h += `<div class="tip">「${esc(ex.name)}」考后定的一件事：<b>${esc(ex.oneThing)}</b></div>`;
   return h;
@@ -991,6 +1014,9 @@ function vToday(){
     <button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
 </div>
     <div class="wstrip">` + range(mon, addD(mon,6)).map(x => `<button data-act="goday" data-v="${x}" class="${dayHasData(x)?'rec':''} ${x===d?'sel':''} ${x>today()?'fut':''}" ${x>today()?'disabled':''}>${WD[P(x).getDay()]}<i>${P(x).getDate()}</i></button>`).join('') + `</div></div>`;
+  if (filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
+  h += `<div class="row" style="margin:-4px 0 12px;gap:8px"><button class="btn" style="flex:1" data-act="voiceopen">${MIC.replace('<svg','<svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 说一句话记今天</button><button class="btn" style="flex:1" data-act="photoopen">${CAM} 拍照</button></div>`;
+  if (isToday) h += welcomeCard();
   if (isToday) {
     loadLib();
     const hr = new Date().getHours() + new Date().getMinutes()/60, late = hr >= 21.75;
@@ -998,15 +1024,21 @@ function vToday(){
     const wDone = Object.values(DB.words).filter(s => (s.hist||[]).some(x => x.d === today())).length;
     const wLeft = Math.max(0, Math.min(wq, WORDS_PER_NIGHT - wDone));
     const learning = LIB.recite ? LIB.recite.items.filter(x => rState(x.id) === 'learning').length : 0;
-    const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today()));
-    const allDone = filled >= subs.length && subs.length && left === 0 && LIB.words && wLeft === 0;
+    const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today())), rDue = reciteDue().length;
+    const allDone = filled >= subs.length && subs.length && left === 0 && LIB.words && wLeft === 0 && !rDue;
     if (late && !allDone) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
     if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[filled ? '自己把 ' + filled + ' 科作业记清楚了' : '', dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
     h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
       <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">②</span><span class="t">重做</span><span class="s">${left ? left + ' 道' : dn ? '做完了' : '今天没有'}</span></button>
       <button class="step ${LIB.words && wLeft === 0 ? 'done' : ''}" data-act="golearn" data-v="card"><span class="n">③</span><span class="t">单词</span><span class="s">${!LIB.words ? '…' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有'}</span></button>
-      <button class="step ${rToday ? 'done' : ''}" data-act="golearn" data-v="recite"><span class="n">④ 可选</span><span class="t">背诵</span><span class="s">${rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇' : '选一篇'}</span></button></div>`;
+      <button class="step ${rToday && !rDue ? 'done' : ''}" data-act="golearn" data-v="recite"><span class="n">④${rDue ? '' : ' 可选'}</span><span class="t">背诵</span><span class="s">${rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇' : '选一篇'}</span></button></div>`;
+  }
+  const yd = addD(d, -1), ydd = DB.days[yd];
+  if (isToday && ydd && !ydd.errAsked && Object.values(ydd.subj || {}).some(r => !r.none && r.min > 0)) {
+    const hw = subjects(yd).filter(s => { const r = ydd.subj[s.id]; return r && !r.none && r.min > 0; });
+    h += `<div class="card"><h3>昨天的作业批改回来了吗？</h3><p class="small muted" style="margin:0 0 8px">老师批改后才知道哪题没做对的话，现在补记到昨天（${esc(hw.map(s => s.name).join('、'))}）。</p>
+      <div class="row"><button class="btn sm primary" data-act="erryd">补记到昨天</button><button class="btn sm ghost" data-act="erryno">都记好了 / 都对了</button></div></div>`;
   }
   const dow = P(d).getDay();
   if (isToday && (dow === 0 || dow === 6 || dow === 5)) {
@@ -1018,8 +1050,6 @@ function vToday(){
       <label class="f">④ 如果……我就……</label><input type="text" data-in="woop" data-f="p" value="${esc(wo.p||'')}" placeholder="比如：如果卡住了，我就先圈出来接着往下做"></details>`;
   }
   h += `<div class="cols"><div>`;
-  if (filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
-  h += `<div class="row" style="margin:-4px 0 12px;gap:8px"><button class="btn" style="flex:1" data-act="voiceopen">${MIC.replace('<svg','<svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 说一句话记今天</button><button class="btn" style="flex:1" data-act="photoopen">${CAM} 拍照</button></div>`;
   h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
     <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
   for (const s of subs) h += subjRow(d, s, dd.subj[s.id]);
@@ -1036,6 +1066,7 @@ function vToday(){
   const tp = DB.photos.filter(p => p.d === d);
   if (tp.length) h += `<div class="card"><div class="row"><h3 style="margin:0">今天的照片</h3><span class="spacer"></span><button class="btn sm" data-act="photoopen">${CAM} 再拍</button></div><div style="margin-top:10px">${photoStrip(tp)}</div></div>`;
   h += `</div></div>`;
+  if (isToday) h += installBanner();
   return h;
 }
 const PLAY = '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>', PAUSE = '<svg viewBox="0 0 16 16"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>';
@@ -1387,7 +1418,7 @@ function extCard(it, s){
     <details style="margin-top:8px"><summary class="small" style="color:var(--accent)">做完再点开看答案</summary>
       <div class="signal good" style="margin-top:6px"><span class="k">正确答案</span>${esc(it.answer)}</div>
       ${it.kidAnswer ? `<div class="small muted">上次写的：${esc(it.kidAnswer)}</div>` : ''}
-      ${it.note ? `<div class="signal info"><span class="k">讲题提示（给家长）</span>${esc(it.note)}</div>` : ''}</details>
+      ${it.note ? `<div class="signal info"><span class="k">错在哪（给家长了解，不用讲题）</span>${esc(it.note)}</div>` : ''}</details>
     <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div></div>`;
 }
 /* ================= 错题导出：打印/存 PDF、Excel 表格 ================= */
@@ -1537,7 +1568,7 @@ function vWeek(){
   const pw = DB.weeks[addD(mon,-7)];
   if (pw && pw.adjust) h += `<div class="tip">上周定的调整：<b>${esc(pw.adjust)}</b>。这周看起来有没有用？</div>`;
   h += `<div class="card"><h3>这一周的节奏</h3>${weekGrid(st, mon, anchors)}</div>`;
-  h += `<div class="card"><div class="row"><h3 style="margin:0">观察到的模式</h3><span class="spacer"></span><button class="btn sm" data-act="copyweek">复制本周小结</button></div>${findingsHTML(findings(st, prev, anchors, passed))}</div>`;
+  h += `<div class="card"><div class="row"><h3 style="margin:0">观察到的模式</h3><span class="spacer"></span><button class="btn sm" data-act="copyweek">复制本周小结</button></div>${findingsHTML(state._fs = findings(st, prev, anchors, passed), true)}</div>`;
   const stuck = []; for (const sid in st.S) stuck.push(...st.S[sid].stuck);
   const ans = st.days.filter(d => DB.days[d] && DB.days[d].answer).map(d => ({d, text:DB.days[d].answer}));
   h += `<div class="card"><h3>本周孩子说的卡点</h3>` + (stuck.length + ans.length ? stuck.concat(ans).sort((a,b)=>a.d<b.d?-1:1).map(x=>`<p style="margin:5px 0"><span class="small faint num">${wd(x.d)}</span> ${x.sid?'<b>'+esc(subjById(x.sid).name)+'</b> ':''}${esc(x.text)}</p>`).join('') : '<div class="empty">本周没有记录卡点</div>') + `</div>`;
@@ -1549,7 +1580,8 @@ function vWeek(){
     <textarea data-in="week" data-f="found" placeholder="比如：数学中断都在前15分钟，卡在去括号">${esc(w.found||'')}</textarea>
     <label class="f">下周只调一件事</label>
     <textarea data-in="week" data-f="adjust" placeholder="比如：数学开头先做一道会做的去括号小题">${esc(w.adjust||'')}</textarea>
-    <label class="f">下周每科的固定锚点（每天最少练几分钟，定了就不轻易动）</label>
+    <label class="f">下周每科的锚点（每天最少练几分钟）</label>
+    <p class="small faint" style="margin:0 0 6px">已经按孩子最近两周的实际用时自动算好了，一般不用改。觉得不合适再改某一科。</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">` +
     subjects(addD(mon,7)).map(s => `<div class="row" style="gap:6px;flex-wrap:nowrap"><span class="dot" style="background:${s.color}"></span><span style="width:36px">${esc(s.name)}</span><input type="number" inputmode="numeric" min="0" step="5" data-in="anchor" data-s="${s.id}" value="${next[s.id]||0}" style="width:70px;padding:6px 8px"></div>`).join('') + `</div>
     <p class="small faint" style="margin:8px 0 0">锚点改动从下周开始生效。每次最多动一科，才看得出是哪个调整起了作用。</p></div>`;
@@ -1595,6 +1627,8 @@ function vMonth(){
   const emo = DB.emotions.filter(e => e.date >= from && e.date <= end);
   if (emo.length) { const c = {}; emo.forEach(e => c[e.trigger] = (c[e.trigger]||0)+1);
     h += `<div class="card"><h3>我的情绪（本月 ${emo.length} 次，停住 ${emo.filter(e=>e.paused).length} 次）</h3><p class="small muted" style="margin:0">最常被触发：${topEntries(c,3).map(e=>esc(e[0])+' '+e[1]+' 次').join('、')}</p></div>`; }
+  h += `<div class="card"><h3>这个月问老师一次</h3><p class="small muted" style="margin:0 0 8px">主动问一句：<b>「最近他有什么进步的地方吗？」</b>只问进步点，不问排名。老师每周给家长一条简短个性化消息的随机实验里，学生没拿到学分的比例降了 41%。</p>
+    <label class="f">老师说的进步点</label><textarea data-in="month" data-f="teacher" placeholder="比如：课堂上主动举手了两次">${esc(mo.teacher||'')}</textarea></div>`;
   h += `<div class="card"><h3>本月复盘</h3>
     <label class="f">这个月最重要的发现</label><textarea data-in="month" data-f="found">${esc(mo.found||'')}</textarea>
     <label class="f">下个月调整什么（节奏 / 锚点 / 问法）</label><textarea data-in="month" data-f="adjust">${esc(mo.adjust||'')}</textarea>
@@ -1827,9 +1861,17 @@ function markWord(w, ok){
   else { s.box = 0; s.done = false; s.tries = s.triesD === t ? (s.tries || 0) + 1 : 1; s.triesD = t; s.due = s.tries >= 2 ? addD(t, 1) : t; }   // 当晚再考一次，第二次还没想起来就明天
   s.u = now(); DB.words[k] = s; save();
 }
-const RST = [['','没背'],['learning','在背'],['can','会背了'],['dict','默写全对']];
+const RST = [['','没背'],['learning','在背'],['can','会背了'],['dict','默写全对'],['rv-ok','复习还会'],['rv-no','复习忘了']];
 const rState = id => (DB.recite[id] || {}).st || '';
-function setRecite(id, st){ const r = DB.recite[id] || {hist:[]}; r.st = st; r.hist = (r.hist||[]).concat([{d:today(), st}]).slice(-20); r.u = now(); DB.recite[id] = r; save(); }
+const RBOX = [3, 7, 21];                   // 会背之后隔 3、7、21 天回来检查，第 3 次还会就算记牢
+function setRecite(id, st){ const r = DB.recite[id] || {hist:[]}; r.st = st; r.hist = (r.hist||[]).concat([{d:today(), st}]).slice(-20);
+  if (st === 'can' || st === 'dict') { if (r.box == null || r.box < 0) { r.box = 0; r.due = addD(today(), RBOX[0]); } } else { r.box = -1; r.due = null; }
+  r.u = now(); DB.recite[id] = r; save(); }
+function reviewRecite(id, ok){ const r = DB.recite[id]; if (!r) return; const t = today(); r.hist = (r.hist||[]).concat([{d:t, st: ok ? 'rv-ok' : 'rv-no'}]).slice(-20);
+  if (ok) { r.box = (r.box || 0) + 1; r.due = r.box >= RBOX.length ? null : addD(t, RBOX[r.box]); if (r.box >= RBOX.length) r.solid = true; }
+  else { r.st = 'learning'; r.box = -1; r.due = null; }
+  r.u = now(); save(); }
+const reciteDue = () => (LIB.recite ? LIB.recite.items : []).filter(x => { const r = DB.recite[x.id]; return r && r.due && r.due <= today(); });
 
 function vLearn(){
   loadLib();
@@ -1913,7 +1955,7 @@ function vRecite(){
     if (k) h += `<h3 style="margin:14px 0 6px">${esc(k)}</h3>`;
     h += `<div class="card" style="padding:4px 0">` + list.filter(x => (x.kind||'') === k).map(x => { const st = rState(x.id);
       return `<div class="row" data-act="rpoem" data-v="${esc(x.id)}" style="padding:11px 16px;border-bottom:1px solid var(--line);cursor:pointer;flex-wrap:nowrap"><div style="flex:1;min-width:0"><b>${esc(x.title)}</b><div class="small muted">${[esc([x.dynasty, x.author].filter(Boolean).join(' · ')), x.mode === 'excerpt' ? '<span class="faint">重点句</span>' : x.mode === 'title' || !x.text ? '<span class="faint">只有篇目</span>' : '', x.checked === false ? '<span class="faint">未逐字校对</span>' : ''].filter(Boolean).join(' · ')}</div></div>
-        <span class="pill ${st==='dict'?'good':st==='can'?'accent':st==='learning'?'amber':''}">${RST.find(r=>r[0]===st)[1]}</span></div>`; }).join('') + `</div>`;
+        ${(DB.recite[x.id] || {}).due && DB.recite[x.id].due <= today() ? '<span class="pill amber" style="margin-right:4px">该复习</span>' : ''}<span class="pill ${st==='dict'?'good':st==='can'?'accent':st==='learning'?'amber':''}">${RST.find(r=>r[0]===st)[1]}</span></div>`; }).join('') + `</div>`;
   }
   if (LIB.recite && LIB.recite.source) h += `<p class="small faint">篇目来源：${esc(LIB.recite.source)}</p>`;
   return h;
@@ -1937,7 +1979,9 @@ function vPoem(){
   if (x.text) h += `<div style="font-family:var(--serif);font-size:19px;line-height:2;margin:16px 0 6px">` + x.text.map((ln, i) => mode === 'blank' && !(L.reveal||{})[i] ? `<div data-act="preveal" data-v="${i}" style="cursor:pointer;color:var(--ink2)">${blankLine(ln, lvl)}</div>` : `<div>${esc(ln)}</div>`).join('') + `</div>` +
     `<div class="row" style="justify-content:center"><button class="btn sm" data-act="sayzh">${SPK} 朗读</button>${mode==='blank' ? '<span class="small faint">点一行看原文</span>' : ''}</div>`;
   else h += `<p class="small muted" style="margin:14px 0">这篇只收了篇目，原文看课本。</p>`;
-  h += `</div><div class="card"><div class="small muted" style="margin-bottom:8px">现在背到哪了？</div><div class="big two">` + RST.slice(1).map(([k,n]) => `<button class="${st===k?'on':''}" data-act="rset" data-v="${k}">${n}</button>`).join('') + `</div>`;
+  const rr = DB.recite[x.id] || {};
+  if (rr.due && rr.due <= today()) h += `</div><div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>今天该复习这篇了</h3><p class="small muted" style="margin:0 0 8px">不看原文背一遍（或切到「默写自查」选「全默」），再说结果。</p><div class="big two"><button data-act="rrev" data-v="1">还会背</button><button data-act="rrev" data-v="0">有点忘了</button></div>`;
+  h += `</div><div class="card"><div class="small muted" style="margin-bottom:8px">现在背到哪了？${rr.solid ? ' <span class="pill good">已经记牢</span>' : rr.due ? ' <span class="small faint">下次复习 ' + mdShort(rr.due) + '</span>' : ''}</div><div class="big two">` + RST.slice(1, 4).map(([k,n]) => `<button class="${st===k?'on':''}" data-act="rset" data-v="${k}">${n}</button>`).join('') + `</div>`;
   const hist = (DB.recite[x.id] || {}).hist || [];
   if (hist.length) h += `<p class="small faint" style="margin:10px 0 0">记录：${hist.slice(-5).map(e => mdShort(e.d) + ' ' + RST.find(r=>r[0]===e.st)[1]).join(' → ')}</p>`;
   return h + `</div>`;
@@ -2047,7 +2091,7 @@ function syncCard(){
     `<label class="f">有配置码就直接粘贴（从另一台设备或飞书私聊里复制）</label><textarea id="sy-code" placeholder="OBS1.xxxxxxxx" style="min-height:52px"></textarea><div class="row" style="margin:8px 0 4px"><button class="btn primary" data-act="usesetup">用配置码开启</button></div><p class="small faint" style="margin:10px 0 0">没有配置码就手动填下面三格：</p>`}
     <label class="f">仓库（用户名/仓库名）</label><input type="text" id="sy-repo" value="${esc(SYNC.repo||'')}" placeholder="cditlimei/observer-data" autocapitalize="off" autocorrect="off">
     <label class="f">访问令牌（fine-grained token）</label><input type="password" id="sy-token" value="${esc(SYNC.token||'')}" placeholder="github_pat_…" autocomplete="off">
-    <label class="f">加密口令（每台设备填一样的；忘了就解不开，请记在别处）</label><input type="password" id="sy-pass" value="${esc(SYNC.pass||'')}" autocomplete="off">
+    <label class="f">加密口令（至少 10 位，每台设备填一样的；忘了就解不开，请记在别处）</label><input type="password" id="sy-pass" value="${esc(SYNC.pass||'')}" autocomplete="off">
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="syncsave">保存并同步</button>${on ? '<button class="btn" data-act="syncnow">立即同步</button><button class="btn ghost danger" data-act="syncoff">关闭同步</button>' : ''}</div>
     <details style="margin-top:12px"><summary class="small muted">怎么拿到仓库和令牌（一次性，约 5 分钟）</summary><ol class="guide">
       <li>登录 github.com → 右上角「+」→ New repository，名字填 <b>observer-data</b>，选 <b>Private</b>，创建。</li>
@@ -2091,6 +2135,11 @@ const ACT = {
   delitem: el => { delRec('items', el.dataset.v); touchDay(state.date); save(); render(); },
   conf: el => { const it = DB.items.find(x => x.id === el.dataset.v); it.conf = it.conf === el.dataset.c ? null : el.dataset.c; it.u = now(); save(); render(); },
   wizstart: () => wizStart(),
+  welcomed: () => { lsSet('observer:welcomed', true); render(); },
+  erryd: () => { const yd = addD(today(), -1); setDayField(yd, 'errAsked', 1); save(); state.date = yd; const r = DB.days[yd].subj; state.openSubj = (subjects(yd).find(s => r[s.id] && !r[s.id].none && r[s.id].min > 0) || {}).id || null; render(); window.scrollTo(0, 0); toast('点开科目，点「+」补记'); },
+  erryno: () => { setDayField(addD(today(), -1), 'errAsked', 1); save(); render(); },
+  adopt: el => { const f = (state._fs || [])[+el.dataset.v]; if (!f) return; const t = f.t.replace(/<[^>]+>/g, ''); const m = t.match(/可以问：「[^」]+」|开头先放[^。]+|回到课本[^。]+|试试「[^」]+」[^。]*|先看睡眠[^。]*|建议[^。]+/);
+    const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.adjust = m ? m[0] : t.slice(0, 60); w.u = now(); (w.fu = w.fu || {}).adjust = w.u; save(); toast('已写进「下周只调一件事」'); render(); },
   pet: el => { const pe = JSON.parse(JSON.stringify(DB.settings.pe || {})); pe.tests = pe.tests || {}; pe.tests[el.dataset.y] = pe.tests[el.dataset.y] === el.dataset.v ? '' : el.dataset.v; setSetting('pe', pe); save(); render(); },
   explain: el => { const dd = dayObj(today()) || {}; setDayField(today(), 'explain', (dd.explain || 0) + 1); save(); toast(el.dataset.v === '1' ? '好。只听不判，就是在帮他' : '让他换个说法再讲一遍'); render(); },
   golearn: el => { state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.view = el.dataset.v; state.learn.flip = false; try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
@@ -2109,6 +2158,7 @@ const ACT = {
   rterm: el => { state.learn.term = el.dataset.v; render(); },
   rpoem: el => { state.learn.poem = el.dataset.v; state.learn.view = 'poem'; state.learn.pmode = 'full'; state.learn.reveal = {}; render(); window.scrollTo(0,0); },
   pmode: el => { state.learn.pmode = el.dataset.v; state.learn.reveal = {}; render(); },
+  rrev: el => { reviewRecite(state.learn.poem, el.dataset.v === '1'); toast(el.dataset.v === '1' ? '记得真牢，隔几天再来' : '改成「在背」，再多读几遍'); render(); },
   plvl: el => { state.learn.lvl = +el.dataset.v; state.learn.reveal = {}; render(); },
   preveal: el => { state.learn.reveal[el.dataset.v] = true; render(); },
   rset: el => { setRecite(state.learn.poem, el.dataset.v); toast('记下了'); render(); },
@@ -2218,7 +2268,7 @@ const ACT = {
   hideinstall: () => { lsSet('observer:hideInstall', true); render(); },
   syncsave: () => {
     const repo = $('#sy-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/+$/,''), token = $('#sy-token').value.trim(), pass = $('#sy-pass').value;
-    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return toast('仓库格式：用户名/仓库名'); if (!token) return toast('请填访问令牌'); if (pass.length < 6) return toast('口令至少 6 位');
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return toast('仓库格式：用户名/仓库名'); if (!token) return toast('请填访问令牌'); if (pass.length < 10) return toast('口令至少 10 位');
     SYNC = Object.assign(SYNC, {repo, token, pass, err:''}); saveSync(); syncNow(true).then(render);
   },
   usesetup: () => { const cfg = parseSetupCode($('#sy-code').value); if (!cfg) return toast('配置码不对，要以 OBS1. 开头'); applySetup(cfg); },
