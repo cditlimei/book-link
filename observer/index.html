@@ -1001,12 +1001,21 @@ function vToday(){
     const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today()));
     const allDone = filled >= subs.length && subs.length && left === 0 && LIB.words && wLeft === 0;
     if (late && !allDone) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
-    if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">作业记好了，该做的都做了。早点休息。</div></div>`;
+    if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[filled ? '自己把 ' + filled + ' 科作业记清楚了' : '', dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
     h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
       <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">②</span><span class="t">重做</span><span class="s">${left ? left + ' 道' : dn ? '做完了' : '今天没有'}</span></button>
       <button class="step ${LIB.words && wLeft === 0 ? 'done' : ''}" data-act="golearn" data-v="card"><span class="n">③</span><span class="t">单词</span><span class="s">${!LIB.words ? '…' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有'}</span></button>
       <button class="step ${rToday ? 'done' : ''}" data-act="golearn" data-v="recite"><span class="n">④ 可选</span><span class="t">背诵</span><span class="s">${rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇' : '选一篇'}</span></button></div>`;
+  }
+  const dow = P(d).getDay();
+  if (isToday && (dow === 0 || dow === 6 || dow === 5)) {
+    const wo = (DB.weeks[monOf(d)] || {}).woop || {};
+    h += `<details class="card" ${wo.w ? '' : 'open'}><summary><h3 style="display:inline">这周的一句话计划</h3><span class="small faint">（自己填，3 分钟）</span></summary>
+      <label class="f">① 这周最想做到的一件事</label><input type="text" data-in="woop" data-f="w" value="${esc(wo.w||'')}" placeholder="比如：数学作业不中途换科">
+      <label class="f">② 做到了会怎么样</label><input type="text" data-in="woop" data-f="o" value="${esc(wo.o||'')}" placeholder="比如：写完能早点玩">
+      <label class="f">③ 最可能卡在哪</label><input type="text" data-in="woop" data-f="b" value="${esc(wo.b||'')}" placeholder="比如：遇到不会的题就想先做语文">
+      <label class="f">④ 如果……我就……</label><input type="text" data-in="woop" data-f="p" value="${esc(wo.p||'')}" placeholder="比如：如果卡住了，我就先圈出来接着往下做"></details>`;
   }
   h += `<div class="cols"><div>`;
   if (filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
@@ -1362,6 +1371,9 @@ function vRedo(){
       <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button><span class="spacer"></span><button class="btn sm ghost" data-act="skipitem" data-v="${it.id}">找不到原题</button></div></div>`;
   }
   if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">今天就这些。</p>`;
+  if (dn) { const ex = (dayObj(today()) || {}).explain || 0;
+    h += `<div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>讲给我听（给家长）</h3><p style="margin:0 0 8px">请他挑刚才做对的一道讲讲：<b>「这题为什么这么做？」</b>你只听，不判对错、不纠正。自己讲一遍，比听别人讲记得牢。</p>
+      <div class="row"><button class="btn sm" data-act="explain" data-v="1">听他讲完了</button><button class="btn sm ghost" data-act="explain" data-v="0">没讲清，明天再讲</button>${ex ? `<span class="small faint">今天讲了 ${ex} 次</span>` : ''}</div></div>`; }
   const up = {}; for (const it of AI) if (!it.done && it.due > today() && it.due <= addD(today(), 7)) up[it.due] = (up[it.due]||0) + 1;
   if (Object.keys(up).length) h += `<div class="card"><h3>接下来 7 天</h3><div class="row">` + Object.keys(up).sort().map(d => `<span class="pill">${mdShort(d)} ${wd(d)} · ${up[d]} 道</span>`).join('') + `</div></div>`;
   if (wk.redoN) h += `<div class="card"><h3>本周重做</h3><p style="margin:0">做了 ${wk.redoN} 次，做对 ${wk.redoOk} 次（${pct(wk.redoOk, wk.redoN)}%）。</p></div>`;
@@ -1519,6 +1531,9 @@ function vWeek(){
   const passed = range(mon, end).length;
   let h = `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="wk" data-v="-7">‹</button><div style="flex:1"><div class="d" style="font-size:20px">${md(mon)} – ${md(sun)}</div><div class="w">记录 ${st.recDays}/${passed} 天 · 错题 ${st.errN} · 重做 ${st.redoN}</div></div>
     <button class="navbtn" data-act="wk" data-v="7" ${addD(mon,7) > t ? 'disabled':''}>›</button></div></div>`;
+  const wo = w.woop || {};
+  if (wo.w) h += `<div class="card"><h3>他这周的一句话计划</h3><p style="margin:0">想做到：<b>${esc(wo.w)}</b>${wo.o ? '<br>做到了会：' + esc(wo.o) : ''}${wo.b ? '<br>可能卡在：' + esc(wo.b) : ''}${wo.p ? '<br>如果……就：' + esc(wo.p) : ''}</p><p class="small faint" style="margin:6px 0 0">这是他自己定的，只看，不改。</p></div>`;
+  h += useTopicCard(st, mon);
   const pw = DB.weeks[addD(mon,-7)];
   if (pw && pw.adjust) h += `<div class="tip">上周定的调整：<b>${esc(pw.adjust)}</b>。这周看起来有没有用？</div>`;
   h += `<div class="card"><h3>这一周的节奏</h3>${weekGrid(st, mon, anchors)}</div>`;
@@ -1670,11 +1685,15 @@ function vTrends(){
   const y0 = DB.settings.startYear;
   h += `<div class="card"><h3>初中三年</h3><div class="terms">` + TERM_N.map((n,i) => `<div class="${i===cur.idx?'now':i<cur.idx?'past':''}">${n}<b>${dcnt[i]||'·'}</b>${cnt[i]?cnt[i]+'次考试':'&nbsp;'}</div>`).join('') + `</div>
     <p class="small faint" style="margin:8px 0 10px">格子里的数字 = 记录天数</p>
+    <div class="signal" style="margin-top:4px"><span class="k">别转学</span>名额分配占公办普高计划的一半，资格是<b>从初一第一学期起一直在同一所初中就读</b>，中途转学就没有了。</div>
+    <div class="ms"><span class="when">每学期末</span><span>综合素质评价（学生自评、亲子共评、老师评语），省一级高中录取要「达标」</span></div>
+    <div class="ms"><span class="when">每学年</span><span>体质健康测试：及格就拿到当年的 3 分体育过程分，三年共 9 分</span></div>
     <div class="ms"><span class="when">${y0+1} 秋 八上</span><span>物理开课（科目自动出现）</span></div>
-    <div class="ms"><span class="when">${y0+2} 春 八下</span><span><b>生物学 + 地理合卷考</b>：各 50 分，不计中考总分，但总分相同时排第一位比较，没有成绩不能投档</span></div>
-    <div class="ms"><span class="when">${y0+2} 秋 九上</span><span>化学开课</span></div>
-    <div class="ms"><span class="when">${y0+3} 4–6月</span><span>体育现场考 4 月 · 英语听说 5 月 · 理化实验 5 月 · 笔试 6 月下旬（按 2026 年安排推算，以当年通知为准）</span></div>
+    <div class="ms"><span class="when">${y0+2} 春 八下</span><span><b>生物学 + 地理合卷考</b>（各 50 分，不计总分，同分时第一个比）· 体育通识考 2 分 · 信息科技考试</span></div>
+    <div class="ms"><span class="when">${y0+2} 秋 九上</span><span>化学开课 · 艺术科目考试</span></div>
+    <div class="ms"><span class="when">${y0+3} 3–7月</span><span>3 月报名 · 4 月体育现场考 · 5 月英语听说、理化实验 · 5 月底填志愿 · 6 月下旬笔试（按 2026 年安排推算，以当年通知为准）</span></div>
     <p class="small faint" style="margin:8px 0 0">深圳中考 630 分：语文 120 · 数学 100 · 英语 100（含听说 25）· 物理 70 · 化学 50 · 理化实验 20 · 历史 70 · 道法 50 · 体育 50。</p></div>`;
+  h += peCard();
   const room = [];
   for (const s of DB.settings.subjects) {
     if (!s.inTotal) continue;
@@ -1714,6 +1733,28 @@ function vTrends(){
     for (const s of subsNow) h += `<tr><td>${esc(s.name)}</td>` + ms.map(x => { const y = x.st.S[s.id]; return `<td class="n">${y.recOn ? pct(y.intrN, y.recOn)+'%' : '·'}</td>`; }).join('') + `</tr>`;
     h += `</table></div></div>`;
   }
+  return h;
+}
+/* 「这有什么用」：初中阶段把学习和生活、将来联系起来，对成绩的正向关联最强（Hill & Tyson 2009 meta），每周聊一个，5 分钟 */
+const USE_TOPICS = {
+  sx: ['负数：天气预报的零下几度、电梯里的地下一层、手机账单的欠费，都是负数', '比例和百分数：打折到底便宜多少？「满 200 减 50」和「七五折」哪个划算？', '方程：网约车起步价加每公里价，打多远的车刚好花 30 块？', '统计图：新闻里的图表有没有故意把纵轴截断、让变化看起来更大？', '几何展开图：快递纸箱拆开是什么形状？怎么剪才最省纸？'],
+  yw: ['说明方法：产品说明书、导航语音里用了哪些「举例子、列数字、打比方」？', '概括：让他用三句话讲一部刚看的电影，这就是阅读题里的「概括内容」', '古诗：「海内存知己」这类句子，现在的歌词、广告里还在用吗？', '作文：写一条让别人愿意看完的朋友圈，和写作文的开头是一回事'],
+  yy: ['英语在游戏、电影、说明书里：找一个他平时见得到的英文界面，看能认出几个词', '时态：用英语说「我昨天做了什么、明天打算做什么」，这就是一般过去时和将来时', '如果将来去国外旅行或看比赛，最想用英语问什么？'],
+  '*': ['你觉得现在学的哪一科，以后最可能用得上？为什么？', '你认识的大人里，谁的工作用到了你正在学的东西？', '如果可以选一个职业体验一天，你选什么？它需要会什么？']
+};
+function useTopicCard(st, mon){
+  const top = subjects(mon).map(s => [s.id, sum(Object.values(st.S[s.id] ? st.S[s.id].errs : {}))]).filter(x => USE_TOPICS[x[0]]).sort((a,b) => b[1]-a[1])[0];
+  const key = top && top[1] ? top[0] : '*', list = USE_TOPICS[key], k = Math.floor(P(mon).getTime() / 6048e5) % list.length;
+  return `<div class="card"><h3>这周聊一个「这有什么用」</h3><p style="margin:0">${esc(list[k])}</p><p class="small faint" style="margin:6px 0 0">随口聊 5 分钟，不问分数、不借机讲题。研究发现，初中家长谈学习的用处和将来，比帮着做作业更有用。</p></div>`;
+}
+const PE_LV = ['优秀','良好','及格','不及格'];
+const PE_C = [['c1','一类（耐力）',['男1000米/女800米','200米游泳','4分钟跳绳']],['c2','二类',['100米','50米游泳','实心球','1分钟跳绳','1分钟踢毽子','二级蛙跳','10米×4折返跑']],['c3','三类（球类）',['足球','篮球','排球','乒乓球','羽毛球','网球']]];
+function peCard(){
+  const pe = DB.settings.pe || {}, tests = pe.tests || {}, picks = pe.picks || {}, y0 = DB.settings.startYear;
+  let h = `<div class="card"><h3>体育（50 分）</h3><p class="small muted" style="margin:0 0 8px">每学年体测及格 = 当年 3 分过程分。现场考三类各选一项，选好就长期练，球类技术要早练。</p>`;
+  for (let i = 0; i < 3; i++) { const k = String(y0 + i), v = tests[k] || '';
+    h += `<div class="row" style="margin:6px 0"><span class="small" style="width:118px">${['七','八','九'][i]}年级体测（${y0+i}–${y0+i+1}）</span><div class="seg sm">` + PE_LV.map(l => `<button data-act="pet" data-y="${k}" data-v="${l}" class="${v===l?'on':''}">${l}</button>`).join('') + `</div>${v ? (v === '不及格' ? '<span class="pill amber">这 3 分还没拿到</span>' : '<span class="pill good">3 分到手</span>') : ''}</div>`; }
+  h += `<div class="grid2" style="margin-top:8px">` + PE_C.map(([c, n, opts]) => `<div><label class="f">${n}</label><select data-in="pepick" data-c="${c}"><option value="">还没选</option>` + opts.map(o => `<option ${picks[c]===o?'selected':''}>${o}</option>`).join('') + `</select></div>`).join('') + `</div></div>`;
   return h;
 }
 function lineChart(series, xl, W, H){
@@ -2026,6 +2067,8 @@ function methodCard(){
   <tr><td>复盘对话</td><td>你就是不努力</td><td>你卡在哪一步</td></tr>
   <tr><td>情绪标记</td><td>我快被气死了</td><td>我的哪个触发点被激活了</td></tr></table>
   <p class="small"><b>每天</b>：孩子自己计时、自己填，再重做 3 道到期错题；你只问一句。<br><b>每周日</b>：看「复盘 → 周」，写一句发现，下周只调一件事。<br><b>每月底</b>：看「复盘 → 月」和「趋势」，定一个下个月能观察到的变化。<br><b>每次考试</b>：先看自己的触发点，再和孩子聊；填完三段反思。</p>
+  <p class="small"><b>研究发现有害、别做的</b>：拿别人家孩子做批评式比较（一年后抑郁焦虑上升）；按分数给钱（2.7 万人随机实验，效果为零）；熬夜多学（第二天学业问题反而更多）；吼骂（13 岁时的严厉言语管教预测一年后抑郁和行为问题）；过度检查、辅导作业（和成绩负相关）。</p>
+  <p class="small"><b>有证据、值得做的</b>：聊学习的用处和将来；请他讲给你听（自我解释）；每周一句话计划；表扬具体做法而不是聪明；22 点前睡；每月主动问老师一次「最近的一个进步点」。</p>
   <p class="small"><b>刻意不做的</b>：家长批改打分（初中阶段家长干涉型参与和数学成绩负相关）、积分徽章和鼓励语打卡（成长型思维干预总体效应很小）、把「学得更久」当进步（数学作业时长和成绩是倒 U 形）。</p>
   <p class="small faint">工具一旦用来监控和审判，就会变成对抗的导火索。</p></details>`;
 }
@@ -2048,6 +2091,8 @@ const ACT = {
   delitem: el => { delRec('items', el.dataset.v); touchDay(state.date); save(); render(); },
   conf: el => { const it = DB.items.find(x => x.id === el.dataset.v); it.conf = it.conf === el.dataset.c ? null : el.dataset.c; it.u = now(); save(); render(); },
   wizstart: () => wizStart(),
+  pet: el => { const pe = JSON.parse(JSON.stringify(DB.settings.pe || {})); pe.tests = pe.tests || {}; pe.tests[el.dataset.y] = pe.tests[el.dataset.y] === el.dataset.v ? '' : el.dataset.v; setSetting('pe', pe); save(); render(); },
+  explain: el => { const dd = dayObj(today()) || {}; setDayField(today(), 'explain', (dd.explain || 0) + 1); save(); toast(el.dataset.v === '1' ? '好。只听不判，就是在帮他' : '让他换个说法再讲一遍'); render(); },
   golearn: el => { state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.view = el.dataset.v; state.learn.flip = false; try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
   toggleq: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.q = !queued(it); it.u = now(); save(); render(); },
   pv: el => { state.pv = el.dataset.v; state.examEdit = null; render(); window.scrollTo(0,0); },
@@ -2162,6 +2207,7 @@ const ACT = {
     if (!tr) return toast('选一个情境，或者自己写'); if (!state._lv) return toast('选一下强度');
     DB.emotions.push({id:uid('m'), date: today(), trigger: tr, level: state._lv, paused: state._ps === '1', note: $('#emo-note').value.trim(), u: now()});
     state._tr = null; state._lv = null; state._ps = null; state._trc = ''; save(); toast('记下了'); render();
+    if (DB.emotions[DB.emotions.length-1].level >= 4) setTimeout(() => alert('先慢慢呼吸 3 次：吸气数到 4，停 4，呼气数到 6。\n\n今天先别谈作业。明天再说也来得及。'), 200);
   },
   emodel: el => { if (!confirm('删除这条？')) return; delRec('emotions', el.dataset.v); save(); render(); },
   smode: el => { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); x.mode = el.dataset.v; x.u = now(); DB.settings.u = now(); save(); render(); },
@@ -2212,6 +2258,8 @@ document.addEventListener('input', e => {
   else if (k === 'rec') rec(state.date, el.dataset.s, true)[f] = v;
   else if (k === 'recmin') { const r = rec(state.date, el.dataset.s, true); r.min = Math.max(0, Math.min(600, Math.round(+v) || 0)); if (r.min) r.none = false; }
   else if (k === 'rectime') { const r = rec(state.date, el.dataset.s, true); r[f] = v; const m = spanMin(r.start, r.end); if (m && m <= 600) { r.min = m; r.none = false; const mi = document.querySelector(`[data-in="recmin"][data-s="${el.dataset.s}"]`); if (mi) mi.value = m; } }
+  else if (k === 'pepick') { const pe = JSON.parse(JSON.stringify(DB.settings.pe || {})); pe.picks = pe.picks || {}; pe.picks[el.dataset.c] = v; setSetting('pe', pe); }
+  else if (k === 'woop') { const mon = monOf(today()), w = DB.weeks[mon] = DB.weeks[mon] || {}; w.woop = Object.assign({}, w.woop || {}, {[f]: v}); w.u = now(); (w.fu = w.fu || {}).woop = w.u; }
   else if (k === 'voice') { state.voice.text = v; const pv = $('#vqprev'); if (pv) pv.innerHTML = v ? speechPreview(parseSpeech(v, state.date)) : ''; return; }
   else if (k === 'item') { const it = DB.items.find(x => x.id === el.dataset.id); if (it) { it[f] = v; it.u = now(); } }
   else if (k === 'week') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w[f] = v; w.u = now(); (w.fu = w.fu || {})[f] = w.u; }

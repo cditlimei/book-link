@@ -1,5 +1,5 @@
 // 网络优先（3 秒超时回退缓存）：在线时拿最新版本，弱网/离线用缓存。只缓存成功的响应。改版本号即可让旧缓存失效。
-const V = 'observer-v4';
+const V = 'observer-v5';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png',
   './data/words.json', './data/recite.json', './data/books.json'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
