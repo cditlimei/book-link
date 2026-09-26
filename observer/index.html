@@ -51,7 +51,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
-#top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+#top{position:sticky;top:0;z-index:20;background:var(--bg);background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .topin{max-width:880px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;align-items:center;gap:10px}
 .brand{font-family:var(--serif);font-size:20px;font-weight:700;letter-spacing:.02em}
 .term{font-size:13px;color:var(--ink2)}
@@ -382,9 +382,12 @@ const pct = (a,b) => b ? Math.round(a*100/b) : 0;
 const range = (from,to) => { const r=[]; for(let d=from; d<=to; d=addD(d,1)) r.push(d); return r; };
 const splitTags = s => String(s||'').split(/[,，、;；\s]+/).map(x=>x.trim()).filter(Boolean);
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-const now = () => Date.now();
+let clockMax = 0;                                   // 混合逻辑时钟：u 永远大于见过的最大时间戳，设备钟慢也不会被旧值覆盖
+const now = () => { clockMax = Math.max(Date.now(), clockMax + 1); return clockMax; };
+const observeClock = x => { if (x && x.u) clockMax = Math.max(clockMax, x.u); };
 const topEntries = (o, n) => Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0, n||3);
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2000); }
+const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a.toFixed(2)})`; };
 const hm = ts => { const d = new Date(ts); return pad(d.getHours())+':'+pad(d.getMinutes()); };
 
 /* 学段：9–1 月上学期，2–6 月下学期，7–8 月暑假 */
@@ -412,7 +415,15 @@ const IDB = {
     return new Promise((res, rej) => { try { const r = indexedDB.open('observer-app', 1);
       r.onupgradeneeded = () => r.result.createObjectStore('kv');
       r.onsuccess = () => { this.db = r.result; res(this.db); }; r.onerror = () => rej(r.error); } catch(e) { rej(e); } }); },
-  async get(k){ try { const db = await this.open(); return await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); } catch(e) { return undefined; } },
+  failed: false,
+  async get(k){
+    for (let i = 0; i < 2; i++) {
+      try { const db = await this.open(); return await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+      catch(e) { this.db = null; await new Promise(r => setTimeout(r, 300)); }
+    }
+    if (k === K_DB) this.failed = true;          // 读不出主库：本次不写 IDB，免得拿旧副本覆盖好数据
+    return undefined;
+  },
   async del(k){ try { const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } catch(e) {} },
   async set(k, v){ try { const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); return true; } catch(e) { return false; } }
 };
@@ -445,7 +456,7 @@ function migrate(x){
     for (const d in x.days) { const dd = x.days[d]; for (const sid in (dd.subj||{})) { const r = dd.subj[sid];
       const tag = splitTags(r.tag)[0] || '';
       if (r.errs) for (const t of ET) for (let i = 0; i < (r.errs[t.k]||0); i++)
-        x.items.push({id:uid('i'), d, sid, type:t.k, conf:null, tag, box:0, due:addD(d, BOXES[0]), hist:[], done:false, u:now()});
+        x.items.push({id:`v1-${d}-${sid}-${t.k}-${i}`, d, sid, type:t.k, conf:null, tag, box:0, due:addD(d, BOXES[0]), hist:[], done:false, u:1});
       delete r.errs; delete r.tag; } }
     x.v = 2;
   }
@@ -458,7 +469,7 @@ async function load(){
   // 先比修改时间，时间相同（旧版没有 u）比内容多少，防止空库盖掉有数据的旧版
   const size = x => Object.keys(x.days||{}).length + (x.items||[]).length + (x.exams||[]).length;
   const best = cands.filter(c => c[0]).sort((a,b) => ((b[0].u||0)-(a[0].u||0)) || (size(b[0]) - size(a[0])))[0];
-  if (best) { DB = migrate(best[0]); loadedFrom = best[1]; }
+  if (best) { DB = migrate(best[0]); loadedFrom = best[1]; observeClock(DB); }
   else { DB = fresh(); if (DEMO) { seedDemo(); DB = migrate(DB); } }
   SYNC = (await IDB.get(K_SYNC)) || lsGet(K_SYNC) || {};
   if (DEMO) SYNC = {};
@@ -472,6 +483,7 @@ function save(){
 function flush(){
   clearTimeout(writeT); if (!pendingLocal) return; pendingLocal = false;
   const ok1 = lsSet(K_DB, DB);
+  if (IDB.failed) { if (!ok1) toast('保存失败：请关掉 app 重新打开'); return; }
   IDB.set(K_DB, JSON.parse(JSON.stringify(DB))).then(ok2 => { if (!ok1 && !ok2) toast('保存失败：浏览器存储不可用，请马上导出备份'); });
 }
 const saveSync = () => { if (DEMO) return; IDB.set(K_SYNC, SYNC); lsSet(K_SYNC, SYNC); };
@@ -493,6 +505,7 @@ function orderedSubjects(d){
 }
 const filledRec = r => r && (r.none || r.min > 0);
 function dayObj(d, create){ let x = DB.days[d]; if (!x && create) x = DB.days[d] = {subj:{}, u:now()}; return x; }
+function setSetting(f, v){ const s = DB.settings; s[f] = v; s.fu = s.fu || {}; s.fu[f] = now(); s.u = now(); }
 function touchDay(d){ const x = dayObj(d, true); x.u = now(); return x; }
 function setDayField(d, f, v){ const x = touchDay(d); x[f] = v; x.fu = x.fu || {}; x.fu[f] = now(); return x; }
 function rec(d, sid, create){
@@ -690,7 +703,8 @@ function timerStart(sid){
 function timerPause(){ const tm = DB.timer; if (!tm || !tm.start) return; tm.acc += now() - tm.start; tm.start = null; tm.pauses.push(tm.acc/60000); save(); render(); }
 function timerStop(){
   const tm = DB.timer; if (!tm) return;
-  const ms = timerElapsed(tm), mins = Math.max(1, Math.round(ms/60000));
+  const ms = timerElapsed(tm); let mins = Math.max(1, Math.round(ms/60000));
+  if (mins > 180) { const v = prompt(`计时器走了 ${mins} 分钟，可能是忘了停。实际做了多少分钟？`, ''); if (v === null) return; mins = Math.max(0, Math.min(600, Math.round(+v) || 0)); if (!mins) { DB.timer = null; save(); render(); return; } }
   const r = rec(tm.d, tm.sid, true);
   r.min = (r.min||0) + mins; r.none = false;
   if (tm.pauses.length && (!r.intr || r.intr === 'none')) { const p = tm.pauses[0], total = ms/60000; r.intr = p < 15 ? 'early' : p > total*0.75 ? 'late' : 'mid'; }
@@ -712,7 +726,7 @@ async function deriveKey(pass, salt, iter){
   return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
 }
 async function encryptDB(obj, pass){
-  let bytes = new TextEncoder().encode(JSON.stringify(obj)); const gz = typeof CompressionStream !== 'undefined';
+  let bytes = new TextEncoder().encode(JSON.stringify(obj)); const gz = false;   // 不压缩：iPadOS 15 没有 DecompressionStream，压缩后老设备读不了
   if (gz) bytes = await gzip(bytes);
   const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iter = 210000;
   const key = await deriveKey(pass, salt, iter);
@@ -721,9 +735,10 @@ async function encryptDB(obj, pass){
 }
 async function decryptDB(text, pass){
   const env = JSON.parse(text);
+  if (!(env.iter > 0 && env.iter <= 2000000)) throw Object.assign(new Error('云端数据格式不对'), {kind:'format'});
   const key = await deriveKey(pass, b64d(env.salt), env.iter);
   let bytes = new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(env.iv)}, key, b64d(env.ct)));
-  if (env.gz) bytes = await gzip(bytes, true);
+  if (env.gz) { if (typeof DecompressionStream === 'undefined') throw Object.assign(new Error('这台设备的系统太旧，读不了压缩过的云端数据：请先在新设备上点一次「立即同步」'), {kind:'gz'}); bytes = await gzip(bytes, true); }
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 /* 配置码：一台设备配好后复制给另一台（iPad 主屏幕 app 与 Safari 存储隔离，也靠它） */
@@ -755,12 +770,46 @@ async function ghPush(text, sha){
   if (!r.ok) throw new Error('上传失败：GitHub 返回 ' + r.status);
   return 'ok';
 }
+/* 通用：按字段取新（字段时间 fu[f]，没有就用整条 u），hist 取并集 */
+function mergeRec(x, y){
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const out = clone(x); out.fu = Object.assign({}, x.fu||{}); let l = false, r = false;
+  const ft = (o, f) => o[f] === undefined ? -1 : o.fu ? (o.fu[f] || 0) : (o.u || 0);
+  for (const f of new Set(Object.keys(x).concat(Object.keys(y)))) {
+    if (f === 'u' || f === 'fu' || f === 'hist') continue;
+    if (JSON.stringify(x[f]) === JSON.stringify(y[f])) continue;
+    const a = ft(x, f), b = ft(y, f);
+    if (b > a) { out[f] = clone(y[f]); out.fu[f] = b; r = true; } else l = true;
+  }
+  if (x.hist || y.hist) {
+    const seen = new Set(), all = [];
+    for (const h of (x.hist||[]).concat(y.hist||[])) { const k = JSON.stringify(h); if (!seen.has(k)) { seen.add(k); all.push(h); } }
+    all.sort((a,b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+    if (all.length > (x.hist||[]).length) r = true; if (all.length > (y.hist||[]).length) l = true;
+    out.hist = all;
+  }
+  out.u = Math.max(x.u||0, y.u||0);
+  return {v: out, l, r};
+}
+/* 设置：普通字段按 fu；科目按 id + 各自 u；锚点按科目 */
+function mergeSettings(x, y){
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const {subjects: sa = [], anchors: aa = {}, ...xr} = x, {subjects: sb = [], anchors: ab = {}, ...yr} = y;
+  const m = mergeRec(xr, yr); let l = m.l, r = m.r; const out = m.v;
+  const A = new Map(sa.map(s => [s.id, s])), B = new Map(sb.map(s => [s.id, s]));
+  out.subjects = [...new Set([...A.keys(), ...B.keys()])].map(id => { const p = A.get(id), q = B.get(id);
+    if (p && !q) { l = true; return clone(p); } if (q && !p) { r = true; return clone(q); }
+    if (JSON.stringify(p) === JSON.stringify(q)) return clone(p);
+    if ((q.u||0) > (p.u||0)) { r = true; return clone(q); } l = true; return clone(p); });
+  out.anchors = Object.assign({}, ab, aa);
+  return {v: out, l, r};
+}
 /* 同一天：各科记录按各自 u、当天字段按 fu 分别取新——两台设备同一天各填各的不会互相覆盖 */
 function mergeDay(x, y){
   const clone = o => JSON.parse(JSON.stringify(o));
   const out = clone(x); out.fu = Object.assign({}, x.fu||{}); out.subj = Object.assign({}, x.subj||{});
   let l = false, r = false;
-  const ft = (o, f) => o[f] === undefined ? -1 : ((o.fu && o.fu[f]) || o.u || 0);
+  const ft = (o, f) => o[f] === undefined ? -1 : o.fu ? (o.fu[f] || 0) : (o.u || 0);
   for (const f of ['mood','q','answer','note']) {
     if (x[f] === y[f]) continue;
     const a = ft(x, f), b = ft(y, f);
@@ -790,7 +839,7 @@ function mergeDB(L, R){
     const a = L[k]||{}, b = R[k]||{};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
-      if (k === 'days' && x && y) { const m = mergeDay(x, y); M[k][key] = m.v; lN = lN || m.l; rN = rN || m.r; continue; }
+      if (x && y) { const m = k === 'days' ? mergeDay(x, y) : mergeRec(x, y); M[k][key] = m.v; lN = lN || m.l; rN = rN || m.r; continue; }
       if (x && (!y || (x.u||0) > (y.u||0))) lN = true;
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
@@ -806,7 +855,7 @@ function mergeDB(L, R){
     }
     M[k] = out;
   }
-  if ((R.settings.u||0) > (L.settings.u||0)) { rN = true; M.settings = clone(R.settings); } else if ((L.settings.u||0) > (R.settings.u||0)) lN = true;
+  { const m = mergeSettings(L.settings || {}, R.settings || {}); M.settings = m.v; lN = lN || m.l; rN = rN || m.r; }
   M.timer = L.timer; M.u = Math.max(L.u||0, R.u||0);
   return {M, lN, rN};
 }
@@ -821,14 +870,15 @@ async function syncNow(manual, depth){
     flush();
     const {text, sha} = await ghPull();
     let remote = null;
-    if (text) { try { remote = migrate(await decryptDB(text, SYNC.pass)); } catch(e) { throw new Error('口令不对，解不开云端数据'); } }
+    if (text) { try { remote = migrate(await decryptDB(text, SYNC.pass)); } catch(e) { throw new Error(e.kind ? e.message : e.name === 'OperationError' ? '口令不对，解不开云端数据' : '云端数据读不出来：' + (e.message || e.name)); } }
     let target = DB, push = !remote, changedLocal = false;
     if (remote) { const {M, lN, rN} = mergeDB(DB, remote); target = M; push = lN; changedLocal = rN; }
     if (push) {
       const res = await ghPush(await encryptDB(Object.assign({}, target, {timer:null}), SYNC.pass), sha);
       if (res === 'conflict') { syncing = false; if ((depth||0) < 2) return syncNow(manual, (depth||0)+1); throw new Error('云端同时被改动，请稍后再同步'); }
     }
-    if (changedLocal) { target.timer = DB.timer; DB = target; reindex(); pendingLocal = true; flush(); if (!isTyping()) render(); else pendingRender = true; }
+    if (remote) observeClock(remote);
+    if (changedLocal) { const cur = mergeDB(DB, target).M; cur.timer = DB.timer; DB = cur; reindex(); pendingLocal = true; flush(); if (!isTyping()) render(); else pendingRender = true; }
     await uploadPhotos();
     SYNC.last = now(); saveSync();
     if (manual) toast(push || changedLocal ? '已同步' : '已是最新');
@@ -1031,12 +1081,14 @@ const ghFileURL = path => `https://api.github.com/repos/${SYNC.repo.trim()}/cont
 async function uploadPhotos(){
   let n = 0;
   for (const p of DB.photos.filter(x => !x.up)) {
-    const blob = await IDB.get('photo:' + p.id); if (!blob) continue;
-    const env = await encryptBytes(new Uint8Array(await blob.arrayBuffer()), SYNC.pass);
-    const r = await fetch(ghFileURL(photoPath(p)), {method:'PUT', headers: ghHeaders(), body: JSON.stringify({message:'photo ' + p.id, content: btoa(env)})});
-    if (r.ok || r.status === 422) { p.up = true; p.u = now(); n++; }
-    else throw new Error('照片上传失败：GitHub 返回 ' + r.status);
+    try {
+      const blob = await IDB.get('photo:' + p.id); if (!blob) continue;
+      const env = await encryptBytes(new Uint8Array(await blob.arrayBuffer()), SYNC.pass);
+      const r = await fetch(ghFileURL(photoPath(p)), {method:'PUT', headers: ghHeaders(), body: JSON.stringify({message:'photo ' + p.id, content: btoa(env)})});
+      if (r.ok || r.status === 422) { p.up = true; p.u = now(); n++; } else SYNC.photoErr = '有照片没传上去（GitHub 返回 ' + r.status + '），下次同步再试';
+    } catch(e) { SYNC.photoErr = '有照片没传上去，下次同步再试'; }
   }
+  if (!DB.photos.some(x => !x.up)) SYNC.photoErr = '';
   if (n) { DB.u = now(); pendingLocal = true; flush(); syncAgain = true; }   // 把「已上传」标记马上同步出去
   return n;
 }
@@ -1329,7 +1381,7 @@ function vExport(){
   return h;
 }
 function exportCSV(){
-  const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  const q = v => { v = v == null ? '' : String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
   const head = ['日期','科目','错误类型','具体问题','知识点','题干','正确答案','孩子当时的答案','做的时候','卡点','来源','重做次数','重做做对','状态','下次重做'];
   const lines = [head.join(',')].concat(exportRows().map(it => [it.d, subjById(it.sid).name, typeName(it), subName(it), it.tag, it.stem || '', it.answer || '', it.kidAnswer || '', it.conf ? CONF.find(c=>c.k===it.conf).n : '', it.ext ? '' : itemStuck(it), it.ext ? '拍照错题本 · ' + (it.src||'') : '每日记录', (it.hist||[]).length, (it.hist||[]).filter(h=>h.ok).length, itemStatus(it), it.done ? '' : it.due].map(q).join(',')));
   download('错题-' + today() + '.csv', '﻿' + lines.join('\r\n'), 'text/csv');
@@ -1432,7 +1484,7 @@ function weekGrid(st, mon, anchors){
       if (!r) { h += `<div class="c blank">${e ? `<span class="e">×${e}</span>` : '?'}</div>`; continue; }
       if (r.none) { h += `<div class="c blank">—</div>`; continue; }
       const ratio = a ? Math.min(1.4, (r.min||0)/a) : 0.6;
-      h += `<div class="c" style="background:color-mix(in srgb, ${s.color} ${Math.round(12 + ratio*45)}%, var(--surface))">${r.min||0}${r.intr && r.intr !== 'none' ? '<span class="intr"></span>' : ''}${e ? `<span class="e">×${e}</span>` : ''}</div>`;
+      h += `<div class="c" style="background:${tint(s.color, (12 + ratio*45)/100)}">${r.min||0}${r.intr && r.intr !== 'none' ? '<span class="intr"></span>' : ''}${e ? `<span class="e">×${e}</span>` : ''}</div>`;
     }
     const avg = x.days ? Math.round(x.min/x.days) : 0;
     h += `<div class="tot"><span>${avg||'–'}</span><span class="faint">/${a}</span></div>`;
@@ -1884,6 +1936,7 @@ function syncCard(){
   const on = syncReady();
   return `<div class="card"><h3>云同步 ${on ? `<span class="pill ${SYNC.err?'amber':'good'}">${SYNC.err ? '出错' : '已开启'}</span>` : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">加密后存进你自己的 GitHub 私有仓库。iPad 和电脑填同一套设置，数据自动合并；每次同步都留一个版本，三年都能回看。口令只在你的设备上，GitHub 上只有看不懂的密文。</p>
+    ${SYNC.photoErr ? `<div class="signal"><span class="k">照片</span>${esc(SYNC.photoErr)}</div>` : ''}
     ${SYNC.err ? `<div class="signal"><span class="k">上次同步失败</span>${esc(SYNC.err)}</div>` : on && SYNC.last ? `<p class="small">上次同步：${new Date(SYNC.last).toLocaleString('zh-CN')}${SYNC.exp ? ' · 令牌 '+md(SYNC.exp)+' 到期' : ''}</p>` : ''}
     ${on ? `<div class="row"><button class="btn" data-act="copysetup">复制配置码给另一台设备</button></div><p class="small faint" style="margin:6px 0 10px">在另一台设备（或 iPad 主屏幕上的图标）打开家长页，粘贴这段配置码即可，不用再填三格。配置码里有令牌和口令，别发到群里。</p>
     <details ${SYNC.err ? 'open' : ''} style="margin-bottom:10px"><summary class="small" style="color:var(--accent)">换成新的配置码（令牌续期后用）</summary><textarea id="sy-code" placeholder="OBS1.xxxxxxxx" style="min-height:52px;margin-top:6px"></textarea><div class="row" style="margin-top:8px"><button class="btn primary sm" data-act="usesetup">用新配置码</button></div></details>` :
@@ -1967,7 +2020,7 @@ const ACT = {
   voiceopen: () => { state.voice = {text:''}; render(); },
   voiceclose: () => { if (recog) recog.stop(); state.voice = null; render(); },
   voiceapply: () => { const p = parseSpeech(state.voice.text || '', state.date); if (!p.rows.length) return toast('没认出科目，要说出科目名'); if (recog) recog.stop(); applySpeech(p, state.date); state.voice = null; toast('写入了 ' + p.rows.length + ' 科'); render(); },
-  toggleext: () => { DB.settings.useExt = DB.settings.useExt === false; DB.settings.u = now(); save(); render(); },
+  toggleext: () => { setSetting('useExt', DB.settings.useExt === false); save(); render(); },
   expf: el => { const f = state.exp; const k = el.dataset.f; f[k] = k === 'answers' ? el.dataset.v === '1' : el.dataset.v; render(); },
   expcsv: () => { exportCSV(); toast('已导出，用 Excel 或 WPS 打开'); },
   expprint: () => exportPrint(),
@@ -2043,10 +2096,10 @@ const ACT = {
     state._tr = null; state._lv = null; state._ps = null; state._trc = ''; save(); toast('记下了'); render();
   },
   emodel: el => { if (!confirm('删除这条？')) return; delRec('emotions', el.dataset.v); save(); render(); },
-  smode: el => { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); x.mode = el.dataset.v; DB.settings.u = now(); save(); render(); },
+  smode: el => { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); x.mode = el.dataset.v; x.u = now(); DB.settings.u = now(); save(); render(); },
   saddsub: () => { const n = $('#newsubj').value.trim(); if (!n) return;
-    DB.settings.subjects.push({id:uid('c'), name:n, color: EXTRA_COLORS[DB.settings.subjects.length % EXTRA_COLORS.length], zk:100, from:0, to:5, inTotal:false, mode:'on'}); DB.settings.u = now(); save(); render(); },
-  setpin: () => { const v = $('#newpin').value.trim(); if (v && !/^\d{4}$/.test(v)) return toast('请输入 4 位数字'); DB.settings.pin = v; DB.settings.u = now(); save(); toast(v ? '密码已设置' : '密码已取消'); render(); },
+    DB.settings.subjects.push({id:uid('c'), name:n, color: EXTRA_COLORS[DB.settings.subjects.length % EXTRA_COLORS.length], zk:100, from:0, to:5, inTotal:false, mode:'on', u:now()}); DB.settings.u = now(); save(); render(); },
+  setpin: () => { const v = $('#newpin').value.trim(); if (v && !/^\d{4}$/.test(v)) return toast('请输入 4 位数字'); setSetting('pin', v); save(); toast(v ? '密码已设置' : '密码已取消'); render(); },
   copylink: () => { const u = location.origin + location.pathname; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('链接已复制')).catch(() => prompt('复制这个链接', u)); },
   hideinstall: () => { lsSet('observer:hideInstall', true); render(); },
   syncsave: () => {
@@ -2063,17 +2116,17 @@ const ACT = {
     flush(); const txt = JSON.stringify(Object.assign({}, DB, {timer:null}), null, 1);
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type:'application/json'}));
     a.download = '每日观察备份-' + today() + '.json'; document.body.appendChild(a); a.click(); a.remove();
-    if (!DEMO) { DB.settings.lastBackup = new Date().toISOString(); save(); }
+    if (!DEMO) { setSetting('lastBackup', new Date().toISOString()); save(); }
     toast('已导出，把文件发到飞书私聊存档'); render();
   },
   copy: () => {
     const txt = JSON.stringify(Object.assign({}, DB, {timer:null}));
     (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => {
-      if (!DEMO) { DB.settings.lastBackup = new Date().toISOString(); save(); } toast('已复制'); render();
+      if (!DEMO) { setSetting('lastBackup', new Date().toISOString()); save(); } toast('已复制'); render();
     }).catch(() => { const t = $('#importt'); t.value = txt; t.closest('details').open = true; t.select(); toast('请手动全选复制'); });
   },
   importtext: () => importData($('#importt').value),
-  wipe: () => { if (!confirm('清空本机数据？开了云同步的话，云端数据不受影响。')) return; if (!confirm('真的清空？建议先导出备份。')) return; DB = fresh(); pendingLocal = true; flush(); render(); },
+  wipe: () => { if (!confirm('清空本机数据？开了云同步的话，云端数据不受影响。')) return; if (!confirm('真的清空？建议先导出备份。')) return; DB = fresh(); try { localStorage.removeItem(LEGACY); } catch(e) {} pendingLocal = true; flush(); render(); },
 };
 function importData(txt){
   try {
@@ -2092,11 +2145,11 @@ document.addEventListener('input', e => {
   else if (k === 'rectime') { const r = rec(state.date, el.dataset.s, true); r[f] = v; const m = spanMin(r.start, r.end); if (m && m <= 600) { r.min = m; r.none = false; const mi = document.querySelector(`[data-in="recmin"][data-s="${el.dataset.s}"]`); if (mi) mi.value = m; } }
   else if (k === 'voice') { state.voice.text = v; const pv = $('#vqprev'); if (pv) pv.innerHTML = v ? speechPreview(parseSpeech(v, state.date)) : ''; return; }
   else if (k === 'item') { const it = DB.items.find(x => x.id === el.dataset.id); if (it) { it[f] = v; it.u = now(); } }
-  else if (k === 'week') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w[f] = v; w.u = now(); }
-  else if (k === 'anchor') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.next = Object.assign({}, anchorsFor(state.week), w.next||{}); w.next[el.dataset.s] = Math.max(0, +v||0); w.u = now(); }
-  else if (k === 'month') { const m = DB.months[state.month] = DB.months[state.month] || {}; m[f] = v; m.u = now(); }
-  else if (k === 'set') { DB.settings[f] = f === 'startYear' ? (+v || 2026) : v; DB.settings.u = now(); }
-  else if (k === 'sname') { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); if (x && v.trim()) { x.name = v.trim(); DB.settings.u = now(); } }
+  else if (k === 'week') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w[f] = v; w.u = now(); (w.fu = w.fu || {})[f] = w.u; }
+  else if (k === 'anchor') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.next = Object.assign({}, anchorsFor(state.week), w.next||{}); w.next[el.dataset.s] = Math.max(0, +v||0); w.u = now(); (w.fu = w.fu || {}).next = w.u; }
+  else if (k === 'month') { const m = DB.months[state.month] = DB.months[state.month] || {}; m[f] = v; m.u = now(); (m.fu = m.fu || {})[f] = m.u; }
+  else if (k === 'set') { setSetting(f, f === 'startYear' ? (+v || 2026) : v); }
+  else if (k === 'sname') { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); if (x && v.trim()) { x.name = v.trim(); x.u = now(); DB.settings.u = now(); } }
   save();
 });
 document.addEventListener('change', e => {
@@ -2106,6 +2159,10 @@ document.addEventListener('change', e => {
   if (e.target.closest('[data-in="recmin"],[data-in="rectime"]')) render();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.wiz) { state.wiz = null; render(); } });
+let lastToday = today();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; const t = today(); if (t === lastToday) return;
+  if (state.date === lastToday) state.date = t; if (state.week === monOf(lastToday)) state.week = monOf(t); if (state.month === mKey(lastToday)) state.month = mKey(t);
+  lastToday = t; render(); });
 let rt; window.addEventListener('resize', () => { if (state.tab !== 'trends') return; clearTimeout(rt); rt = setTimeout(render, 200); });
 
 /* ================= 示例数据（只在 ?demo 下生成，独立存储） ================= */
