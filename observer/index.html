@@ -306,7 +306,7 @@ const DEMO = QS.has('demo');
 const K_DB = DEMO ? 'observer:db-demo' : 'observer:db';
 const K_SYNC = 'observer:sync';
 const LEGACY = 'observer-v1';
-let DB, SYNC = {};
+let DB, SYNC = {}, loadedFrom = null;
 const IDB = {
   db: null,
   open(){ if (this.db) return Promise.resolve(this.db);
@@ -324,13 +324,13 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, items:[], exams:[], emotions:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, items:[], exams:[], emotions:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
-  for (const k of ['days','weeks','months','del']) x[k] = x[k] || {};
+  for (const k of ['days','weeks','months','del','extReview']) x[k] = x[k] || {};
   for (const k of ['items','exams','emotions']) x[k] = x[k] || [];
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
   const subs = x.settings.subjects || [];
@@ -353,10 +353,12 @@ function migrate(x){
   return x;
 }
 async function load(){
-  const cands = [await IDB.get(K_DB), lsGet(K_DB)];
-  if (!DEMO) cands.push(lsGet(LEGACY));
-  const best = cands.filter(Boolean).sort((a,b)=>(b.u||0)-(a.u||0))[0];
-  if (best) DB = migrate(best);
+  const cands = [[await IDB.get(K_DB), 'idb'], [lsGet(K_DB), 'ls']];
+  if (!DEMO) cands.push([lsGet(LEGACY), 'legacy']);
+  // 先比修改时间，时间相同（旧版没有 u）比内容多少，防止空库盖掉有数据的旧版
+  const size = x => Object.keys(x.days||{}).length + (x.items||[]).length + (x.exams||[]).length;
+  const best = cands.filter(c => c[0]).sort((a,b) => ((b[0].u||0)-(a[0].u||0)) || (size(b[0]) - size(a[0])))[0];
+  if (best) { DB = migrate(best[0]); loadedFrom = best[1]; }
   else { DB = fresh(); if (DEMO) { seedDemo(); DB = migrate(DB); } }
   SYNC = (await IDB.get(K_SYNC)) || lsGet(K_SYNC) || {};
   if (DEMO) SYNC = {};
@@ -451,7 +453,7 @@ function stats(from, to){
   const errs = {calc:0,concept:0,read:0};
   for (const sid in S) for (const t of ET) errs[t.k] += S[sid].errs[t.k];
   let redoN = 0, redoOk = 0;
-  for (const it of DB.items) for (const h of (it.hist||[])) if (h.d >= from && h.d <= to) { redoN++; if (h.ok) redoOk++; }
+  for (const it of allItems()) for (const h of (it.hist||[])) if (h.d >= from && h.d <= to) { redoN++; if (h.ok) redoOk++; }
   return {S, days, recDays, mood, errByDay, errs, errN: sum(Object.values(errs)), tagsByType, conf, from, to, dayMin, redoN, redoOk};
 }
 
@@ -519,10 +521,29 @@ function findings(st, prev, anchors, nDays, monthly){
 }
 const findingsHTML = fs => fs.map(f => `<div class="signal ${f.k}"><span class="k">${{signal:'信号',good:'好的变化',info:'说明'}[f.k]}</span>${f.t}</div>`).join('');
 
+/* ================= 拍照错题本（../math/data/errors.json，同域只读） =================
+   题干/答案/讲题提示由 Claude 收录流程写入；这里只保存重做进度（DB.extReview），不改原文件 */
+let EXT = [];
+const EXT_TYPE = {cuxin:'calc', fufenshu:'calc', buzhou:'calc', fuhao:'concept', kuohao:'concept', dishu:'concept', gainian:'concept', fangfa:'concept', shenti:'read', biaoda:'read'};
+async function loadExt(){
+  try {
+    const [er, kt] = await Promise.all([
+      fetch('../math/data/errors.json', {cache:'no-cache'}).then(r => r.json()),
+      fetch('../math/data/kaodian-tree.json', {cache:'no-cache'}).then(r => r.json()).catch(() => ({nodes:[]}))]);
+    const names = Object.fromEntries((kt.nodes||[]).map(n => [n.id, n.name]));
+    EXT = (er.records||[]).filter(r => r.confirmed && r.status === 'active').map(r => ({
+      id:'m:'+r.id, ext:true, d:r.date, sid:'sx', type: EXT_TYPE[r.errorType] || 'concept', conf:null,
+      tag: (r.kaodian||[]).map(k => names[k] || k).join('、'), stem:r.stem, answer:r.answer, kidAnswer:r.kidAnswer,
+      note:r.errorNote, src:[r.source, r.sourceDetail].filter(Boolean).join(' · '), due0: r.review && r.review.due || addD(r.date, BOXES[0])}));
+  } catch(e) { EXT = []; }
+}
+function extItems(){ return EXT.map(x => Object.assign({}, x, {box:0, due:x.due0, hist:[], done:false}, DB.extReview[x.id] || {})); }
+const allItems = () => DB.items.concat(extItems());
+
 /* ================= 错题重做队列 ================= */
 function dueList(t){
   t = t || today();
-  const due = DB.items.filter(it => !it.done && it.due <= t);
+  const due = allItems().filter(it => !it.done && it.due <= t);
   const pri = it => (it.conf === 'sure' ? 0 : it.conf === 'unsure' ? 1 : it.conf === 'no' ? 3 : 2);
   due.sort((a,b) => pri(a)-pri(b) || (a.due < b.due ? -1 : 1));
   // 交错：同一科目 / 知识点尽量不连着出
@@ -534,12 +555,14 @@ function dueList(t){
   }
   return out;
 }
-function doneToday(){ const t = today(); return DB.items.filter(it => (it.hist||[]).some(h => h.d === t)).length; }
+function doneToday(){ const t = today(); return allItems().filter(it => (it.hist||[]).some(h => h.d === t)).length; }
 function redoItem(id, ok){
-  const it = DB.items.find(x => x.id === id); if (!it) return;
-  const t = today(); it.hist = it.hist || []; it.hist.push({d:t, ok}); it.u = now();
+  const ext = id.startsWith('m:');
+  const it = ext ? extItems().find(x => x.id === id) : DB.items.find(x => x.id === id); if (!it) return;
+  const t = today(); it.hist = (it.hist || []).slice(); it.hist.push({d:t, ok}); it.u = now();
   if (ok) { it.box = (it.box||0) + 1; if (it.box >= BOXES.length) { it.done = true; toast('这道算掌握了'); } else { it.due = addD(t, BOXES[it.box]); toast(BOXES[it.box]+' 天后再做一次'); } }
   else { it.box = 0; it.due = addD(t, 1); toast('明天再来一次，不着急'); }
+  if (ext) DB.extReview[id] = {box:it.box, due:it.due, hist:it.hist, done:it.done, u:it.u};
   save(); render();
 }
 
@@ -590,6 +613,15 @@ async function decryptDB(text, pass){
   if (env.gz) bytes = await gzip(bytes, true);
   return JSON.parse(new TextDecoder().decode(bytes));
 }
+/* 配置码：一台设备配好后复制给另一台（iPad 主屏幕 app 与 Safari 存储隔离，也靠它） */
+const b64url = str => b64e(new TextEncoder().encode(str)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const unb64url = str => { str = str.replace(/-/g,'+').replace(/_/g,'/'); while (str.length % 4) str += '='; return new TextDecoder().decode(b64d(str)); };
+const makeSetupCode = () => 'OBS1.' + b64url(JSON.stringify({r:SYNC.repo, t:SYNC.token, p:SYNC.pass}));
+function parseSetupCode(text){
+  const m = String(text||'').match(/OBS1\.([A-Za-z0-9_-]+)/); if (!m) return null;
+  try { const o = JSON.parse(unb64url(m[1])); return o.r && o.t && o.p ? {repo:o.r, token:o.t, pass:o.p} : null; } catch(e) { return null; }
+}
+function applySetup(cfg){ SYNC = Object.assign({}, SYNC, cfg, {err:''}); saveSync(); return syncNow(true).then(render); }
 const syncReady = () => !DEMO && SYNC.repo && SYNC.token && SYNC.pass;
 function ghURL(){ return `https://api.github.com/repos/${SYNC.repo.trim()}/contents/${encodeURIComponent(SYNC.path || 'observer.enc.json')}`; }
 const ghHeaders = accept => ({Authorization:'Bearer ' + SYNC.token.trim(), Accept: accept || 'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28'});
@@ -619,7 +651,7 @@ function mergeDB(L, R){
   M.del = Object.assign({}, Ld);
   for (const id in Rd) if ((Rd[id]||0) > (M.del[id]||0)) { M.del[id] = Rd[id]; rN = true; }
   for (const id in Ld) if (!Rd[id]) lN = true;
-  for (const k of ['days','weeks','months']) {
+  for (const k of ['days','weeks','months','extReview']) {
     const a = L[k]||{}, b = R[k]||{};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
@@ -816,17 +848,18 @@ function vErrors(){
 }
 function vRedo(){
   const due = dueList(), dn = doneToday();
-  const mastered = DB.items.filter(it => it.done && !it.skipped).length, active = DB.items.filter(it => !it.done).length;
+  const AI = allItems(); const mastered = AI.filter(it => it.done && !it.skipped).length, active = AI.filter(it => !it.done).length;
   const wk = stats(monOf(today()), today());
   const quotaAll = Math.min(DAILY_REDO, due.length + dn);
   let h = `<div class="kpis"><div class="kpi"><b>${dn}<span class="faint" style="font-size:16px">/${quotaAll || DAILY_REDO}</span></b><span>今天做了</span></div><div class="kpi"><b>${active}</b><span>还在队列里</span></div><div class="kpi"><b>${mastered}</b><span>已掌握</span></div></div>`;
   h += `<p class="sub">翻到错题本上的原题，<b>盖住答案重做一遍</b>，再对答案。自己回忆一遍比重看答案管用得多。</p>`;
   const quota = Math.max(0, DAILY_REDO - dn);
   const shown = state.showAllDue ? due : due.slice(0, quota);
-  if (!due.length) h += `<div class="card empty">${dn ? `今天重做了 ${dn} 道，够了。` : DB.items.length ? '今天没有到期的题。' : '还没有错题。在「今天」页点开科目，点「+ 计算错误」这类按钮记一道。'}</div>`;
+  if (!due.length) h += `<div class="card empty">${dn ? `今天重做了 ${dn} 道，够了。` : AI.length ? '今天没有到期的题。' : '还没有错题。在「今天」页点开科目，点「+ 计算错误」这类按钮记一道。'}</div>`;
   else if (!shown.length) h += `<div class="card empty">今天做了 ${dn} 道，够了。剩下 ${due.length} 道明天再说。<div style="margin-top:8px"><button class="btn sm" data-act="alldue">还想做就继续</button></div></div>`;
   for (const it of shown) {
     const s = subjById(it.sid); const r = DB.days[it.d] && DB.days[it.d].subj[it.sid];
+    if (it.ext) { h += extCard(it, s); continue; }
     const nth = (it.hist||[]).length + 1;
     h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${ETN[it.type]}</span>${it.conf==='sure'?'<span class="pill amber">有把握却错了 · 优先</span>':''}<span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
       <div class="q">${it.tag ? esc(it.tag) : '（没标知识点）'}</div>
@@ -834,10 +867,21 @@ function vRedo(){
       <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button><span class="spacer"></span><button class="btn sm ghost" data-act="skipitem" data-v="${it.id}">找不到原题</button></div></div>`;
   }
   if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">另外还有 ${due.length - shown.length} 道到期，每天最多 ${DAILY_REDO} 道，明天再排。<a href="#" data-act="alldue" style="color:var(--accent)">全部显示</a></p>`;
-  const up = {}; for (const it of DB.items) if (!it.done && it.due > today() && it.due <= addD(today(), 7)) up[it.due] = (up[it.due]||0) + 1;
+  const up = {}; for (const it of AI) if (!it.done && it.due > today() && it.due <= addD(today(), 7)) up[it.due] = (up[it.due]||0) + 1;
   if (Object.keys(up).length) h += `<div class="card"><h3>接下来 7 天</h3><div class="row">` + Object.keys(up).sort().map(d => `<span class="pill">${mdShort(d)} ${wd(d)} · ${up[d]} 道</span>`).join('') + `</div></div>`;
   if (wk.redoN) h += `<div class="card"><h3>本周重做</h3><p style="margin:0">做了 ${wk.redoN} 次，做对 ${wk.redoOk} 次（${pct(wk.redoOk, wk.redoN)}%）。</p></div>`;
   return h;
+}
+function extCard(it, s){
+  const nth = (it.hist||[]).length + 1;
+  return `<div class="card redo"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill accent">拍照错题本</span><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${ETN[it.type]}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
+    <div class="q" style="font-family:var(--mono);font-size:17px">${esc(it.stem)}</div>
+    <div class="small muted">${esc(it.src)}${it.tag ? ' · '+esc(it.tag) : ''}</div>
+    <details style="margin-top:8px"><summary class="small" style="color:var(--accent)">做完再点开看答案</summary>
+      <div class="signal good" style="margin-top:6px"><span class="k">正确答案</span>${esc(it.answer)}</div>
+      ${it.kidAnswer ? `<div class="small muted">上次写的：${esc(it.kidAnswer)}</div>` : ''}
+      ${it.note ? `<div class="signal info"><span class="k">讲题提示（给家长）</span>${esc(it.note)}</div>` : ''}</details>
+    <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div></div>`;
 }
 function periodRange(p){
   const t = today();
@@ -918,7 +962,7 @@ function vWeek(){
   const pw = DB.weeks[addD(mon,-7)];
   if (pw && pw.adjust) h += `<div class="tip">上周定的调整：<b>${esc(pw.adjust)}</b>。这周看起来有没有用？</div>`;
   h += `<div class="card"><h3>这一周的节奏</h3>${weekGrid(st, mon, anchors)}</div>`;
-  h += `<div class="card"><h3>观察到的模式</h3>${findingsHTML(findings(st, prev, anchors, passed))}</div>`;
+  h += `<div class="card"><div class="row"><h3 style="margin:0">观察到的模式</h3><span class="spacer"></span><button class="btn sm" data-act="copyweek">复制本周小结</button></div>${findingsHTML(findings(st, prev, anchors, passed))}</div>`;
   const stuck = []; for (const sid in st.S) stuck.push(...st.S[sid].stuck);
   const ans = st.days.filter(d => DB.days[d] && DB.days[d].answer).map(d => ({d, text:DB.days[d].answer}));
   h += `<div class="card"><h3>本周孩子说的卡点</h3>` + (stuck.length + ans.length ? stuck.concat(ans).sort((a,b)=>a.d<b.d?-1:1).map(x=>`<p style="margin:5px 0"><span class="small faint num">${wd(x.d)}</span> ${x.sid?'<b>'+esc(subjById(x.sid).name)+'</b> ':''}${esc(x.text)}</p>`).join('') : '<div class="empty">本周没有记录卡点</div>') + `</div>`;
@@ -937,6 +981,19 @@ function vWeek(){
   const past = Object.keys(DB.weeks).filter(k => DB.weeks[k].found || DB.weeks[k].adjust).sort().reverse();
   if (past.length) h += `<div class="card"><h3>历次周调整</h3>` + past.slice(0,12).map(k => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><a href="#" data-act="wkgo" data-v="${k}" class="small num" style="color:var(--accent)">${md(k)} 那周</a><div>${esc(DB.weeks[k].found||'')}</div>${DB.weeks[k].adjust?`<div class="small muted">→ ${esc(DB.weeks[k].adjust)}</div>`:''}</div>`).join('') + `</div>`;
   return h;
+}
+function weekSummary(mon){
+  const sun = addD(mon,6), t = today(), end = sun < t ? sun : t;
+  const st = stats(mon, end), prev = stats(addD(mon,-7), addD(mon,-1)), anchors = anchorsFor(mon), w = DB.weeks[mon] || {};
+  const L = [`【${DB.settings.child}·本周小结】${md(mon)}–${md(sun)}`, `记录 ${st.recDays}/${range(mon,end).length} 天 · 错题 ${st.errN} 道 · 重做 ${st.redoN} 次（对 ${st.redoOk}）`];
+  const rows = subjects(mon).map(s => { const x = st.S[s.id]; if (!x.recOn) return null; const avg = x.days ? Math.round(x.min/x.days) : 0; const e = sum(Object.values(x.errs));
+    return `· ${s.name}：日均 ${avg} 分钟（锚点 ${anchors[s.id]||0}）${x.intrN ? '，中断 '+x.intrN+' 次' : ''}${e ? '，错 '+e : ''}`; }).filter(Boolean);
+  if (rows.length) L.push('', '各科：', ...rows);
+  if (st.errN) L.push('', '错题类型：' + ET.map(t => `${t.n} ${st.errs[t.k]}`).join(' / '));
+  L.push('', '观察到的：', ...findings(st, prev, anchors, range(mon,end).length).map(f => '· ' + f.t.replace(/<[^>]+>/g,'')));
+  if (w.found) L.push('', '这周发现：' + w.found);
+  if (w.adjust) L.push('下周只调：' + w.adjust);
+  return L.join('\n');
 }
 function vMonth(){
   const m = state.month, from = m+'-01', end = monthEnd(m), t = today(), to = end < t ? end : t;
@@ -1171,6 +1228,8 @@ function syncCard(){
   return `<div class="card"><h3>云同步 ${on ? `<span class="pill ${SYNC.err?'amber':'good'}">${SYNC.err ? '出错' : '已开启'}</span>` : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">加密后存进你自己的 GitHub 私有仓库。iPad 和电脑填同一套设置，数据自动合并；每次同步都留一个版本，三年都能回看。口令只在你的设备上，GitHub 上只有看不懂的密文。</p>
     ${SYNC.err ? `<div class="signal"><span class="k">上次同步失败</span>${esc(SYNC.err)}</div>` : on && SYNC.last ? `<p class="small">上次同步：${new Date(SYNC.last).toLocaleString('zh-CN')}</p>` : ''}
+    ${on ? `<div class="row"><button class="btn" data-act="copysetup">复制配置码给另一台设备</button></div><p class="small faint" style="margin:6px 0 10px">在另一台设备（或 iPad 主屏幕上的图标）打开家长页，粘贴这段配置码即可，不用再填三格。配置码里有令牌和口令，别发到群里。</p>` :
+    `<label class="f">有配置码就直接粘贴（从另一台设备或飞书私聊里复制）</label><textarea id="sy-code" placeholder="OBS1.xxxxxxxx" style="min-height:52px"></textarea><div class="row" style="margin:8px 0 4px"><button class="btn primary" data-act="usesetup">用配置码开启</button></div><p class="small faint" style="margin:10px 0 0">没有配置码就手动填下面三格：</p>`}
     <label class="f">仓库（用户名/仓库名）</label><input type="text" id="sy-repo" value="${esc(SYNC.repo||'')}" placeholder="cditlimei/observer-data" autocapitalize="off" autocorrect="off">
     <label class="f">访问令牌（fine-grained token）</label><input type="password" id="sy-token" value="${esc(SYNC.token||'')}" placeholder="github_pat_…" autocomplete="off">
     <label class="f">加密口令（每台设备填一样的；忘了就解不开，请记在别处）</label><input type="password" id="sy-pass" value="${esc(SYNC.pass||'')}" autocomplete="off">
@@ -1269,6 +1328,9 @@ const ACT = {
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return toast('仓库格式：用户名/仓库名'); if (!token) return toast('请填访问令牌'); if (pass.length < 6) return toast('口令至少 6 位');
     SYNC = Object.assign(SYNC, {repo, token, pass, err:''}); saveSync(); syncNow(true).then(render);
   },
+  usesetup: () => { const cfg = parseSetupCode($('#sy-code').value); if (!cfg) return toast('配置码不对，要以 OBS1. 开头'); applySetup(cfg); },
+  copysetup: () => { const code = makeSetupCode(); (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => toast('配置码已复制')).catch(() => prompt('复制这段配置码', code)); },
+  copyweek: () => { const txt = weekSummary(state.week); (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('本周小结已复制，可以粘贴到飞书')).catch(() => prompt('复制本周小结', txt)); },
   syncnow: () => { if (syncReady()) syncNow(true); else if (!DEMO) setTab('me'); },
   syncoff: () => { if (!confirm('关闭同步？本机数据保留，云端数据也保留。')) return; SYNC = {}; saveSync(); render(); },
   export: () => {
@@ -1371,10 +1433,13 @@ function seedDemo(){
 /* ================= 启动 ================= */
 (async function boot(){
   await load();
+  await loadExt();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e) {}
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
   render();
-  if (!DEMO && lsGet(LEGACY) && !lsGet(K_DB)) { pendingLocal = true; flush(); }
+  if (loadedFrom === 'legacy') { pendingLocal = true; flush(); }
+  const hs = location.hash.match(/setup=(OBS1\.[A-Za-z0-9_-]+)/);
+  if (hs && !DEMO) { history.replaceState(null, '', location.pathname + location.search); const cfg = parseSetupCode(hs[1]); if (cfg && confirm('用这个链接开启云同步？')) { state.tab = 'me'; await applySetup(cfg); return; } }
   if (syncReady()) syncNow();
 })();
 </script>
