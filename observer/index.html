@@ -616,10 +616,10 @@ async function decryptDB(text, pass){
 /* 配置码：一台设备配好后复制给另一台（iPad 主屏幕 app 与 Safari 存储隔离，也靠它） */
 const b64url = str => b64e(new TextEncoder().encode(str)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const unb64url = str => { str = str.replace(/-/g,'+').replace(/_/g,'/'); while (str.length % 4) str += '='; return new TextDecoder().decode(b64d(str)); };
-const makeSetupCode = () => 'OBS1.' + b64url(JSON.stringify({r:SYNC.repo, t:SYNC.token, p:SYNC.pass}));
+const makeSetupCode = () => 'OBS1.' + b64url(JSON.stringify(Object.assign({r:SYNC.repo, t:SYNC.token, p:SYNC.pass}, SYNC.exp ? {e:SYNC.exp} : {})));
 function parseSetupCode(text){
   const m = String(text||'').match(/OBS1\.([A-Za-z0-9_-]+)/); if (!m) return null;
-  try { const o = JSON.parse(unb64url(m[1])); return o.r && o.t && o.p ? {repo:o.r, token:o.t, pass:o.p} : null; } catch(e) { return null; }
+  try { const o = JSON.parse(unb64url(m[1])); return o.r && o.t && o.p ? Object.assign({repo:o.r, token:o.t, pass:o.p}, o.e ? {exp:o.e} : {}) : null; } catch(e) { return null; }
 }
 function applySetup(cfg){ SYNC = Object.assign({}, SYNC, cfg, {err:''}); saveSync(); return syncNow(true).then(render); }
 const syncReady = () => !DEMO && SYNC.repo && SYNC.token && SYNC.pass;
@@ -628,7 +628,7 @@ const ghHeaders = accept => ({Authorization:'Bearer ' + SYNC.token.trim(), Accep
 async function ghPull(){
   const r = await fetch(ghURL() + '?t=' + now(), {headers: ghHeaders(), cache:'no-store'});
   if (r.status === 404) return {text:null, sha:null};
-  if (r.status === 401 || r.status === 403) throw new Error('令牌无效或没有这个仓库的权限');
+  if (r.status === 401 || r.status === 403) throw new Error('令牌无效、已过期，或没有这个仓库的权限');
   if (!r.ok) throw new Error('GitHub 返回 ' + r.status);
   const j = await r.json();
   let text = j.content ? new TextDecoder().decode(b64d(j.content.replace(/\n/g,''))) : null;
@@ -753,6 +753,8 @@ function banners(){
     const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
     if (gap >= 7) h += `<div class="signal"><span class="k">备份提醒</span>${lb ? gap+' 天没备份了' : '还没备份过'}。数据只存在这台设备里。在「家长」页开启云同步，就不用再手动备份。<div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="export">导出备份</button><button class="btn sm" data-act="tab" data-v="me">去开同步</button></div></div>`;
   }
+  if (syncReady() && SYNC.exp) { const left = dayDiff(today(), SYNC.exp);
+    if (left <= 7) h += `<div class="signal"><span class="k">同步令牌${left < 0 ? '已过期' : left + ' 天后到期'}</span>到期后数据只存本机、不再同步。请家长重新生成 GitHub 令牌（有效期选 1 年）并更新配置码。</div>`; }
   // 家长情绪连续偏高 → 今晚只听不讲（Maloney 2015：焦虑高 + 辅导多 → 孩子学得更少）
   const recent = DB.emotions.filter(e => e.date >= addD(today(), -3));
   if (recent.filter(e => +e.level >= 4).length >= 2) h += `<div class="tip">今晚建议：<b>只听孩子说卡点，不讲题</b>。</div>`;
@@ -1227,7 +1229,7 @@ function syncCard(){
   const on = syncReady();
   return `<div class="card"><h3>云同步 ${on ? `<span class="pill ${SYNC.err?'amber':'good'}">${SYNC.err ? '出错' : '已开启'}</span>` : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">加密后存进你自己的 GitHub 私有仓库。iPad 和电脑填同一套设置，数据自动合并；每次同步都留一个版本，三年都能回看。口令只在你的设备上，GitHub 上只有看不懂的密文。</p>
-    ${SYNC.err ? `<div class="signal"><span class="k">上次同步失败</span>${esc(SYNC.err)}</div>` : on && SYNC.last ? `<p class="small">上次同步：${new Date(SYNC.last).toLocaleString('zh-CN')}</p>` : ''}
+    ${SYNC.err ? `<div class="signal"><span class="k">上次同步失败</span>${esc(SYNC.err)}</div>` : on && SYNC.last ? `<p class="small">上次同步：${new Date(SYNC.last).toLocaleString('zh-CN')}${SYNC.exp ? ' · 令牌 '+md(SYNC.exp)+' 到期' : ''}</p>` : ''}
     ${on ? `<div class="row"><button class="btn" data-act="copysetup">复制配置码给另一台设备</button></div><p class="small faint" style="margin:6px 0 10px">在另一台设备（或 iPad 主屏幕上的图标）打开家长页，粘贴这段配置码即可，不用再填三格。配置码里有令牌和口令，别发到群里。</p>` :
     `<label class="f">有配置码就直接粘贴（从另一台设备或飞书私聊里复制）</label><textarea id="sy-code" placeholder="OBS1.xxxxxxxx" style="min-height:52px"></textarea><div class="row" style="margin:8px 0 4px"><button class="btn primary" data-act="usesetup">用配置码开启</button></div><p class="small faint" style="margin:10px 0 0">没有配置码就手动填下面三格：</p>`}
     <label class="f">仓库（用户名/仓库名）</label><input type="text" id="sy-repo" value="${esc(SYNC.repo||'')}" placeholder="cditlimei/observer-data" autocapitalize="off" autocorrect="off">
