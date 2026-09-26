@@ -115,7 +115,7 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 /* 首页 hero */
 .hero{padding:14px 16px 12px}
 .hero-top{display:flex;align-items:center;gap:8px}
-.hero .d{font-family:var(--serif);font-size:24px;font-weight:700;line-height:1.2}
+.hero .d{font-family:var(--serif);font-size:24px;font-weight:700;line-height:1.2;white-space:nowrap}
 .hero .w{color:var(--ink2);font-size:13px}
 .navbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:18px;color:var(--ink2);flex:none}
 .navbtn:disabled{opacity:.3}
@@ -128,6 +128,29 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .wstrip .rec i{background:var(--accent-bg);border-color:var(--accent-bg);color:var(--accent)}
 .wstrip .sel i{border-color:var(--ink);border-width:2px}
 .wstrip .fut{opacity:.35}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.kpi .v{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1}
+.kpi .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:2px}
+.kpi .l{font-size:13px;color:var(--ink2);margin-top:4px}
+.todo{padding:4px 0}
+.todo-r{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:none;border:0;border-top:1px solid var(--line);text-align:left;font-size:17px;color:var(--ink)}
+.todo-r:first-child{border-top:0}
+.todo-r .ck{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;flex:none}
+.todo-r.done .ck{background:var(--good);border-color:var(--good)}
+.todo-r.done .t{color:var(--ink3)}
+.todo-r.next .ck{border-color:var(--accent)}
+.todo-r .t{font-weight:600;flex:1}
+.todo-r .s{font-size:14px;color:var(--ink2)}
+.todo-r .chev{color:var(--ink3);font-size:20px}
+.tools{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:-4px 0 14px}
+.tools .btn{color:var(--ink2)}
+.streak{font-size:14px;color:var(--amber);background:var(--amber-bg);border-radius:20px;padding:4px 10px;white-space:nowrap}
+.streak b{font-family:var(--mono);font-size:16px}
+details.more{margin:6px 0 14px}
+details.more>summary{cursor:pointer;color:var(--accent);font-size:15px;padding:10px 4px;list-style:none}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::before{content:'▸ '}
+details.more[open]>summary::before{content:'▾ '}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .step{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--surface);text-align:left;display:flex;flex-direction:column;gap:2px;min-height:74px;box-shadow:var(--shadow)}
 .step .n{font-size:12px;color:var(--ink3)}
@@ -538,6 +561,7 @@ function queued(it){
 }
 const queueWhy = it => it.q === true ? '手动加入' : it.ext ? '拍照错题本' : it.conf === 'sure' ? '有把握却错了' : it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2 ? '同一个问题出现了 ' + REP[it.sid + '|' + it.sub] + ' 次' : '';
 const itemsOn = (d, sid) => (IDX[d] || []).filter(it => !sid || it.sid === sid);
+function streak(){ let d = dayHasData(today()) ? today() : addD(today(), -1), n = 0; while (dayHasData(d) && n < 2000) { n++; d = addD(d, -1); } return n; }
 function dayHasData(d){
   if (itemsOn(d).length) return true;
   const dd = DB.days[d]; if (!dd) return false;
@@ -1090,12 +1114,12 @@ function vToday(){
   let h = isToday ? banners() : '';
   h += `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="day" data-v="-1">‹</button>
     <div style="flex:1;min-width:0"><div class="d">${md(d)}</div><div class="w">${wd(d)}${isToday?' · 今天':' · <a href="#" data-act="day" data-v="0" style="color:var(--accent)">回到今天</a>'}</div></div>
-    <button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
+    ${isToday && streak() > 1 ? `<span class="streak">连续 <b>${streak()}</b> 天</span>` : ''}<button class="navbtn" data-act="wkshow" aria-label="看这周">${state.showWeek ? '▴' : '▾'}</button><button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
 </div>
-    <div class="wstrip">` + range(mon, addD(mon,6)).map(x => `<button data-act="goday" data-v="${x}" class="${dayHasData(x)?'rec':''} ${x===d?'sel':''} ${x>today()?'fut':''}" ${x>today()?'disabled':''}>${WD[P(x).getDay()]}<i>${P(x).getDate()}</i></button>`).join('') + `</div></div>`;
-  if (filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
-  h += `<div class="row" style="margin:-4px 0 12px;gap:8px"><button class="btn" style="flex:1" data-act="voiceopen">${MIC.replace('<svg','<svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 说一句话记今天</button><button class="btn" style="flex:1" data-act="photoopen">${CAM} 拍照</button><button class="btn" style="flex:1" data-act="tuopen">问 AI 老师</button></div>`;
-  if (isToday) h += welcomeCard();
+    ${!state.showWeek && isToday ? '</div>' : `<div class="wstrip">` + range(mon, addD(mon,6)).map(x => `<button data-act="goday" data-v="${x}" class="${dayHasData(x)?'rec':''} ${x===d?'sel':''} ${x>today()?'fut':''}" ${x>today()?'disabled':''}>${WD[P(x).getDay()]}<i>${P(x).getDate()}</i></button>`).join('') + `</div></div>`}`;
+  if (!isToday && filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
+  const tools = `<div class="tools"><button class="btn sm ghost" data-act="voiceopen">${MIC.replace('<svg','<svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 说一句话记今天</button><button class="btn" style="flex:1" data-act="photoopen">${CAM} 拍照</button><button class="btn" style="flex:1" data-act="tuopen">问 AI 老师</button></div>`;
+  if (!isToday) h += tools;
   if (isToday) { const pl = planFor(monOf(d)); if (pl && !pl.manual && pl.m && pl.m.kind !== 'total') h += `<div class="tip">这周的小调整：<b>${esc(pl.act)}</b></div>`; }
   if (isToday) {
     loadLib();
@@ -1108,12 +1132,21 @@ function vToday(){
     const allDone = filled >= subs.length && subs.length && left === 0 && LIB.words && wLeft === 0 && !rDue;
     if (late && !allDone) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
     if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[filled ? '自己把 ' + filled + ' 科作业记清楚了' : '', dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
-    h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
+    const T = [
+      {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length && subs.length > 0, act: filled < subs.length ? 'wizstart' : 'scroll', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
+      {t: '重做错题', s: left ? left + ' 道' : dn ? '做完了' : '今天没有', done: left === 0, act: 'tab', v: 'errors', go: `重做 ${left} 道错题`},
+      {t: '背单词', s: !LIB.words ? '…' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有', done: !!LIB.words && wLeft === 0, act: 'golearn', v: 'card', go: `背 ${wLeft} 个单词`},
+      {t: '背古诗', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
+    const nx = T.find(x => !x.done && !x.opt);
+    if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
+    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done' : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + tools + welcomeCard();
+    if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
       <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">②</span><span class="t">重做</span><span class="s">${left ? left + ' 道' : dn ? '做完了' : '今天没有'}</span></button>
       <button class="step ${LIB.words && wLeft === 0 ? 'done' : ''}" data-act="golearn" data-v="card"><span class="n">③</span><span class="t">单词</span><span class="s">${!LIB.words ? '…' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有'}</span></button>
       <button class="step ${rToday && !rDue ? 'done' : ''}" data-act="golearn" data-v="recite"><span class="n">④${rDue ? '' : ' 可选'}</span><span class="t">背诵</span><span class="s">${rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇' : '选一篇'}</span></button></div>`;
   }
+  let more = '', nMore = 0; const h0 = h; h = '';
   const yd = addD(d, -1), ydd = DB.days[yd];
   if (isToday && ydd && !ydd.errAsked && Object.values(ydd.subj || {}).some(r => !r.none && r.min > 0)) {
     const hw = subjects(yd).filter(s => { const r = ydd.subj[s.id]; return r && !r.none && r.min > 0; });
@@ -1129,23 +1162,24 @@ function vToday(){
       <label class="f">③ 最可能卡在哪</label><input type="text" data-in="woop" data-f="b" value="${esc(wo.b||'')}" placeholder="比如：遇到不会的题就想先做语文">
       <label class="f">④ 如果……我就……</label><input type="text" data-in="woop" data-f="p" value="${esc(wo.p||'')}" placeholder="比如：如果卡住了，我就先圈出来接着往下做"></details>`;
   }
-  h += `<div class="cols"><div>`;
+  more = h; h = h0; nMore = (more.match(/<h3/g) || []).length;
   h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
     <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
   for (const s of subs) h += subjRow(d, s, dd.subj[s.id]);
   if (filled && filled < subs.length) h += `<div class="sr" style="padding:10px 16px"><button class="btn sm ghost" data-act="restnone">其余 ${subs.length - filled} 科今天都没作业</button></div>`;
-  h += `</div><p class="small faint" style="margin:-4px 4px 12px">让孩子自己点 ▶ 开始、做完点「做完了」；中途离开就点暂停，会自动记成中断。只记实际发生的，没有「计划用时」。</p></div><div>`;
+  h += `</div><p class="small faint" style="margin:-4px 4px 12px">开始写哪科就点 ▶，写完点「做完了」。</p>`;
   const qi = (P(d).getTime()/864e5|0) % QUESTIONS.length;
   const errSub = subs.filter(s => taxOf(s.id)).map(s => [s, itemsOn(d, s.id).length]).filter(x => x[1]).sort((a,b)=>b[1]-a[1])[0];
   const q = dd.q || (errSub ? errSub[0].name + '：' + taxOf(errSub[0].id).ask[qi % taxOf(errSub[0].id).ask.length] : QUESTIONS[qi]);
-  h += `<div class="card" id="askq"><h3>今晚只问一句</h3>
+  nMore++;
+  more += `<div class="card" id="askq"><h3>今晚只问一句 <span class="small faint">（家长）</span></h3>
     <div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div style="flex:1;font-family:var(--serif);font-size:17px">「${esc(q)}」</div><button class="btn sm ghost" data-act="nextq">换一句</button></div>
     <label class="f">孩子怎么回答的（可选，原话就好）</label>
     <div class="withmic"><textarea id="t-ans" data-in="day" data-f="answer" placeholder="比如：第二题第三步，不确定用相遇还是追及">${esc(dd.answer||'')}</textarea>${micBtn('t-ans')}</div>
     <p class="small faint" style="margin:8px 0 0">问「卡在哪一步」，不问「为什么又错」。只听，不批改。</p></div>`;
   const tp = DB.photos.filter(p => p.d === d);
-  if (tp.length) h += `<div class="card"><div class="row"><h3 style="margin:0">今天的照片</h3><span class="spacer"></span><button class="btn sm" data-act="photoopen">${CAM} 再拍</button></div><div style="margin-top:10px">${photoStrip(tp)}</div></div>`;
-  h += `</div></div>`;
+  if (tp.length) h += `<div class="card"><div class="row"><h3 style="margin:0">${isToday ? '今天' : '这天'}的照片</h3><span class="spacer"></span><button class="btn sm" data-act="photoopen">${CAM} 再拍</button></div><div style="margin-top:10px">${photoStrip(tp)}</div></div>`;
+  if (more) h += `<details class="more" ${state.moreOpen || !isToday ? 'open' : ''}><summary data-act="moretog">还可以做的 ${nMore} 件事（可选）</summary>${more}</details>`;
   if (isToday) h += installBanner();
   return h;
 }
@@ -1569,8 +1603,8 @@ function vRedo(){
   const wk = stats(monOf(today()), today());
   const RQ = redoQuota(), quotaAll = Math.min(RQ, due.length + dn);
   let h = `<div class="kpis" style="grid-template-columns:1fr 1fr"><div class="kpi"><b>${dn}<span class="faint" style="font-size:16px">/${quotaAll || RQ}</span></b><span>今天做了</span></div><div class="kpi"><b>${mastered}</b><span>已经掌握</span></div></div>
-    <p class="small faint" style="margin:-4px 0 10px">只重做最值得的题：有把握却错了的、同一个问题反复出现的、拍照收录的。其余的错题照样记着，不天天催。</p>`;
-  h += `<p class="sub">翻到错题本上的原题，<b>盖住答案重做一遍</b>，再对答案。自己回忆一遍比重看答案管用得多。</p>`;
+`;
+  h += `<p class="sub">翻到原题，<b>盖住答案重做一遍</b>，再对答案。</p>`;
   if (EXT.length) {
     const on = DB.settings.useExt !== false, dates = [...new Set(EXT.map(x => x.d))].sort();
     h += `<div class="signal info"><span class="k">题目从哪来</span>${on ? `队列里有 <b>${EXT.length} 道</b>来自拍照错题本（${dates.map(md).join('、')} 拍照收录，你确认过的），其余是每天在「今天」页记的错题。` : `拍照错题本里有 ${EXT.length} 道题，现在没放进重做。`}
@@ -1587,7 +1621,7 @@ function vRedo(){
     h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span>${it.conf==='sure'?'<span class="pill amber">有把握却错了 · 优先</span>':''}<span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
       <div class="q">${it.tag ? esc(it.tag) : '（没标知识点）'}</div>
       <div class="small muted">${md(it.d)}的${esc(s.name)}作业${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
-      <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button><span class="spacer"></span><button class="btn sm ghost" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</button><button class="btn sm ghost" data-act="skipitem" data-v="${it.id}">找不到原题</button></div></div>`;
+      <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div><div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</a><a href="#" class="small faint" data-act="skipitem" data-v="${it.id}">找不到原题</a></div></div>`;
   }
   if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">今天就这些。</p>`;
   if (dn) { const ex = (dayObj(today()) || {}).explain || 0;
@@ -1750,6 +1784,7 @@ function vWeek(){
   const passed = range(mon, end).length;
   let h = `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="wk" data-v="-7">‹</button><div style="flex:1"><div class="d" style="font-size:20px">${md(mon)} – ${md(sun)}</div><div class="w">记录 ${st.recDays}/${passed} 天 · 错题 ${st.errN} · 重做 ${st.redoN}</div></div>
     <button class="navbtn" data-act="wk" data-v="7" ${addD(mon,7) > t ? 'disabled':''}>›</button></div></div>`;
+  const heroLen = h.length;
   const wo = w.woop || {};
   if (wo.w) h += `<div class="card"><h3>他这周的一句话计划</h3><p style="margin:0">想做到：<b>${esc(wo.w)}</b>${wo.o ? '<br>做到了会：' + esc(wo.o) : ''}${wo.b ? '<br>可能卡在：' + esc(wo.b) : ''}${wo.p ? '<br>如果……就：' + esc(wo.p) : ''}</p><p class="small faint" style="margin:6px 0 0">这是他自己定的，只看，不改。</p></div>`;
   h += useTopicCard(st, mon);
@@ -1781,6 +1816,14 @@ function vWeek(){
   if (hist.length) h += `<div class="card"><h3>调整记录</h3><p class="small faint" style="margin:0 0 6px">每周试一件事，下一周看数据有没有变化。没效果的会自动换下一条。</p>` + hist.map(k => { const a = DB.weeks[k].auto, man = DB.weeks[k].adjust;
     const on = addD(k, 7), v = a && !man && !a.skip ? verdict(a.base, metricValue(a.m, on, addD(on, 6) < today() ? addD(on, 6) : today())) : null;
     return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span class="small faint num">${md(on)} 那周试的</span><div>${esc(man || (a && !a.skip ? a.act : '这周没调'))}${man ? ' <span class="small faint">（家长写的）</span>' : ''}</div>${v ? `<div class="small"><span class="pill ${v.k==='good'?'good':v.k==='bad'?'amber':''}">${v.t}</span> <span class="faint">${esc(metricLabel(a.m))}：${metricFmt(a.m, a.base)} → ${metricFmt(a.m, metricValue(a.m, on, addD(on, 6) < today() ? addD(on, 6) : today()))}</span></div>` : ''}</div>`; }).join('') + `</div>`;
+  // 先看摘要（3 个数 + 1 条最该关注的），细节收起来
+  const ac = autoWeekCard(mon, end), rest = h.slice(heroLen).replace(ac, '');
+  const avg = st.dayMin.length ? Math.round(sum(st.dayMin) / st.dayMin.length) : 0, pavg = prev.dayMin.length ? Math.round(sum(prev.dayMin) / prev.dayMin.length) : 0;
+  const fs = state._fs || [], top = fs.find(f => f.k === 'signal') || fs.find(f => f.k === 'good');
+  const num = (v, u, sub) => `<div class="kpi"><div class="v">${v}<small>${u}</small></div><div class="l">${sub}</div></div>`;
+  h = h.slice(0, heroLen) + `<div class="card"><div class="kpis">${num(st.recDays + '/' + passed, '天', '有记录')}${num(avg || '–', avg ? '分' : '', '每天作业' + (avg && pavg ? `（上周 ${pavg}）` : ''))}${num(st.redoN ? Math.round(st.redoOk / st.redoN * 100) : '–', st.redoN ? '%' : '', '重做做对' + (st.redoN ? `（${st.redoOk}/${st.redoN}）` : ''))}</div>
+    ${top ? `<div style="margin-top:12px"><div class="small faint" style="margin-bottom:4px">这周最值得看的一条</div>${findingsHTML([top])}</div>` : ''}</div>` + ac +
+    `<details class="more" ${state.wkMore ? 'open' : ''}><summary data-act="wkmore">看这周的详细记录（节奏、模式、卡点、调整记录）</summary>${rest}</details>`;
   return h;
 }
 /* 自动卡片：这周在试的调整 + 进度；上周调整的效果；本周结束后自动定下周 */
@@ -2493,6 +2536,9 @@ const ACT = {
   tab: el => setTab(el.dataset.v),
   day: (el, e) => { e.preventDefault(); const v = +el.dataset.v; state.date = v === 0 ? today() : addD(state.date, v); if (state.date > today()) state.date = today(); state.openSubj = null; render(); },
   goday: el => { state.date = el.dataset.v; state.openSubj = null; render(); },
+  wkmore: (el, e) => { e && e.preventDefault(); state.wkMore = !state.wkMore; render(); },
+  wkshow: () => { state.showWeek = !state.showWeek; render(); },
+  moretog: (el, e) => { e && e.preventDefault(); state.moreOpen = !state.moreOpen; render(); },
   scroll: el => { const t = document.getElementById(el.dataset.v); if (t) window.scrollTo({top: t.getBoundingClientRect().top + scrollY - 70, behavior:'smooth'}); },
   sopen: el => { state.openSubj = state.openSubj === el.dataset.s ? null : el.dataset.s; render(); },
   mood: el => { const dd = dayObj(state.date) || {}; setDayField(state.date, 'mood', dd.mood === el.dataset.v ? '' : el.dataset.v); save(); render(); },
@@ -2693,7 +2739,7 @@ function importData(txt){
     DB = mergeDB(DB, x).M; save(); toast('已合并导入'); render();
   } catch(e) { toast('这不是有效的备份'); }
 }
-document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.stopPropagation(); f(el, e); } });
+document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.stopPropagation(); if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault(); f(el, e); } });
 document.addEventListener('input', e => {
   const el = e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
