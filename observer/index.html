@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f1e8">
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://api.github.com; media-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://api.github.com https://open.bigmodel.cn; media-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
@@ -415,6 +415,8 @@ const QS = new URLSearchParams(location.search);
 const DEMO = QS.has('demo');
 const K_DB = DEMO ? 'observer:db-demo' : 'observer:db';
 const K_SYNC = 'observer:sync';
+const K_AI = 'observer:ai';
+let AI = {};
 const LEGACY = 'observer-v1';
 let DB, SYNC = {}, loadedFrom = null;
 const IDB = {
@@ -480,6 +482,7 @@ async function load(){
   if (best) { DB = migrate(best[0]); loadedFrom = best[1]; observeClock(DB); }
   else { DB = fresh(); if (DEMO) { seedDemo(); DB = migrate(DB); } }
   SYNC = (await IDB.get(K_SYNC)) || lsGet(K_SYNC) || {};
+  AI = (await IDB.get(K_AI)) || lsGet(K_AI) || {};
   if (DEMO) SYNC = {};
 }
 let writeT = null, pendingLocal = false;
@@ -494,6 +497,8 @@ function flush(){
   if (IDB.failed) { if (!ok1) toast('保存失败：请关掉 app 重新打开'); return; }
   IDB.set(K_DB, JSON.parse(JSON.stringify(DB))).then(ok2 => { if (!ok1 && !ok2) toast('保存失败：浏览器存储不可用，请马上导出备份'); });
 }
+const saveAI = () => { IDB.set(K_AI, AI); lsSet(K_AI, AI); };
+const aiReady = () => !DEMO && !!AI.key;
 const saveSync = () => { if (DEMO) return; IDB.set(K_SYNC, SYNC); lsSet(K_SYNC, SYNC); };
 window.addEventListener('pagehide', flush);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { flush(); if (syncT) syncNow(); } });
@@ -1035,8 +1040,8 @@ function render(){
   if (state.tab === 'review') { state.tab = 'me'; state.pv = 'review'; }
   const v = {today:vToday, errors:vErrors, learn:vLearn, me:vParent}[state.tab] || vToday;
   $('#main').innerHTML = v();
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : '';
-  document.body.style.overflow = (state.wiz || state.voice || state.photo || state.pview) ? 'hidden' : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.rcheck ? vReciteCheck() : '';
+  document.body.style.overflow = (state.wiz || state.voice || state.photo || state.pview || state.rcheck) ? 'hidden' : '';
   hydratePhotos();
 }
 
@@ -1972,7 +1977,7 @@ function markWord(w, ok){
   else { s.box = 0; s.done = false; s.tries = s.triesD === t ? (s.tries || 0) + 1 : 1; s.triesD = t; s.due = s.tries >= 2 ? addD(t, 1) : t; }   // 当晚再考一次，第二次还没想起来就明天
   s.u = now(); DB.words[k] = s; save();
 }
-const RST = [['','没背'],['learning','在背'],['can','会背了'],['dict','默写全对'],['rv-ok','复习还会'],['rv-no','复习忘了']];
+const RST = [['','没背'],['learning','在背'],['can','会背了'],['dict','默写全对'],['rv-ok','复习还会'],['rv-no','复习忘了'],['voice','语音检验'],['type','默写检验']];
 const rState = id => (DB.recite[id] || {}).st || '';
 const RBOX = [3, 7, 21];                   // 会背之后隔 3、7、21 天回来检查，第 3 次还会就算记牢
 function setRecite(id, st){ const r = DB.recite[id] || {hist:[]}; r.st = st; r.hist = (r.hist||[]).concat([{d:today(), st}]).slice(-20);
@@ -2073,6 +2078,93 @@ function vRecite(){
 }
 const PUNC = /[，。；！？、：“”‘’（）《》\s,.;!?]/;
 /* 默写三档：1 提示多（隔一个分句遮一个）、2 提示少（每行只留开头两个字）、3 全默（只留标点） */
+/* ================= 背诵检验：语音（智谱语音识别 / 浏览器识别）或打字默写 → 与原文逐字对照 =================
+   语音按拼音对照（同音字、多音字算对，避免「澹澹」被识别成「淡淡」误判）；打字默写逐字严格对照 */
+let PY = null;
+async function loadPY(){ if (!PY) PY = await fetch('data/pinyin.json').then(r => r.json()).catch(() => ({})); return PY; }
+const isHan = c => /[一-鿿]/.test(c);
+function pyEq(a, b){ if (a === b) return true; const pa = (PY||{})[a], pb = (PY||{})[b]; if (!pa || !pb) return false; const sa = pa.split('|'); return pb.split('|').some(p => sa.includes(p)); }
+function alignText(lines, said, strict){
+  const A = []; lines.forEach((l, li) => [...l].forEach((c, ci) => { if (isHan(c)) A.push({li, ci, c}); }));
+  const B = [...said].filter(isHan), n = A.length, m = B.length;
+  const dp = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
+  const eq = (a, b) => strict ? a === b : pyEq(a, b);
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) dp[i][j] = eq(A[i-1].c, B[j-1]) ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  const ok = new Set(); let i = n, j = m;
+  while (i > 0 && j > 0) { if (eq(A[i-1].c, B[j-1]) && dp[i][j] === dp[i-1][j-1] + 1) { ok.add(i-1); i--; j--; } else if (dp[i-1][j] >= dp[i][j-1]) i--; else j--; }
+  const miss = new Set(A.filter((x, k) => !ok.has(k)).map(x => x.li + ':' + x.ci));
+  return {score: n ? ok.size / n : 0, miss, total: n, got: ok.size};
+}
+function markedLines(lines, miss){ return lines.map((l, li) => `<div>${[...l].map((c, ci) => miss.has(li + ':' + ci) ? `<span style="background:var(--amber-bg);color:var(--amber);border-bottom:2px solid var(--amber)">${esc(c)}</span>` : esc(c)).join('')}</div>`).join(''); }
+let REC = null;
+async function recStart(){
+  const R = state.rcheck; R.said = ''; R.err = '';
+  if (aiReady() && window.MediaRecorder && navigator.mediaDevices) {
+    try { const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+      const type = ['audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+      REC = {stream, blobs: [], type, on: true, t0: Date.now()};
+      const next = () => { if (!REC || !REC.on) return; const mr = new MediaRecorder(stream, type ? {mimeType: type} : undefined); REC.mr = mr; const parts = [];
+        mr.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
+        mr.onstop = () => { if (parts.length) REC.blobs.push(new Blob(parts, {type: mr.mimeType || type})); if (REC.on) next(); else if (REC.done) REC.done(); };
+        mr.start(); REC.cut = setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 25000); };   // 智谱语音识别每段 ≤ 30 秒
+      next(); R.phase = 'rec'; R.how = 'asr'; render(); return;
+    } catch(e) { R.err = '没拿到麦克风权限'; }
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { R.phase = 'ready'; R.err = (R.err ? R.err + '，' : '') + '这台设备不能语音识别。在「家长 → 设置」填智谱密钥，或者用「打字默写检验」。'; render(); return; }
+  const sr = new SR(); sr.lang = 'zh-CN'; sr.continuous = true; sr.interimResults = false;
+  REC = {sr, on: true, t0: Date.now()}; sr.onresult = e => { for (let k = e.resultIndex; k < e.results.length; k++) if (e.results[k].isFinal) R.said += e.results[k][0].transcript; };
+  sr.onerror = e => { if (/not-allowed|service-not-allowed|network|audio-capture|language-not-supported/.test(e.error)) { R.err = '浏览器不给用语音识别。在「家长 → 设置」填智谱密钥，或者用「打字默写检验」。'; R.phase = 'ready'; REC = null; render(); } };
+  sr.onend = () => { if (REC && REC.on) { try { sr.start(); } catch(e) {} } };
+  sr.start(); R.phase = 'rec'; R.how = 'browser'; render();
+}
+async function recStop(){
+  const R = state.rcheck; if (!REC) return; REC.on = false; R.phase = 'busy'; render();
+  try {
+    if (REC.sr) { REC.sr.stop(); await new Promise(r => setTimeout(r, 800)); }
+    else { clearTimeout(REC.cut); await new Promise(res => { REC.done = res; if (REC.mr && REC.mr.state === 'recording') REC.mr.stop(); else res(); }); REC.stream.getTracks().forEach(t => t.stop());
+      let txt = ''; for (const b of REC.blobs) txt += await aiASR(b); R.said = txt; }
+  } catch(e) { R.err = '识别失败：' + e.message; }
+  REC = null;
+  if (!R.said && !R.err) { R.err = '没识别到声音。浏览器的语音识别在国内经常连不上：在「家长 → 设置」填智谱密钥会更稳，或者用「打字默写检验」。'; R.phase = 'ready'; render(); return; }
+  await finishCheck();
+}
+async function finishCheck(){
+  const R = state.rcheck, x = LIB.recite.items.find(i => i.id === R.id); await loadPY();
+  const strict = R.mode === 'type', res = alignText(x.text, R.said || '', strict);
+  R.res = res; R.phase = 'result';
+  const pctv = Math.round(res.score * 100), r = DB.recite[x.id] || {hist: []}, cur = r.st || '';
+  r.hist = (r.hist || []).concat([{d: today(), st: strict ? 'type' : 'voice', score: pctv}]).slice(-20); r.u = now(); DB.recite[x.id] = r;
+  const dueNow = r.due && r.due <= today();
+  if (dueNow && pctv >= 90) reviewRecite(x.id, true); else if (dueNow && pctv < 70) reviewRecite(x.id, false);
+  if (strict && pctv >= 98) setRecite(x.id, 'dict'); else if (!strict && pctv >= 90 && !['can','dict'].includes(DB.recite[x.id].st || '')) setRecite(x.id, 'can'); else if (!cur) setRecite(x.id, 'learning'); else save();
+  render();
+}
+function vReciteCheck(){
+  const R = state.rcheck, x = LIB.recite.items.find(i => i.id === R.id); if (!x) return '';
+  let h = `<div class="wiz" role="dialog" aria-label="背诵检验"><div class="wiz-top"><div style="flex:1;font-weight:600">${R.mode === 'type' ? '打字默写检验' : '背一遍检验'} · ${esc(x.title)}</div><button class="wiz-x" data-act="rcclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (x.mode === 'excerpt') h += `<p class="small faint">这篇只收了默写常考的重点句，检验的也是这些句子。</p>`;
+  if (R.phase === 'result') {
+    const p = Math.round(R.res.score * 100), good = R.mode === 'type' ? p >= 98 : p >= 90;
+    h += `<div style="text-align:center;margin:10px 0 14px"><div style="font-family:var(--mono);font-size:44px;font-weight:700;color:${good ? 'var(--good)' : 'var(--amber)'}">${p}%</div>
+      <div class="muted">${good ? (R.mode === 'type' ? '默写全对，记为「默写全对」' : '背下来了，记为「会背了」') : `背出了 ${R.res.got}/${R.res.total} 个字，标出来的是漏了或错了的`}</div></div>
+      <div class="card" style="font-family:var(--serif);font-size:18px;line-height:2;text-align:center">${markedLines(x.text, R.res.miss)}</div>
+      ${R.said ? `<details><summary class="small faint">识别到的内容</summary><p class="small muted">${esc(R.said)}</p></details>` : ''}${R.err ? `<div class="signal">${esc(R.err)}</div>` : ''}`;
+    h += `</div><div class="wiz-foot"><button class="btn" data-act="rcagain">再来一遍</button><button class="btn primary" data-act="rcclose">好了</button></div></div>`;
+    return h;
+  }
+  if (R.mode === 'type') {
+    h += `<p class="muted">不看原文，把整篇默写出来（标点可以不打）。写完点「对答案」。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="从第一句开始写">${esc(R.said||'')}</textarea>`;
+    return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
+  }
+  h += `<div style="text-align:center;margin-top:30px"><div class="small faint">不看原文，从题目开始背</div><div style="font-family:var(--serif);font-size:24px;font-weight:700;margin:10px 0">${esc(x.title)}</div><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>`;
+  if (R.phase === 'rec') h += `<div style="margin:30px auto 10px;width:110px;height:110px;border-radius:50%;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center" class="mic rec">${MIC.replace('<svg','<svg style="width:44px;height:44px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…背完点下面「背完了」</div>`;
+  else if (R.phase === 'busy') h += `<div class="muted" style="margin-top:40px">正在对照原文…</div>`;
+  else h += `<button class="btn primary" style="margin-top:30px;min-height:64px;font-size:19px;padding:0 30px" data-act="rcstart">${MIC.replace('<svg','<svg style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-4px"')} 开始背</button><p class="small faint" style="margin-top:12px">${aiReady() ? '用智谱语音识别，每 25 秒自动分段' : '用浏览器语音识别；识别不稳可以在「家长 → 设置」填智谱密钥'}</p>`;
+  if (R.err) h += `<div class="signal" style="text-align:left">${esc(R.err)}</div>`;
+  h += `</div></div><div class="wiz-foot">${R.phase === 'rec' ? '<button class="btn primary" data-act="rcstop">背完了</button>' : '<button class="btn ghost" data-act="rcclose">取消</button>'}</div></div>`;
+  return h;
+}
 function blankLine(line, lvl){
   lvl = lvl || 2; const chars = [...line];
   if (lvl === 1) { let clause = 0; return chars.map(c => { if (PUNC.test(c)) { clause++; return esc(c); } return clause % 2 ? '＿' : esc(c); }).join(''); }
@@ -2088,13 +2180,14 @@ function vPoem(){
   h += `<div class="card" style="margin-top:12px;text-align:center"><h2 style="margin:6px 0 2px">${esc(x.title)}</h2><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>
     ${x.mode === 'excerpt' ? '<div class="pill amber" style="display:inline-block;margin-top:8px">默写常考重点句 · 全文看课本</div>' : ''}${x.checked === false ? '<div class="small faint" style="margin-top:6px">这篇还没逐字校对，背之前对照课本看一眼</div>' : ''}`;
   if (x.text) h += `<div style="font-family:var(--serif);font-size:19px;line-height:2;margin:16px 0 6px">` + x.text.map((ln, i) => mode === 'blank' && !(L.reveal||{})[i] ? `<div data-act="preveal" data-v="${i}" style="cursor:pointer;color:var(--ink2)">${blankLine(ln, lvl)}</div>` : `<div>${esc(ln)}</div>`).join('') + `</div>` +
-    `<div class="row" style="justify-content:center"><button class="btn sm" data-act="sayzh">${SPK} 朗读</button>${mode==='blank' ? '<span class="small faint">点一行看原文</span>' : ''}</div>`;
+    `<div class="row" style="justify-content:center"><button class="btn sm" data-act="sayzh">${SPK} ${x.audio ? '听标准朗读' : '朗读'}</button><button class="btn sm primary" data-act="rcheck" data-v="voice">${MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 背一遍检验</button><button class="btn sm" data-act="rcheck" data-v="type">打字默写检验</button></div>${mode==='blank' ? '<p class="small faint" style="margin:6px 0 0">点一行看原文</p>' : ''}`;
   else h += `<p class="small muted" style="margin:14px 0">这篇只收了篇目，原文看课本。</p>`;
   const rr = DB.recite[x.id] || {};
-  if (rr.due && rr.due <= today()) h += `</div><div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>今天该复习这篇了</h3><p class="small muted" style="margin:0 0 8px">不看原文背一遍（或切到「默写自查」选「全默」），再说结果。</p><div class="big two"><button data-act="rrev" data-v="1">还会背</button><button data-act="rrev" data-v="0">有点忘了</button></div>`;
-  h += `</div><div class="card"><div class="small muted" style="margin-bottom:8px">现在背到哪了？${rr.solid ? ' <span class="pill good">已经记牢</span>' : rr.due ? ' <span class="small faint">下次复习 ' + mdShort(rr.due) + '</span>' : ''}</div><div class="big two">` + RST.slice(1, 4).map(([k,n]) => `<button class="${st===k?'on':''}" data-act="rset" data-v="${k}">${n}</button>`).join('') + `</div>`;
+  if (rr.due && rr.due <= today()) h += `</div><div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>今天该复习这篇了</h3><p class="small muted" style="margin:0 0 8px">点「背一遍检验」，不看原文背一遍：90% 以上算还记得，隔更久再查；低于 70% 就改回「在背」。</p>`;
+  h += `</div><div class="card"><div class="small muted" style="margin-bottom:8px">现在：<b>${(RST.find(r => r[0] === st) || ['', '没背'])[1]}</b>${rr.solid ? ' <span class="pill good">已经记牢</span>' : rr.due ? ' <span class="small faint">下次复习 ' + mdShort(rr.due) + '</span>' : ''}</div>
+    <p class="small faint" style="margin:0 0 8px">「会背了」要通过背一遍检验（90% 以上），「默写全对」要通过打字默写检验（98% 以上），不能直接点。</p><div class="big two">` + RST.slice(1, 2).map(([k,n]) => `<button class="${st===k?'on':''}" data-act="rset" data-v="${k}">${n}</button>`).join('') + `</div>`;
   const hist = (DB.recite[x.id] || {}).hist || [];
-  if (hist.length) h += `<p class="small faint" style="margin:10px 0 0">记录：${hist.slice(-5).map(e => mdShort(e.d) + ' ' + RST.find(r=>r[0]===e.st)[1]).join(' → ')}</p>`;
+  if (hist.length) h += `<p class="small faint" style="margin:10px 0 0">记录：${hist.slice(-5).map(e => mdShort(e.d) + ' ' + (e.score != null ? (e.st === 'type' ? '默写 ' : '背诵 ') + e.score + '%' : (RST.find(r=>r[0]===e.st)||['',''])[1])).join(' → ')}</p>`;
   return h + `</div>`;
 }
 function vBooks(){
@@ -2171,6 +2264,7 @@ function vMe(part){
   if (part === 'mine') return h + `</div><div>` + methodCard() + `</div></div>`;
   h = `<div class="cols"><div>`;
   h += syncCard();
+  h += aiCard();
   const s = DB.settings;
   h += `<div class="card"><h3>设置</h3>
     <div class="grid2"><div><label class="f">孩子的称呼</label><input type="text" data-in="set" data-f="child" value="${esc(s.child)}"></div>
@@ -2189,6 +2283,27 @@ function vMe(part){
     <p class="small faint" style="margin:10px 0 0">iPad 主屏幕上的图标和 Safari 里的网页是两份独立的存储。装到主屏幕之前在 Safari 里记过的数据，要先在 Safari 里「复制备份文本」，再到主屏幕 app 里粘贴恢复；开了云同步则会自动合并。</p>
     <div class="row" style="margin-top:12px"><a class="small" href="?demo" style="color:var(--accent)">打开示例模式看看效果</a><span class="spacer"></span>${DEMO?'':'<button class="btn danger sm" data-act="wipe">清空本机数据</button>'}</div></div>`;
   return h + `</div></div>`;
+}
+function aiCard(){
+  return `<div class="card"><h3>AI 学习教练 · 语音识别 ${aiReady() ? '<span class="pill good">已开启</span>' : '<span class="pill">未开启</span>'}</h3>
+    <p class="small muted" style="margin:0 0 8px">用智谱大模型：背诵检验时把录音转成文字，以及之后的 AI 辅导。密钥只存在这台设备上，不进备份文件。发给模型的只有学习内容，不含名字、学校、排名和你的情绪记录。</p>
+    <label class="f">智谱 API 密钥</label><input type="password" id="ai-key" value="${esc(AI.key||'')}" placeholder="在 open.bigmodel.cn 的「API Keys」里新建" autocomplete="off">
+    <label class="f">辅导用的模型</label><select id="ai-model">${[['glm-4.6v-flash','GLM-4.6V-Flash（免费，能看图）'],['glm-5.3-flash','GLM-5.3-Flash（更强，按量付费）']].map(([k,n]) => `<option value="${k}" ${(AI.model||'glm-4.6v-flash')===k?'selected':''}>${n}</option>`).join('')}</select>
+    <div class="row" style="margin-top:12px"><button class="btn primary" data-act="aisave">保存并测试</button>${aiReady() ? '<button class="btn ghost danger" data-act="aioff">清除密钥</button>' : ''}</div>
+    <details style="margin-top:10px"><summary class="small muted">怎么拿到密钥（约 3 分钟）</summary><ol class="guide"><li>打开 open.bigmodel.cn，用手机号注册并实名。</li><li>右上角头像 →「API Keys」→「添加新的 API Key」，复制。</li><li>粘贴到上面，点「保存并测试」。免费模型不花钱；语音识别按量计费，背一首诗约几分钱。</li></ol></details></div>`;
+}
+async function aiChat(messages, opts){
+  const r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key, 'Content-Type':'application/json'},
+    body: JSON.stringify(Object.assign({model: AI.model || 'glm-4.6v-flash', messages, stream:false}, opts || {}))});
+  if (!r.ok) { const t = await r.text(); throw new Error(r.status === 401 ? '密钥不对' : '模型返回 ' + r.status + ' ' + t.slice(0, 80)); }
+  const j = await r.json(); return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+}
+async function aiASR(blob){
+  const fd = new FormData(); fd.append('model', 'glm-asr-2512'); fd.append('stream', 'false');
+  fd.append('file', blob, /mp4|m4a|aac/.test(blob.type) ? 'rec.m4a' : /ogg/.test(blob.type) ? 'rec.ogg' : /wav/.test(blob.type) ? 'rec.wav' : 'rec.webm');
+  const r = await fetch('https://open.bigmodel.cn/api/paas/v4/audio/transcriptions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key}, body: fd});
+  if (!r.ok) throw new Error(r.status === 401 ? '密钥不对' : '语音识别返回 ' + r.status);
+  const j = await r.json(); return j.text || (j.data && j.data.text) || (j.choices && j.choices[0] && (j.choices[0].text || (j.choices[0].message||{}).content)) || '';
 }
 function syncCard(){
   if (DEMO) return `<div class="card"><h3>云同步</h3><p class="small muted" style="margin:0">示例模式不同步。</p></div>`;
@@ -2246,6 +2361,15 @@ const ACT = {
   delitem: el => { delRec('items', el.dataset.v); touchDay(state.date); save(); render(); },
   conf: el => { const it = DB.items.find(x => x.id === el.dataset.v); it.conf = it.conf === el.dataset.c ? null : el.dataset.c; it.u = now(); save(); render(); },
   wizstart: () => wizStart(),
+  rcheck: el => { try { window.__poemAudio && window.__poemAudio.pause(); } catch(e) {} state.rcheck = {id: state.learn.poem, mode: el.dataset.v, phase: 'ready', said: ''}; loadPY(); render(); },
+  rcstart: () => recStart(),
+  rcstop: () => recStop(),
+  rctype: () => { state.rcheck.said = $('#rc-type').value; state.rcheck.phase = 'busy'; finishCheck(); },
+  rcagain: () => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: ''}; render(); },
+  rcclose: () => { if (REC) { REC.on = false; try { REC.sr && REC.sr.stop(); REC.mr && REC.mr.state === 'recording' && REC.mr.stop(); REC.stream && REC.stream.getTracks().forEach(t => t.stop()); } catch(e) {} REC = null; } state.rcheck = null; render(); },
+  aisave: async () => { const k = $('#ai-key').value.trim(); if (!k) return toast('请粘贴密钥'); AI = {key: k, model: $('#ai-model').value}; saveAI(); toast('测试中…');
+    try { await aiChat([{role:'user', content:'回复「好」'}], {max_tokens: 10, thinking:{type:'disabled'}}); toast('可以用了'); } catch(e) { toast('测试失败：' + e.message); } render(); },
+  aioff: () => { if (!confirm('清除这台设备上的智谱密钥？')) return; AI = {}; saveAI(); render(); },
   plannext: () => { const a = DB.weeks[addD(monOf(today()), -7)].auto; a.idx = (a.idx + 1) % a.cands.length; Object.assign(a, a.cands[a.idx]); a.skip = false; const w = DB.weeks[addD(monOf(today()), -7)]; w.u = now(); (w.fu = w.fu || {}).auto = w.u; save(); toast(a.cands.length > 1 ? '换成下一条' : '只有这一条'); render(); },
   planskip: () => { const w = DB.weeks[addD(monOf(today()), -7)]; w.auto.skip = true; w.u = now(); (w.fu = w.fu || {}).auto = w.u; save(); render(); },
   welcomed: () => { lsSet('observer:welcomed', true); render(); },
@@ -2275,7 +2399,9 @@ const ACT = {
   plvl: el => { state.learn.lvl = +el.dataset.v; state.learn.reveal = {}; render(); },
   preveal: el => { state.learn.reveal[el.dataset.v] = true; render(); },
   rset: el => { setRecite(state.learn.poem, el.dataset.v); toast('记下了'); render(); },
-  sayzh: () => { const x = LIB.recite.items.find(i => i.id === state.learn.poem); if (x && x.text) speak(x.title + '。' + x.text.join(''), 'zh-CN'); },
+  sayzh: () => { const x = LIB.recite.items.find(i => i.id === state.learn.poem); if (!x || !x.text) return;
+    if (x.audio) { try { speechSynthesis.cancel(); } catch(e) {} const a = window.__poemAudio || (window.__poemAudio = new Audio()); if (!a.paused && a.dataset.id === x.id) { a.pause(); return; } a.src = 'audio/' + x.id + '.mp3'; a.dataset.id = x.id; a.play().catch(() => speak(x.title + '。' + x.text.join(''), 'zh-CN')); }
+    else speak(x.title + '。' + x.text.join(''), 'zh-CN'); },
   rprint: el => printRecite(el.dataset.v),
   gv: el => { state.gradeView = el.dataset.v; render(); },
   wizmanual: () => { const a = $('#w-start').value, b = $('#w-end').value, n = +$('#w-min').value, r = rec(state.date, state.wiz.list[state.wiz.i], true);
