@@ -224,6 +224,28 @@ details>summary{cursor:pointer}
 .methods td:first-child{white-space:nowrap;font-weight:600}
 ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0}
 
+.mic{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.mic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round}
+.mic.rec{background:var(--danger);border-color:var(--danger);color:#fff;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.6}}
+.withmic{display:flex;gap:8px;align-items:flex-start}.withmic > textarea,.withmic > input{flex:1}
+#printbox{display:none}
+@media print{
+  body{background:#fff;color:#000;padding:0}
+  body > *:not(#printbox){display:none !important}
+  #printbox{display:block;font-family:var(--sans);font-size:12pt;line-height:1.5;color:#000}
+  #printbox h1{font-family:var(--serif);font-size:20pt;margin:0 0 2pt}
+  #printbox h2{font-family:var(--serif);font-size:15pt;margin:16pt 0 4pt;border-bottom:1.5pt solid #000;padding-bottom:2pt}
+  #printbox h2 span{font-size:10pt;font-weight:400;color:#555;font-family:var(--sans)}
+  #printbox h3{font-size:12pt;margin:10pt 0 4pt;color:#333}
+  #printbox .pm,#printbox .pmeta{font-size:9.5pt;color:#555}
+  #printbox .pi{break-inside:avoid;padding:6pt 0;border-bottom:.5pt dashed #999}
+  #printbox .pq{font-size:12.5pt}
+  #printbox .pblank{height:70pt}
+  #printbox .pblank.sm{height:40pt;font-size:9pt;color:#888}
+  #printbox .pbreak{break-before:page}
+}
+
 /* 一步一步填：全屏、一次只问一件事、大按钮、点完自动下一步 */
 .wiz{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
 .wiz-top{display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) 16px 8px;max-width:680px;margin:0 auto;width:100%}
@@ -250,6 +272,7 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 .wiz-foot .btn{flex:1;min-height:54px;font-size:17px}
 .wiz-in{font-size:19px !important;padding:14px !important;border-radius:14px !important}
 .wiz-sum{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:16px}
+.wiz-sum b{flex:none;white-space:nowrap}
 .fillbtn{width:100%;min-height:56px;border-radius:var(--r);font-size:17px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
 </head>
@@ -262,7 +285,7 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 <script>
 'use strict';
 /* ================= 常量 ================= */
-const ET = [{k:'calc',n:'计算错误',s:'计算'},{k:'concept',n:'概念混淆',s:'概念'},{k:'read',n:'审题失误',s:'审题'}];
+const ET = [{k:'calc',n:'计算·书写',s:'执行'},{k:'concept',n:'概念·理解',s:'理解'},{k:'read',n:'审题·表达',s:'审题'}];
 const ET_COLOR = {calc:'#c0822a',concept:'#8a5a9e',read:'#2f8a8a'};
 const ETN = Object.fromEntries(ET.map(t=>[t.k,t.n]));
 const CONF = [{k:'sure',n:'有把握'},{k:'unsure',n:'不太确定'},{k:'no',n:'不会'}];
@@ -289,6 +312,46 @@ const QUESTIONS = [
   '最近做数学题，是不是觉得特别累？', '今天有没有一道题，是一开始不会、后来弄明白的？', '如果明天再做一遍，你会先改哪一步？'];
 const TRIGGERS = ['看到走神','同一题型重复犯错','说「我知道了」但在敷衍','想到别人家孩子','成绩或排名出来','老师在群里点名','拖到很晚还没写完','顶嘴或不耐烦'];
 const MINS = [10,20,30,45,60,90];
+/* 分学科错因体系：三个大类的内部 key 不变（calc/concept/read，统计与同步兼容），每科有自己的叫法和具体问题。
+   依据《陪考手记》第 7/9/10/11/16 章；b:1 = 书中原有，b:0 = 书中未提、按书的逻辑补的建议。 */
+const TAX = {
+  sx: {name:'数学', calc:{n:'运算执行', s:'运算', subs:[
+        ['cf-fu','乘方负号','(-2)³ 写成 8，或把 -2² 和 (-2)² 弄混',1], ['fu-fu','同号异号搞反','(-5)×(-5) 写成 -25',1],
+        ['kuohao','去括号只变第一项','括号前是减号，只给第一项变了号',1], ['duobu','多步题掉符号','2 步的题都对，3 步以上才错',1], ['kousuan','口算算错 / 抄错数','方法对，数字算错或抄错',0]]},
+      concept:{n:'概念理解', s:'概念', subs:[
+        ['yiju','说不出依据','问「这一步的依据是什么」，只会说「规则就是这样」',1], ['yixiang','移项 / 等式性质','把移项当成「移过去变号」',1],
+        ['gongshi','公式认得但不敢用','宁可一步步硬算',1], ['qufenmu','去分母','分不清乘最小公倍数还是直接约分',1], ['fangfa','方法不会','无从下手',0]]},
+      read:{n:'审题习惯', s:'审题', subs:[
+        ['daozhi','数量关系倒置','把「比」字前后的量弄反',1], ['she','不会设未知数','读懂了题，不知道 x 设成什么',1],
+        ['dengliang','找不到等量关系','题目一长就列不出方程',1], ['louting','漏看条件 / 单位','没圈关键词',1], ['tixing','题型没认出','比如相遇和追及分不清',0]]},
+      ask:['你当时是怎么想的？讲每一步怎么想，不是讲步骤。','这一步的依据是什么？（让他自己翻课本找定义）','是忘了要变号，还是知道要变号但算错了？','是读不懂题目，还是读懂了但不知道怎么列方程？'],
+      next:{calc:'做同类变式小题，固定格式，不加量', concept:'回课本找定义和例题，让孩子自己讲一遍依据；缺口可能在小学（运算律）', read:'只写等量关系、设未知数，不求解——专练建模'}},
+  yw: {name:'语文', calc:{n:'积累·书写', s:'积累', subs:[
+        ['cuozi','错别字 / 字词','写错字，或词义不会',0], ['moxie','古诗文默写','漏字、错字、背不出',0], ['yubing','语病','病句没改对，或自己写出病句',1]]},
+      concept:{n:'文本理解', s:'理解', subs:[
+        ['wenyan','文言实词 / 句子','翻译不对',0], ['zhao','阅读找不准答案','找到的句子不是答案要的',1],
+        ['gaikuo','概括不清','复述时讲不清情节',1], ['xijie','细节没筛出来','说不出文中具体细节',1], ['pingjia','讲不出看法','评价、探究题没有自己的观点',1]]},
+      read:{n:'写作表达', s:'表达', subs:[
+        ['miaoxie','描写不具体','语言缺乏表现力',1], ['taiduan','开放题答得太短','只写了两行，要点不全',1], ['shenti','答非所问','没看清题干要求或分值',0]]},
+      ask:['那个人物 / 那段话里有什么细节？（练筛选信息）','他从什么时候开始改变主意的？（练推理）','你觉得最让你意外的是什么？（练评价，回答后不纠正）'],
+      next:{calc:'固定时间积累：字词、默写小本，每天几个就够', concept:'口头复述：讲情节→讲细节→讲看法，家长只接住一个细节回应，不讲题', read:'每天三句话日记，低门槛练笔'}},
+  yy: {name:'英语', calc:{n:'拼写', s:'拼写', subs:[
+        ['pinxie','会认不会拼','读的时候认识，写的时候拼不出',1], ['xingshi','大小写 / 单复数 / 标点','形式写错',0]]},
+      concept:{n:'语法·词汇', s:'语法词汇', subs:[
+        ['weiyu','缺谓语','句子里没有动词',1], ['shitai','时态错','动词时态混乱',1], ['yuxu','中文语序','按中文顺序排单词',1],
+        ['shengci','生词','不认识这个词',1], ['dapei','固定搭配 / 介词','短语、介词用错',0]]},
+      read:{n:'听说·审题', s:'听说', subs:[
+        ['tinglou','听漏词','生词或连读处没听出',1], ['kaikou','只蹦单词','说不成完整句子',1], ['shangxia','完形 / 阅读没看上下文','没找前后文线索',0], ['yaoqiu','没看清题目要求','',0]]},
+      ask:['能听懂，为什么写不出来？','今天听、说、读、写各练了哪项？','用完整的句子说一遍？'],
+      next:{calc:'写的时候认不出的词，单独拎出来拼 3 遍', concept:'先仿写 3–5 句同结构的句子，再改写', read:'精听：1 分钟以内的材料听 4 遍；复述要求完整句子'}}
+};
+const taxOf = sid => TAX[sid] || null;
+const typeName = it => { const t = taxOf(it.sid); return t ? t[it.type].n : ETN[it.type]; };
+const typeNameS = (sid, k) => { const t = taxOf(sid); return t ? t[k].n : ETN[k]; };
+const typeShortS = (sid, k) => { const t = taxOf(sid); return t ? t[k].s : ET.find(x=>x.k===k).s; };
+const subName = it => { const t = taxOf(it.sid); if (!t || !it.sub) return ''; const x = t[it.type].subs.find(a => a[0] === it.sub); return x ? x[1] : ''; };
+/* 拍照错题本 errorType → 数学具体问题 */
+const EXT_SUB = {cuxin:'kousuan', fufenshu:'kousuan', buzhou:'duobu', fuhao:'fu-fu', kuohao:'kuohao', dishu:'cf-fu', gainian:'yiju', fangfa:'fangfa', shenti:'louting', biaoda:'louting'};
 
 /* ================= 工具 ================= */
 const $ = s => document.querySelector(s);
@@ -343,6 +406,7 @@ const IDB = {
       r.onupgradeneeded = () => r.result.createObjectStore('kv');
       r.onsuccess = () => { this.db = r.result; res(this.db); }; r.onerror = () => rej(r.error); } catch(e) { rej(e); } }); },
   async get(k){ try { const db = await this.open(); return await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); } catch(e) { return undefined; } },
+  async del(k){ try { const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } catch(e) {} },
   async set(k, v){ try { const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); return true; } catch(e) { return false; } }
 };
 const lsGet = k => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; } catch(e) { return null; } };
@@ -350,17 +414,17 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); retu
 
 function fresh(){
   return {v:2, u:0,
-    settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null,
+    settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, items:[], exams:[], emotions:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, items:[], exams:[], emotions:[], photos:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
   for (const k of ['days','weeks','months','del','extReview']) x[k] = x[k] || {};
-  for (const k of ['items','exams','emotions']) x[k] = x[k] || [];
+  for (const k of ['items','exams','emotions','photos']) x[k] = x[k] || [];
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
   const subs = x.settings.subjects || [];
   for (const s of subs) { const d = DEF_SUBJ.find(a=>a[0]===s.id);
@@ -539,6 +603,9 @@ function findings(st, prev, anchors, nDays, monthly){
       out.push({k:'signal', t});
     }
   }
+  { const cnt = {}; for (const it of allItems()) if (it.d >= st.from && it.d <= st.to && it.sub) { const k = it.sid + '|' + it.type + '|' + it.sub; cnt[k] = (cnt[k]||0) + 1; }
+    for (const [k, n] of topEntries(cnt, 3)) { if (n < 3) continue; const [sid, type] = k.split('|'); const it = {sid, type, sub:k.split('|')[2]}; const tx = taxOf(sid);
+      out.push({k:'signal', t:`<b>${esc(subjById(sid).name)}「${esc(subName(it))}」</b>出现 ${n} 次（${typeNameS(sid, type)}）。同一个具体问题反复出现，说明是知识漏洞而不是状态问题${tx && tx.next[type] ? '。下一步：' + esc(tx.next[type]) : ''}。`}); } }
   if (prev && prev.recDays >= 3 && st.recDays >= 3) {
     for (const t of ET) {
       const a = st.errs[t.k] / st.recDays * 7, b = prev.errs[t.k] / prev.recDays * 7;
@@ -570,12 +637,12 @@ async function loadExt(){
       fetch('../math/data/kaodian-tree.json', {cache:'no-cache'}).then(r => r.json()).catch(() => ({nodes:[]}))]);
     const names = Object.fromEntries((kt.nodes||[]).map(n => [n.id, n.name]));
     EXT = (er.records||[]).filter(r => r.confirmed && r.status === 'active').map(r => ({
-      id:'m:'+r.id, ext:true, d:r.date, sid:'sx', type: EXT_TYPE[r.errorType] || 'concept', conf:null,
+      id:'m:'+r.id, ext:true, d:r.date, sid: r.subject || 'sx', type: r.type || EXT_TYPE[r.errorType] || 'concept', conf: r.conf || null, photoId: r.photoId || null,
       tag: (r.kaodian||[]).map(k => names[k] || k).join('、'), stem:r.stem, answer:r.answer, kidAnswer:r.kidAnswer,
-      note:r.errorNote, src:[r.source, r.sourceDetail].filter(Boolean).join(' · '), due0: r.review && r.review.due || addD(r.date, BOXES[0])}));
+      sub: r.sub || EXT_SUB[r.errorType] || '', note:r.errorNote, src:[r.source, r.sourceDetail].filter(Boolean).join(' · '), due0: r.review && r.review.due || addD(r.date, BOXES[0])}));
   } catch(e) { EXT = []; }
 }
-function extItems(){ return EXT.map(x => Object.assign({}, x, {box:0, due:x.due0, hist:[], done:false}, DB.extReview[x.id] || {})); }
+function extItems(){ if (DB.settings.useExt === false) return []; return EXT.map(x => Object.assign({}, x, {box:0, due:x.due0, hist:[], done:false}, DB.extReview[x.id] || {})); }
 const allItems = () => DB.items.concat(extItems());
 
 /* ================= 错题重做队列 ================= */
@@ -720,7 +787,7 @@ function mergeDB(L, R){
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
   }
-  for (const k of ['items','exams','emotions']) {
+  for (const k of ['items','exams','emotions','photos']) {
     const a = new Map((L[k]||[]).map(x=>[x.id,x])), b = new Map((R[k]||[]).map(x=>[x.id,x]));
     const out = [];
     for (const id of new Set([...a.keys(), ...b.keys()])) {
@@ -754,11 +821,12 @@ async function syncNow(manual, depth){
       if (res === 'conflict') { syncing = false; if ((depth||0) < 2) return syncNow(manual, (depth||0)+1); throw new Error('云端同时被改动，请稍后再同步'); }
     }
     if (changedLocal) { target.timer = DB.timer; DB = target; reindex(); pendingLocal = true; flush(); if (!isTyping()) render(); else pendingRender = true; }
+    await uploadPhotos();
     SYNC.last = now(); saveSync();
     if (manual) toast(push || changedLocal ? '已同步' : '已是最新');
   } catch(e) { SYNC.err = e.message || String(e); saveSync(); if (manual) toast(SYNC.err); }
   syncing = false; renderSyncState();
-  if (syncAgain) { syncAgain = false; scheduleSync(); }
+  if (syncAgain) { syncAgain = false; setTimeout(syncNow, 300); }
 }
 const isTyping = () => { const a = document.activeElement; return a && /INPUT|TEXTAREA/.test(a.tagName); };
 let pendingRender = false;
@@ -803,8 +871,9 @@ function render(){
   renderChrome();
   const v = {today:vToday, errors:vErrors, review:vReview, exams:vExams, trends:vTrends, me:vMe}[state.tab] || vToday;
   $('#main').innerHTML = v();
-  $('#wiz').innerHTML = state.wiz ? vWiz() : '';
-  document.body.style.overflow = state.wiz ? 'hidden' : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : '';
+  document.body.style.overflow = (state.wiz || state.voice || state.photo || state.pview) ? 'hidden' : '';
+  hydratePhotos();
 }
 
 /* ================= 今天 ================= */
@@ -861,18 +930,23 @@ function vToday(){
   }
   h += `<div class="cols"><div>`;
   if (filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
+  h += `<div class="row" style="margin:-4px 0 12px;gap:8px"><button class="btn" style="flex:1" data-act="voiceopen">${MIC.replace('<svg','<svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 说一句话记今天</button><button class="btn" style="flex:1" data-act="photoopen">${CAM} 拍照</button></div>`;
   h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
     <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
   for (const s of subs) h += subjRow(d, s, dd.subj[s.id]);
   if (filled && filled < subs.length) h += `<div class="sr" style="padding:10px 16px"><button class="btn sm ghost" data-act="restnone">其余 ${subs.length - filled} 科今天都没作业</button></div>`;
   h += `</div><p class="small faint" style="margin:-4px 4px 12px">让孩子自己点 ▶ 开始、做完点「做完了」；中途离开就点暂停，会自动记成中断。只记实际发生的，没有「计划用时」。</p></div><div>`;
-  const qi = (P(d).getTime()/864e5|0) % QUESTIONS.length, q = dd.q || QUESTIONS[qi];
+  const qi = (P(d).getTime()/864e5|0) % QUESTIONS.length;
+  const errSub = subs.filter(s => taxOf(s.id)).map(s => [s, itemsOn(d, s.id).length]).filter(x => x[1]).sort((a,b)=>b[1]-a[1])[0];
+  const q = dd.q || (errSub ? errSub[0].name + '：' + taxOf(errSub[0].id).ask[qi % taxOf(errSub[0].id).ask.length] : QUESTIONS[qi]);
   h += `<div class="card" id="askq"><h3>今晚只问一句</h3>
     <div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div style="flex:1;font-family:var(--serif);font-size:17px">「${esc(q)}」</div><button class="btn sm ghost" data-act="nextq">换一句</button></div>
     <label class="f">孩子怎么回答的（原话就好）</label>
-    <textarea data-in="day" data-f="answer" placeholder="比如：第二题第三步，不确定用相遇还是追及">${esc(dd.answer||'')}</textarea>
+    <div class="withmic"><textarea id="t-ans" data-in="day" data-f="answer" placeholder="比如：第二题第三步，不确定用相遇还是追及">${esc(dd.answer||'')}</textarea>${micBtn('t-ans')}</div>
     <p class="small faint" style="margin:8px 0 0">问「卡在哪一步」，不问「为什么又错」。只听，不批改。</p></div>`;
-  h += `<div class="card"><h3>家长观察</h3><textarea data-in="day" data-f="note" placeholder="只写看到的事实，比如：21:10 开始数学，21:18 起身倒水">${esc(dd.note||'')}</textarea></div>`;
+  const tp = DB.photos.filter(p => p.d === d);
+  if (tp.length) h += `<div class="card"><div class="row"><h3 style="margin:0">今天的照片</h3><span class="spacer"></span><button class="btn sm" data-act="photoopen">${CAM} 再拍</button></div><div style="margin-top:10px">${photoStrip(tp)}</div></div>`;
+  h += `<div class="card"><h3>家长观察</h3><div class="withmic"><textarea id="t-note" data-in="day" data-f="note" placeholder="只写看到的事实，比如：21:10 开始数学，21:18 起身倒水">${esc(dd.note||'')}</textarea>${micBtn('t-note')}</div></div>`;
   h += `</div></div>`;
   return h;
 }
@@ -900,10 +974,11 @@ function subjRow(d, s, r){
       MINS.map(m => `<button class="chip soft ${r.min===m?'on':''}" data-act="minset" data-s="${s.id}" data-v="${m}">${m}</button>`).join('') + `</div>`;
     h += `<div class="line"><span class="lab">中途中断</span><div class="seg">` + INTR.map(i => `<button data-act="intr" data-s="${s.id}" data-v="${i.k}" class="${(r.intr||'none')===i.k?'on':''}">${i.n}</button>`).join('') + `</div></div>`;
     h += `<div class="line" style="align-items:flex-start"><span class="lab">错题</span><div style="flex:1;min-width:0">
-      <div class="addrow">` + ET.map(t => `<button data-act="additem" data-s="${s.id}" data-t="${t.k}"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> + ${t.n}</button>`).join('') + `</div>`;
-    for (const it of its) h += `<div class="item"><span class="it"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${ETN[it.type]}</span>
+      <div class="addrow">` + ET.map(t => `<button data-act="additem" data-s="${s.id}" data-t="${t.k}"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> + ${typeNameS(s.id, t.k)}</button>`).join('') + `</div>`;
+    for (const it of its) h += `<div class="item"><span class="it"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}</span>
       <input type="text" list="tags-${s.id}" data-in="item" data-id="${it.id}" data-f="tag" value="${esc(it.tag||'')}" placeholder="知识点，比如：去括号">
       <button class="x" data-act="delitem" data-v="${it.id}" aria-label="删除">×</button>
+      ${taxOf(s.id) ? `<div class="cf row">` + taxOf(s.id)[it.type].subs.map(a => `<button class="chip ${it.sub===a[0]?'on':''}" style="min-height:30px;padding:4px 10px;font-size:13px" data-act="setsub" data-v="${it.id}" data-s="${a[0]}">${esc(a[1])}</button>`).join('') + `</div>` : ''}
       <div class="cf row"><span class="small faint">做的时候：</span><div class="seg sm">` + CONF.map(c => `<button data-act="conf" data-v="${it.id}" data-c="${c.k}" class="${it.conf===c.k?'on':''}">${c.n}</button>`).join('') + `</div></div></div>`;
     if (its.length) h += tagList(s.id) + `<p class="small faint" style="margin:6px 0 0">每道错题会在 2 天、7 天、21 天后回到「重做」里。</p>`;
     h += `</div></div>`;
@@ -911,6 +986,192 @@ function subjRow(d, s, r){
   }
   return h + `</div></div>`;
 }
+/* ================= 拍照：本机压缩 → IndexedDB → 同步时加密上传私有仓库 photos/ ；识别在 Claude 对话里做 ================= */
+const CAM = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+const PKIND = [['error','错题'],['homework','作业'],['exam','试卷']];
+const photoURL = {};
+async function compressImage(file){
+  const img = await new Promise((res, rej) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = u; });
+  const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return await new Promise(res => c.toBlob(res, 'image/jpeg', 0.82));
+}
+async function addPhotos(files){
+  const ps = state.photo; let n = 0;
+  for (const f of files) {
+    try { const blob = await compressImage(f); const id = uid('p');
+      await IDB.set('photo:' + id, blob); photoURL[id] = URL.createObjectURL(blob);
+      DB.photos.push({id, d: state.date, sid: ps.sid, kind: ps.kind, up:false, size: blob.size, u: now()}); n++;
+    } catch(e) { toast('有一张照片读不出来'); }
+  }
+  touchDay(state.date); save(); state.photo = null; render();
+  toast(n ? `存了 ${n} 张` + (syncReady() ? '，稍后自动加密上传' : '（没开同步，只存在这台设备）') : '没有存上');
+}
+const photoPath = p => `photos/${p.d}/${p.sid || 'x'}-${p.kind}-${p.id}.enc`;
+async function encryptBytes(bytes, pass){
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iter = 210000;
+  const key = await deriveKey(pass, salt, iter);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, bytes));
+  return JSON.stringify({app:'observer-photo', v:1, alg:'AES-GCM', kdf:'PBKDF2-SHA256', iter, type:'image/jpeg', salt:b64e(salt), iv:b64e(iv), ct:b64e(ct)});
+}
+const ghFileURL = path => `https://api.github.com/repos/${SYNC.repo.trim()}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
+async function uploadPhotos(){
+  let n = 0;
+  for (const p of DB.photos.filter(x => !x.up)) {
+    const blob = await IDB.get('photo:' + p.id); if (!blob) continue;
+    const env = await encryptBytes(new Uint8Array(await blob.arrayBuffer()), SYNC.pass);
+    const r = await fetch(ghFileURL(photoPath(p)), {method:'PUT', headers: ghHeaders(), body: JSON.stringify({message:'photo ' + p.id, content: btoa(env)})});
+    if (r.ok || r.status === 422) { p.up = true; p.u = now(); n++; }
+    else throw new Error('照片上传失败：GitHub 返回 ' + r.status);
+  }
+  if (n) { DB.u = now(); pendingLocal = true; flush(); syncAgain = true; }   // 把「已上传」标记马上同步出去
+  return n;
+}
+async function photoSrc(p){
+  if (photoURL[p.id]) return photoURL[p.id];
+  let blob = await IDB.get('photo:' + p.id);
+  if (!blob && syncReady()) {
+    try { const r = await fetch(ghFileURL(photoPath(p)), {headers: ghHeaders('application/vnd.github.raw+json'), cache:'no-store'});
+      if (r.ok) { const env = JSON.parse(await r.text()); const key = await deriveKey(SYNC.pass, b64d(env.salt), env.iter);
+        blob = new Blob([await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(env.iv)}, key, b64d(env.ct))], {type:'image/jpeg'}); await IDB.set('photo:' + p.id, blob); } } catch(e) {}
+  }
+  return blob ? (photoURL[p.id] = URL.createObjectURL(blob)) : null;
+}
+function hydratePhotos(){ document.querySelectorAll('img[data-pid]').forEach(async img => { const p = DB.photos.find(x => x.id === img.dataset.pid); if (!p) return; const u = await photoSrc(p); if (u) img.src = u; else img.alt = '在别的设备上'; }); }
+const photoDone = p => EXT.filter(x => x.photoId === p.id).length;
+function photoStatus(p){ const n = photoDone(p); return n ? `已识别 ${n} 道` : p.up ? '等 Claude 识别' : syncReady() ? '待上传' : '只在本机'; }
+function photoStrip(ps){
+  if (!ps.length) return '';
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px">` + ps.map(p => `<div><img data-pid="${p.id}" data-act="photoview" data-v="${p.id}" alt="" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--surface2);display:block;cursor:pointer">
+    <div class="small" style="margin-top:3px;line-height:1.3">${esc(subjById(p.sid).name||'')} · ${PKIND.find(k=>k[0]===p.kind)[1]}<br><span class="faint">${photoStatus(p)}</span></div></div>`).join('') + `</div>`;
+}
+function vPhotoView(){
+  const p = DB.photos.find(x => x.id === state.pview); if (!p) { state.pview = null; return ''; }
+  return `<div class="wiz" style="background:#000"><div class="wiz-top"><div style="flex:1;color:#ddd">${esc(subjById(p.sid).name||'')} · ${PKIND.find(k=>k[0]===p.kind)[1]} · ${md(p.d)} · ${photoStatus(p)}</div><button class="wiz-x" data-act="pviewclose" aria-label="关闭">×</button></div>
+    <div class="wiz-body" style="display:flex;align-items:center;justify-content:center"><img data-pid="${p.id}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>
+    <div class="wiz-foot"><button class="btn danger" data-act="photodel" data-v="${p.id}">删除这张</button><button class="btn" data-act="pviewclose">关闭</button></div></div>`;
+}
+function vPhotoSheet(){
+  const ps = state.photo, subs = orderedSubjects(state.date);
+  return `<div class="wiz" role="dialog" aria-label="拍照"><div class="wiz-top"><div style="flex:1;font-weight:600">拍照记录 · ${md(state.date)}</div><button class="wiz-x" data-act="photoclose" aria-label="关闭">×</button></div><div class="wiz-body">
+    <div class="wiz-q" style="font-size:22px;margin-top:6px">拍的是什么？</div><div class="big">` + PKIND.map(([k,n]) => `<button class="${ps.kind===k?'on':''}" data-act="pkind" data-v="${k}">${n}</button>`).join('') + `</div>
+    <div class="wiz-q" style="font-size:22px;margin-top:22px">哪一科？</div><div class="row">` + subs.map(s => `<button class="chip ${ps.sid===s.id?'on':''}" style="min-height:42px;font-size:16px" data-act="psubj" data-v="${s.id}"><span class="dot" style="background:${s.color};margin-right:5px"></span>${esc(s.name)}</button>`).join('') + `</div>
+    <p class="small faint" style="margin-top:18px">错题照片：只拍做错的题，一张可以拍多道，字小就拍近一点。存好后，在和 Claude 的对话里说「识别错题」，识别结果会先给你确认，确认后题目自动进「重做」。</p></div>
+    <div class="wiz-foot"><label class="btn primary" style="display:flex;align-items:center;justify-content:center;gap:8px;${ps.sid?'':'opacity:.45;pointer-events:none'}">${CAM} ${ps.sid ? '拍照 / 从相册选' : '先选科目'}<input type="file" accept="image/*" multiple id="photoin" style="display:none"></label></div></div>`;
+}
+
+/* ================= 语音：浏览器语音识别（Safari/Chrome），不支持时引导用键盘上的麦克风 ================= */
+const MIC = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const micBtn = target => `<button class="mic" data-act="mic" data-target="${target}" aria-label="语音输入">${MIC}</button>`;
+let recog = null;
+function startMic(btn){
+  const el = document.getElementById(btn.dataset.target); if (!el) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const fallback = () => { el.focus(); toast('点键盘左下角或空格旁的 🎤 麦克风，直接说话'); };
+  if (!SR) return fallback();
+  if (recog) { recog.stop(); return; }
+  recog = new SR(); recog.lang = 'zh-CN'; recog.interimResults = true; recog.continuous = false;
+  const base = el.value ? el.value.replace(/\s+$/,'') + (/[。，,.！？]$/.test(el.value.trim()) ? '' : '，') : '';
+  btn.classList.add('rec');
+  recog.onresult = e => { let t = ''; for (const r of e.results) t += r[0].transcript; el.value = base + t; el.dispatchEvent(new Event('input', {bubbles:true})); };
+  recog.onerror = e => { if (/not-allowed|service-not-allowed|network/.test(e.error)) fallback(); };
+  recog.onend = () => { btn.classList.remove('rec'); recog = null; };
+  try { recog.start(); } catch(e) { btn.classList.remove('rec'); recog = null; fallback(); }
+}
+/* 说一句话记今天：把「数学四十分钟，中间停了一次，错了两道概念；英语二十分钟；语文没作业」拆成各科记录 */
+const SUBJ_ALIAS = {df:['道德与法治','道法','政治'], sw:['生物学','生物'], dl:['地理'], ls:['历史'], wl:['物理'], hx:['化学'], yw:['语文'], sx:['数学'], yy:['英语']};
+function cnNum(t){
+  if (/^\d+$/.test(t)) return +t;
+  const m = {零:0,一:1,二:2,两:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9};
+  let total = 0, cur = 0;
+  for (const ch of t) { if (ch in m) cur = m[ch]; else if (ch === '十') { total += (cur || 1) * 10; cur = 0; } else if (ch === '百') { total += (cur || 1) * 100; cur = 0; } }
+  return total + cur;
+}
+const NUM = '[0-9零一二两三四五六七八九十百]+';
+function parseMinutes(t){
+  let m = t.match(new RegExp(`(${NUM}|半)\\s*个?\\s*(半)?\\s*(?:小时|钟头)(?:\\s*(${NUM})\\s*分)?`));
+  if (m) return (m[1] === '半' ? 30 : cnNum(m[1]) * 60 + (m[2] ? 30 : 0)) + (m[3] ? cnNum(m[3]) : 0);
+  m = t.match(new RegExp(`(${NUM})\\s*分(?:钟)?`));
+  return m ? cnNum(m[1]) : null;
+}
+/* 关键词 → [大类, 具体问题]；每科自己的词优先，通用词兜底 */
+const KW = {
+  sx: [['去括号','calc','kuohao'],['乘方','calc','cf-fu'],['符号|负号|变号','calc','fu-fu'],['口算|抄错|算错|计算','calc','kousuan'],['多步|步骤','calc','duobu'],
+       ['移项|等式性质','concept','yixiang'],['去分母','concept','qufenmu'],['公式','concept','gongshi'],['依据','concept','yiju'],['方法不会|不会做|没思路','concept','fangfa'],['概念','concept',''],
+       ['设未知数|设x','read','she'],['等量关系|列方程|列不出','read','dengliang'],['倒过来|弄反|倒置','read','daozhi'],['漏看|单位|没圈|条件','read','louting'],['题型|相遇|追及','read','tixing'],['审题|看错','read','']],
+  yw: [['默写|古诗','calc','moxie'],['错别字|写错字|字词','calc','cuozi'],['语病|病句','calc','yubing'],
+       ['文言|翻译','concept','wenyan'],['找不准|找不到答案','concept','zhao'],['概括','concept','gaikuo'],['细节','concept','xijie'],['看法|评价|观点','concept','pingjia'],['阅读','concept',''],
+       ['描写','read','miaoxie'],['太短|写太少|要点不全','read','taiduan'],['答非所问|没看清|审题|看错','read','shenti'],['作文|写作','read','']],
+  yy: [['拼写|拼错|拼不出','calc','pinxie'],['大小写|单复数|标点','calc','xingshi'],
+       ['谓语','concept','weiyu'],['时态','concept','shitai'],['语序','concept','yuxu'],['生词|单词|不认识','concept','shengci'],['搭配|介词|短语','concept','dapei'],['语法','concept',''],
+       ['听力|听漏|没听出','read','tinglou'],['口语|开口|蹦单词','read','kaikou'],['完形|上下文','read','shangxia'],['没看清|审题|看错|题目要求','read','yaoqiu']],
+  '*': [['计算|算错|粗心|抄错|书写|错别字|拼写','calc',''],['概念|不会|不懂|没学会|公式|语法|知识点','concept',''],['审题|看错|看漏|漏看|没看清|理解错','read','']]
+};
+function parseSpeech(text, d){
+  const subs = subjects(d), hits = [];
+  for (const s of subs) for (const a of (SUBJ_ALIAS[s.id] || [s.name])) { let i = -1; while ((i = text.indexOf(a, i + 1)) >= 0) hits.push({i, sid:s.id, len:a.length}); }
+  hits.sort((a,b) => a.i - b.i || b.len - a.len);
+  const segs = [];
+  for (const h of hits) { if (segs.length && h.i < segs[segs.length-1].i + segs[segs.length-1].len) continue; segs.push(h); }
+  const out = []; let mood = null;
+  if (/困|好累|很累|没精神/.test(text)) mood = 'tired'; else if (/精神(很)?好|状态(很)?好/.test(text)) mood = 'good';
+  const texts = segs.map((h, k) => text.slice(h.i + h.len, k + 1 < segs.length ? segs[k+1].i : text.length));
+  for (let k = texts.length - 2; k >= 0; k--) if (!texts[k].replace(/[、和与及跟,，\s]/g, '')) texts[k] = texts[k+1];
+  segs.forEach((h, k) => {
+    const t = texts[k];
+    const r = {sid:h.sid, none:false, min:null, intr:null, errs:{calc:0,concept:0,read:0}, conf:null, stuck:'', raw:t};
+    if (/没(有)?(布置)?(什么)?作业|不用写|没这科/.test(t)) { r.none = true; out.push(r); return; }
+    r.min = parseMinutes(t);
+    if (/(没|没有|一直没|没怎么)(停|中断|休息)|一口气/.test(t)) r.intr = 'none';
+    else if (/停|中断|休息|起来|玩了|走神|换了|去喝水|上厕所/.test(t)) r.intr = /开头|刚开始|一开始|开始没多久|前十五|前15/.test(t) ? 'early' : /快结束|最后|结尾|快做完/.test(t) ? 'late' : 'mid';
+    r.items = [];
+    if (!/没(有)?错|全对|都对/.test(t)) {
+      const kws = (KW[h.sid] || []).concat(KW['*']);
+      let rest = t, typed = 0;
+      const addN = (n, type, sub) => { for (let i = 0; i < n; i++) r.items.push({type, sub}); r.errs[type] += n; typed += n; };
+      for (const [kw, type, sub] of kws) {   // 「三道默写」「一道计算」
+        rest = rest.replace(new RegExp(`(${NUM})\\s*[道个题处]\\s*(?:是)?(?:[^，。；,;0-9零一二两三四五六七八九十]{0,3}?)(?:${kw})`, 'g'), (m, n) => { addN(cnNum(n), type, sub); return ' '.repeat(m.length); });
+      }
+      for (const [kw, type, sub] of kws) {   // 「默写错了三道」「计算两道」
+        rest = rest.replace(new RegExp(`(?:${kw})[^，。；,;0-9零一二两三四五六七八九十]{0,4}(${NUM})\\s*[道个题处]`, 'g'), (m, n) => { addN(cnNum(n), type, sub); return ' '.repeat(m.length); });
+      }
+      const tm = t.match(new RegExp(`错(?:了)?\\s*(${NUM})\\s*[道个题处]`)); const total = tm ? cnNum(tm[1]) : 0;
+      if (total > typed) { const hit = kws.find(([kw]) => new RegExp(kw).test(t)); addN(total - typed, hit ? hit[1] : 'concept', hit ? hit[2] : ''); }
+    }
+    if (/有把握|以为(是)?对|以为做对/.test(t)) r.conf = 'sure'; else if (/不确定|犹豫|拿不准/.test(t)) r.conf = 'unsure'; else if (/完全不会|根本不会|不知道怎么做/.test(t)) r.conf = 'no';
+    const sm = t.match(/(卡在|不确定|不知道|分不清|搞不懂)([^，。；,;]{2,30})/); if (sm) r.stuck = (sm[1] + sm[2]).trim();
+    out.push(r);
+  });
+  return {rows: out, mood};
+}
+function applySpeech(p, d){
+  for (const x of p.rows) {
+    const r = rec(d, x.sid, true);
+    if (x.none) { r.none = true; r.min = 0; continue; }
+    r.none = false; if (x.min != null) r.min = x.min; if (x.intr) r.intr = x.intr; if (x.stuck) r.stuck = x.stuck;
+    for (const e of (x.items || [])) DB.items.push({id:uid('i'), d, sid:x.sid, type:e.type, sub:e.sub || '', conf:x.conf, tag:'', box:0, due:addD(d, BOXES[0]), hist:[], done:false, u:now()});
+  }
+  if (p.mood) setDayField(d, 'mood', p.mood);
+  touchDay(d); save();
+}
+function speechPreview(p){
+  if (!p.rows.length) return '<div class="signal"><span class="k">没认出科目</span>要说出科目名，比如「数学四十分钟」。</div>';
+  return p.rows.map(x => { const s = subjById(x.sid), n = sum(Object.values(x.errs));
+    const errTxt = (x.items || []).length ? Object.entries((x.items).reduce((o, e) => { const k = subName({sid:x.sid, type:e.type, sub:e.sub}) || typeNameS(x.sid, e.type); o[k] = (o[k]||0) + 1; return o; }, {})).map(([k,v]) => `${k} ${v} 道`).join('、') : '';
+    const bits = x.none ? ['没作业'] : [x.min != null ? x.min + ' 分钟' : '<span style="color:var(--amber)">没听到时间</span>', x.intr ? INTR.find(i=>i.k===x.intr).n : '', errTxt, x.conf ? CONF.find(c=>c.k===x.conf).n : '', x.stuck ? '卡点：' + esc(x.stuck) : ''].filter(Boolean);
+    return `<div class="wiz-sum"><span class="dot" style="background:${s.color}"></span><b style="width:3em">${esc(s.name)}</b><span>${bits.join(' · ')}</span></div>`; }).join('') + (p.mood ? `<p class="small muted">精神：${MOOD.find(m=>m.k===p.mood).n}</p>` : '');
+}
+function vVoice(){
+  const v = state.voice, p = v.text ? parseSpeech(v.text, state.date) : null;
+  return `<div class="wiz" role="dialog" aria-label="说一句话记今天"><div class="wiz-top"><div style="flex:1;font-weight:600">说一句话记今天</div><button class="wiz-x" data-act="voiceclose" aria-label="关闭">×</button></div><div class="wiz-body">
+    <p class="muted" style="margin-top:4px">按住说、或点麦克风说，一口气说完各科就行：</p>
+    <p class="small faint" style="margin:0 0 10px">例：「数学四十分钟，中间停了一次，错了两道，一道计算一道概念，卡在去括号。英语二十分钟没错。语文没作业。」</p>
+    <div class="withmic"><textarea id="vq" class="wiz-in" data-in="voice" style="min-height:120px" placeholder="说完的文字会出现在这里，也可以直接打字改">${esc(v.text||'')}</textarea>${micBtn('vq')}</div>
+    <div id="vqprev" style="margin-top:14px">${p ? speechPreview(p) : ''}</div></div>
+    <div class="wiz-foot"><button class="btn ghost" data-act="voiceclose">取消</button><button class="btn primary" data-act="voiceapply">写入今天</button></div></div>`;
+}
+
 /* ================= 一步一步填 ================= */
 const WIZ_MIN = [10,15,20,30,40,45,60,75,90];
 function wizStart(){
@@ -948,17 +1209,23 @@ function vWiz(){
       <p class="small faint" style="margin-top:14px">起身倒水、玩手机、换别的科目，都算停下来。</p>`;
   } else if (w.step === 'err') {
     h += `<div class="wiz-q">错了几道？</div>`;
-    for (const t of ET) { const n = its.filter(it => it.type === t.k).length;
-      h += `<div class="cnt"><span class="nm"><i class="sw" style="background:${ET_COLOR[t.k]};width:12px;height:12px"></i>${t.n}</span><button data-act="wizerr" data-t="${t.k}" data-v="-1" aria-label="减少">−</button><span class="v">${n}</span><button data-act="wizerr" data-t="${t.k}" data-v="1" aria-label="增加">+</button></div>`; }
-    h += `<p class="small faint">分不清就选「概念混淆」。老师批改后才知道对错的话，明天再补也行。</p>`;
+    for (const t of ET) { const n = its.filter(it => it.type === t.k).length, tx = taxOf(sid);
+      h += `<div class="cnt"><span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:8px"><i class="sw" style="background:${ET_COLOR[t.k]};width:12px;height:12px"></i>${typeNameS(sid, t.k)}</span>${tx ? `<small class="faint" style="font-weight:400;font-size:12.5px">${tx[t.k].subs.slice(0,3).map(a=>a[1]).join(' / ')}…</small>` : ''}</span><button data-act="wizerr" data-t="${t.k}" data-v="-1" aria-label="减少">−</button><span class="v">${n}</span><button data-act="wizerr" data-t="${t.k}" data-v="1" aria-label="增加">+</button></div>`; }
+    h += `<p class="small faint">分不清就选「${typeNameS(sid,'concept')}」。老师批改后才知道对错的话，明天再补也行。</p>`;
     foot += `<button class="btn primary" data-act="wiznext">${its.length ? '下一步' : '没有错题'}</button>`;
+  } else if (w.step === 'sub') {
+    const tx = taxOf(sid);
+    h += `<div class="wiz-q">具体是哪种问题？</div><p class="small faint" style="margin:-10px 0 14px">说不清就跳过，家长之后在「今天」页点开这科也能补。</p>`;
+    its.forEach((it, k) => { h += `<div class="card" style="padding:12px 14px"><div class="small muted" style="margin-bottom:6px">第 ${k+1} 道 · ${typeName(it)}</div><div class="row">` +
+      tx[it.type].subs.map(a => `<button class="chip ${it.sub===a[0]?'on':''}" data-act="setsub" data-v="${it.id}" data-s="${a[0]}" title="${esc(a[2])}">${esc(a[1])}</button>`).join('') + `</div>${it.sub ? `<div class="small faint" style="margin-top:6px">${esc((tx[it.type].subs.find(a=>a[0]===it.sub)||[])[2]||'')}</div>` : ''}</div>`; });
+    foot += `<button class="btn primary" data-act="wiznext">下一步</button>`;
   } else if (w.step === 'conf') {
     h += `<div class="wiz-q">这${its.length > 1 ? ' '+its.length+' 道' : '道'}题，做的时候有把握吗？</div><div class="big two">` +
       [['sure','有把握','以为自己做对了'],['unsure','不太确定','有点犹豫'],['no','不会','不知道怎么做'],['skip','每道不一样','之后再分别标']].map(([k,n,sm]) => `<button data-act="wizconf" data-v="${k}">${n}<small>${sm}</small></button>`).join('') + `</div>
       <p class="small faint" style="margin-top:14px">「有把握却错了」的题会优先排进重做——这类错改正后最不容易再犯。</p>`;
   } else if (w.step === 'stuck') {
     h += `<div class="wiz-q">${esc(stuckQ(s.name))}</div>
-      <input type="text" class="wiz-in" data-in="rec" data-s="${sid}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="说一句就行，没有就跳过">`;
+      <div class="withmic"><input type="text" id="w-stuck" class="wiz-in" data-in="rec" data-s="${sid}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="说一句就行，没有就跳过">${micBtn('w-stuck')}</div>`;
     if (its.length) h += `<label class="f" style="margin-top:16px">错在哪个知识点（可选）</label>` + its.map(it => `<input type="text" class="wiz-in" style="margin-bottom:8px" list="tags-${sid}" data-in="item" data-id="${it.id}" data-f="tag" value="${esc(it.tag||'')}" placeholder="${ETN[it.type]}：比如 去括号">`).join('') + tagList(sid);
     foot += `<button class="btn primary" data-act="wiznext">${w.i + 1 < w.list.length ? '下一科' : '完成'}</button>`;
   }
@@ -978,8 +1245,8 @@ function tagList(sid){
 /* ================= 重做 / 错题索引 ================= */
 function vErrors(){
   let h = `<div class="row" style="margin-bottom:10px"><h2 style="margin:0">错题</h2><span class="spacer"></span><div class="seg">
-    <button data-act="ev" data-v="redo" class="${state.errView==='redo'?'on':''}">重做</button><button data-act="ev" data-v="index" class="${state.errView==='index'?'on':''}">索引</button></div></div>`;
-  return h + (state.errView === 'redo' ? vRedo() : vIndex());
+    <button data-act="ev" data-v="redo" class="${state.errView==='redo'?'on':''}">重做</button><button data-act="ev" data-v="index" class="${state.errView==='index'?'on':''}">索引</button><button data-act="ev" data-v="export" class="${state.errView==='export'?'on':''}">导出</button></div></div>`;
+  return h + (state.errView === 'redo' ? vRedo() : state.errView === 'export' ? vExport() : vIndex());
 }
 function vRedo(){
   const due = dueList(), dn = doneToday();
@@ -988,6 +1255,11 @@ function vRedo(){
   const quotaAll = Math.min(DAILY_REDO, due.length + dn);
   let h = `<div class="kpis"><div class="kpi"><b>${dn}<span class="faint" style="font-size:16px">/${quotaAll || DAILY_REDO}</span></b><span>今天做了</span></div><div class="kpi"><b>${active}</b><span>还在队列里</span></div><div class="kpi"><b>${mastered}</b><span>已掌握</span></div></div>`;
   h += `<p class="sub">翻到错题本上的原题，<b>盖住答案重做一遍</b>，再对答案。自己回忆一遍比重看答案管用得多。</p>`;
+  if (EXT.length) {
+    const on = DB.settings.useExt !== false, dates = [...new Set(EXT.map(x => x.d))].sort();
+    h += `<div class="signal info"><span class="k">题目从哪来</span>${on ? `队列里有 <b>${EXT.length} 道</b>来自拍照错题本（${dates.map(md).join('、')} 拍照收录，你确认过的），其余是每天在「今天」页记的错题。` : `拍照错题本里有 ${EXT.length} 道题，现在没放进重做。`}
+      <div class="row" style="margin-top:6px"><button class="btn sm" data-act="toggleext">${on ? '不要把拍照错题本的题放进来' : '把拍照错题本的题放进来'}</button></div></div>`;
+  }
   const quota = Math.max(0, DAILY_REDO - dn);
   const shown = state.showAllDue ? due : due.slice(0, quota);
   if (!due.length) h += `<div class="card empty">${dn ? `今天重做了 ${dn} 道，够了。` : AI.length ? '今天没有到期的题。' : '还没有错题。在「今天」页点开科目，点「+ 计算错误」这类按钮记一道。'}</div>`;
@@ -996,7 +1268,7 @@ function vRedo(){
     const s = subjById(it.sid); const r = DB.days[it.d] && DB.days[it.d].subj[it.sid];
     if (it.ext) { h += extCard(it, s); continue; }
     const nth = (it.hist||[]).length + 1;
-    h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${ETN[it.type]}</span>${it.conf==='sure'?'<span class="pill amber">有把握却错了 · 优先</span>':''}<span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
+    h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span>${it.conf==='sure'?'<span class="pill amber">有把握却错了 · 优先</span>':''}<span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
       <div class="q">${it.tag ? esc(it.tag) : '（没标知识点）'}</div>
       <div class="small muted">${md(it.d)}的${esc(s.name)}作业${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
       <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button><span class="spacer"></span><button class="btn sm ghost" data-act="skipitem" data-v="${it.id}">找不到原题</button></div></div>`;
@@ -1009,7 +1281,7 @@ function vRedo(){
 }
 function extCard(it, s){
   const nth = (it.hist||[]).length + 1;
-  return `<div class="card redo"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill accent">拍照错题本</span><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${ETN[it.type]}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
+  return `<div class="card redo"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill accent">拍照错题本</span><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
     <div class="q" style="font-family:var(--mono);font-size:17px">${esc(it.stem)}</div>
     <div class="small muted">${esc(it.src)}${it.tag ? ' · '+esc(it.tag) : ''}</div>
     <details style="margin-top:8px"><summary class="small" style="color:var(--accent)">做完再点开看答案</summary>
@@ -1018,6 +1290,63 @@ function extCard(it, s){
       ${it.note ? `<div class="signal info"><span class="k">讲题提示（给家长）</span>${esc(it.note)}</div>` : ''}</details>
     <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div></div>`;
 }
+/* ================= 错题导出：打印/存 PDF、Excel 表格 ================= */
+function exportRows(){
+  const f = state.exp || (state.exp = {period:'all', subj:'all', status:'active', answers:true});
+  const [from, to] = periodRange(f.period);
+  return allItems().filter(it => it.d >= from && it.d <= to && (f.subj === 'all' || it.sid === f.subj) && (f.status === 'all' || (f.status === 'active' ? !it.done : it.done && !it.skipped)))
+    .sort((a,b) => DB.settings.subjects.findIndex(s=>s.id===a.sid) - DB.settings.subjects.findIndex(s=>s.id===b.sid) || ET.findIndex(t=>t.k===a.type) - ET.findIndex(t=>t.k===b.type) || (a.d < b.d ? -1 : 1));
+}
+const itemStatus = it => it.skipped ? '移出' : it.done ? '已掌握' : '在练';
+const itemStuck = it => { const r = DB.days[it.d] && DB.days[it.d].subj[it.sid]; return r && r.stuck || ''; };
+function vExport(){
+  const f = state.exp || (state.exp = {period:'all', subj:'all', status:'active', answers:true});
+  const rows = exportRows();
+  const subsWith = DB.settings.subjects.filter(s => allItems().some(it => it.sid === s.id));
+  let h = `<p class="sub">导出成可以打印的错题本（按科目、错误类型分组，留出重做空白），或者 Excel 表格。</p><div class="card">
+    <label class="f">科目</label><div class="row">` + [['all','全部']].concat(subsWith.map(s => [s.id, s.name])).map(([k,n]) => `<button class="chip ${f.subj===k?'on':''}" data-act="expf" data-f="subj" data-v="${k}">${esc(n)}</button>`).join('') + `</div>
+    <label class="f">时间</label><div class="seg">` + [['week','本周'],['month','本月'],['term','本学期'],['all','全部']].map(([k,n]) => `<button data-act="expf" data-f="period" data-v="${k}" class="${f.period===k?'on':''}">${n}</button>`).join('') + `</div>
+    <label class="f">哪些题</label><div class="seg">` + [['active','还在练的'],['done','已掌握的'],['all','全部']].map(([k,n]) => `<button data-act="expf" data-f="status" data-v="${k}" class="${f.status===k?'on':''}">${n}</button>`).join('') + `</div>
+    <label class="f">打印时附答案</label><div class="seg">` + [['1','附在最后一页'],['0','不附']].map(([k,n]) => `<button data-act="expf" data-f="answers" data-v="${k}" class="${(f.answers?'1':'0')===k?'on':''}">${n}</button>`).join('') + `</div>
+    <p style="margin:14px 0 8px">共 <b>${rows.length}</b> 道${rows.length ? '：' + ET.map(t => `${t.s} ${rows.filter(r=>r.type===t.k).length}`).join(' · ') : ''}</p>
+    <div class="row"><button class="btn primary" data-act="expprint" ${rows.length?'':'disabled'}>打印 / 存成 PDF</button><button class="btn" data-act="expcsv" ${rows.length?'':'disabled'}>导出 Excel 表格</button></div>
+    <p class="small faint" style="margin:10px 0 0">iPad / 手机上点「打印」后，在打印预览里用两指张开，或点分享，就能存成 PDF 发到飞书。</p></div>`;
+  return h;
+}
+function exportCSV(){
+  const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  const head = ['日期','科目','错误类型','具体问题','知识点','题干','正确答案','孩子当时的答案','做的时候','卡点','来源','重做次数','重做做对','状态','下次重做'];
+  const lines = [head.join(',')].concat(exportRows().map(it => [it.d, subjById(it.sid).name, typeName(it), subName(it), it.tag, it.stem || '', it.answer || '', it.kidAnswer || '', it.conf ? CONF.find(c=>c.k===it.conf).n : '', it.ext ? '' : itemStuck(it), it.ext ? '拍照错题本 · ' + (it.src||'') : '每日记录', (it.hist||[]).length, (it.hist||[]).filter(h=>h.ok).length, itemStatus(it), it.done ? '' : it.due].map(q).join(',')));
+  download('错题-' + today() + '.csv', '﻿' + lines.join('\r\n'), 'text/csv');
+}
+function download(name, text, type){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type + ';charset=utf-8'}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+function exportPrint(){
+  const f = state.exp, rows = exportRows(); let n = 0;
+  const [from, to, lab] = periodRange(f.period);
+  let h = `<h1>${esc(DB.settings.child)}的错题本</h1><p class="pm">${lab}（${md(from)}–${md(to)}）· ${f.subj==='all'?'全部科目':esc(subjById(f.subj).name)} · 共 ${rows.length} 道 · 导出于 ${md(today())}</p>`;
+  const answers = [];
+  for (const s of DB.settings.subjects) {
+    const rs = rows.filter(r => r.sid === s.id); if (!rs.length) continue;
+    h += `<h2>${esc(s.name)} <span>${rs.length} 道 · ` + ET.map(t => `${t.s} ${rs.filter(r=>r.type===t.k).length}`).join(' · ') + `</span></h2>`;
+    for (const t of ET) {
+      const ts = rs.filter(r => r.type === t.k); if (!ts.length) continue;
+      h += `<h3>${typeName(ts[0])}（${ts.length}）</h3>`;
+      for (const it of ts) { n++;
+        h += `<div class="pi"><div class="pq"><b>${n}.</b> ${it.stem ? esc(it.stem) : esc(it.tag || '（没标知识点）')}</div>
+          <div class="pmeta">${md(it.d)} · ${subName(it) ? esc(subName(it)) + ' · ' : ''}${it.stem && it.tag ? esc(it.tag) + ' · ' : ''}${it.conf ? CONFN[it.conf] + ' · ' : ''}${it.ext ? esc(it.src) : '每日记录'}${!it.ext && itemStuck(it) ? ' · 当时说：「' + esc(itemStuck(it)) + '」' : ''}</div>
+          ${it.stem ? '<div class="pblank"></div>' : '<div class="pblank sm">翻到原题重做：</div>'}</div>`;
+        if (it.answer) answers.push(`<p><b>${n}.</b> ${esc(it.answer)}${it.note ? `<br><span class="pmeta">讲题提示：${esc(it.note)}</span>` : ''}</p>`);
+      }
+    }
+  }
+  if (f.answers && answers.length) h += `<div class="pbreak"></div><h2>答案</h2>` + answers.join('');
+  let box = $('#printbox'); if (!box) { box = document.createElement('div'); box.id = 'printbox'; document.body.appendChild(box); }
+  box.innerHTML = h; setTimeout(() => window.print(), 50);
+}
+
 function periodRange(p){
   const t = today();
   if (p === 'week') return [monOf(t), t, '本周'];
@@ -1036,19 +1365,27 @@ function vIndex(){
     <div class="bar" style="height:14px;margin:6px 0 8px">` + ET.map(t => `<i style="width:${pct(st.errs[t.k],st.errN)}%;background:${ET_COLOR[t.k]}"></i>`).join('') + `</div>
     <div class="legend">` + ET.map(t => `<span><i class="sw" style="background:${ET_COLOR[t.k]}"></i>${t.n} ${st.errs[t.k]}（${pct(st.errs[t.k],st.errN)}%）</span>`).join('') + `</div>
     <p class="small muted" style="margin:10px 0 0">做的时候：有把握 ${st.conf.sure} · 不太确定 ${st.conf.unsure} · 不会 ${st.conf.no}${st.conf.none ? ' · 没记 '+st.conf.none : ''}。「不会」多，要回课本补概念；「有把握却错」多，说明有个错误理解很牢，要专门纠正。</p></div>`;
-  h += `<div class="card"><h3>科目 × 错误类型</h3><div class="tablewrap"><table><tr><th>科目</th>` + ET.map(t=>`<th class="n">${t.s}</th>`).join('') + `<th class="n">合计</th><th>常错知识点</th></tr>`;
-  for (const s of DB.settings.subjects) {
-    const x = st.S[s.id]; const n = sum(Object.values(x.errs)); if (!n) continue;
-    h += `<tr><td><span class="dot" style="background:${s.color};margin-right:6px"></span>${esc(s.name)}</td>` + ET.map(t=>`<td class="n">${x.errs[t.k]||'·'}</td>`).join('') + `<td class="n"><b>${n}</b></td><td class="small wrap">${topEntries(x.tags,3).map(e=>esc(e[0])+' '+e[1]).join('、') || '<span class="faint">未标</span>'}</td></tr>`;
+  // 按科目整理：每科三大类用本科叫法 → 具体问题次数 → 书里的下一步
+  const its = allItems().filter(it => it.d >= from && it.d <= to);
+  for (const sb of DB.settings.subjects) {
+    const xs = its.filter(it => it.sid === sb.id); if (!xs.length) continue;
+    const tx = taxOf(sb.id), x = st.S[sb.id];
+    h += `<div class="card"><div class="row"><span class="dot" style="background:${sb.color}"></span><h3 style="margin:0">${esc(sb.name)} · ${xs.length} 道</h3></div>
+      <div class="bar" style="height:10px;margin:10px 0 6px">` + ET.map(t => `<i style="width:${pct(xs.filter(i=>i.type===t.k).length, xs.length)}%;background:${ET_COLOR[t.k]}"></i>`).join('') + `</div>`;
+    for (const t of ET) {
+      const ts = xs.filter(i => i.type === t.k); if (!ts.length) continue;
+      const cnt = {}; ts.forEach(i => { const k = subName(i) || '没标具体问题'; cnt[k] = (cnt[k]||0) + 1; });
+      h += `<div style="margin:10px 0 4px"><b><i class="sw" style="background:${ET_COLOR[t.k]}"></i> ${typeNameS(sb.id, t.k)} ${ts.length}</b>（${pct(ts.length, xs.length)}%）</div>
+        <div class="row" style="gap:6px">` + topEntries(cnt, 8).map(([k,n]) => `<span class="pill ${k==='没标具体问题'?'':'amber'}">${esc(k)} ${n}</span>`).join('') + `</div>`;
+      if (tx && tx.next[t.k]) h += `<div class="small muted" style="margin-top:4px">下一步：${esc(tx.next[t.k])}</div>`;
+    }
+    const tg = topEntries(x.tags, 4);
+    if (tg.length) h += `<div class="small faint" style="margin-top:8px">常错知识点：${tg.map(e=>esc(e[0])+' '+e[1]).join('、')}</div>`;
+    if (tx) h += `<details style="margin-top:8px"><summary class="small" style="color:var(--accent)">书里建议怎么问</summary><ul class="small" style="margin:6px 0;padding-left:18px">${tx.ask.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></details>`;
+    h += `</div>`;
   }
-  h += `</table></div></div><div class="card"><h3>每类错误集中在哪</h3>`;
-  for (const t of ET) {
-    if (!st.errs[t.k]) continue;
-    const tg = topEntries(st.tagsByType[t.k], 4), tagged = sum(tg.map(e=>e[1]));
-    h += `<p style="margin:6px 0"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> <b>${t.n} ${st.errs[t.k]} 次</b>` +
-      (tg.length ? '：' + tg.map(e=>{const p=e[0].split('｜'); return `${esc(p[1])}·${esc(p[0])} ${e[1]}`;}).join('，') + (st.errs[t.k] > tagged ? `，其余 ${st.errs[t.k]-tagged} 次未标或分散` : '') : '<span class="faint">（没标知识点）</span>') + `</p>`;
-  }
-  h += `</div>`;
+  h += `<details class="card"><summary><h3 style="display:inline">各科分类是怎么定的</h3></summary><p class="small muted">依据《陪考手记》第 7、9、10、11 章。数学的三栏「概念理解 / 运算执行 / 审题习惯」和其中大部分例子是书里原有的；语文书里说「更像是一片雾」，没给分类表，下面按书里列的考点补齐；英语的缺谓语、时态、中文语序、会认不会拼来自书里。标「建议」的是书中未提、按书的逻辑补的。记录时用描述性的话，不写「粗心」。</p>` +
+    Object.values(TAX).map(tx => `<p style="margin:10px 0 4px"><b>${tx.name}</b></p>` + ET.map(t => `<div class="small" style="margin:2px 0"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> <b>${tx[t.k].n}</b>：${tx[t.k].subs.map(a => esc(a[1]) + (a[3] ? '' : '<span class="faint">（建议）</span>')).join('、')}</div>`).join('')).join('') + `</details>`;
   const weeks = []; const m0 = monOf(today()); for (let i=7;i>=0;i--) weeks.push(addD(m0, -7*i));
   const wst = weeks.map(w => stats(w, addD(w,6))); const maxN = Math.max(1, ...wst.map(x=>x.errN));
   h += `<div class="card"><h3>近 8 周，每周错题按类型</h3>
@@ -1217,7 +1554,7 @@ function examForm(){
     h += `<div class="srow"><span><span class="dot" style="background:${s.color};margin-right:5px"></span>${esc(s.name)}</span>
       <input type="number" inputmode="decimal" data-ex="s" data-s="${s.id}" value="${x.s ?? ''}">
       <input type="number" inputmode="decimal" data-ex="full" data-s="${s.id}" value="${x.full || (p && p.full) || s.zk || 100}">
-      <div class="loss"><span class="small faint" style="width:100%">丢分归类（分，可选）</span>` + LOSS.map(l => `<label>${l.s}<input type="number" inputmode="decimal" data-ex="loss" data-s="${s.id}" data-t="${l.k}" value="${x.loss && x.loss[l.k] || ''}"></label>`).join('') + `</div></div>`;
+      <div class="loss"><span class="small faint" style="width:100%">丢分归类（分，可选）</span>` + LOSS.map(l => `<label>${ET.some(t=>t.k===l.k) ? typeShortS(s.id, l.k) : l.s}<input type="number" inputmode="decimal" data-ex="loss" data-s="${s.id}" data-t="${l.k}" value="${x.loss && x.loss[l.k] || ''}"></label>`).join('') + `</div></div>`;
   }
   h += `<div class="grid2"><div><label class="f">班级排名（可选）</label><input type="text" id="ex-rc" value="${esc(e.rankClass||'')}"></div><div><label class="f">年级排名（可选）</label><input type="text" id="ex-rg" value="${esc(e.rankGrade||'')}"></div></div>
     <h3 style="margin:18px 0 0">考后反思</h3>
@@ -1410,6 +1747,22 @@ const ACT = {
   delitem: el => { delRec('items', el.dataset.v); touchDay(state.date); save(); render(); },
   conf: el => { const it = DB.items.find(x => x.id === el.dataset.v); it.conf = it.conf === el.dataset.c ? null : el.dataset.c; it.u = now(); save(); render(); },
   wizstart: () => wizStart(),
+  photoopen: () => { state.photo = {kind:'error', sid: state.openSubj || null}; render(); },
+  photoclose: () => { state.photo = null; render(); },
+  pkind: el => { state.photo.kind = el.dataset.v; render(); },
+  psubj: el => { state.photo.sid = el.dataset.v; render(); },
+  photoview: el => { state.pview = el.dataset.v; render(); },
+  pviewclose: () => { state.pview = null; render(); },
+  photodel: el => { if (!confirm('删除这张照片？（已上传到私有仓库的那份会留着）')) return; IDB.del('photo:' + el.dataset.v); delRec('photos', el.dataset.v); state.pview = null; save(); render(); },
+  setsub: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.sub = it.sub === el.dataset.s ? '' : el.dataset.s; it.u = now(); save(); render(); },
+  mic: el => startMic(el),
+  voiceopen: () => { state.voice = {text:''}; render(); },
+  voiceclose: () => { if (recog) recog.stop(); state.voice = null; render(); },
+  voiceapply: () => { const p = parseSpeech(state.voice.text || '', state.date); if (!p.rows.length) return toast('没认出科目，要说出科目名'); if (recog) recog.stop(); applySpeech(p, state.date); state.voice = null; toast('写入了 ' + p.rows.length + ' 科'); render(); },
+  toggleext: () => { DB.settings.useExt = DB.settings.useExt === false; DB.settings.u = now(); save(); render(); },
+  expf: el => { const f = state.exp; const k = el.dataset.f; f[k] = k === 'answers' ? el.dataset.v === '1' : el.dataset.v; render(); },
+  expcsv: () => { exportCSV(); toast('已导出，用 Excel 或 WPS 打开'); },
+  expprint: () => exportPrint(),
   wizclose: () => { state.wiz = null; render(); },
   wizredo: () => { state.wiz = null; setTab('errors'); },
   wizmin: el => { const w = state.wiz, sid = w.list[w.i], v = el.dataset.v, r = rec(state.date, sid, true);
@@ -1422,12 +1775,14 @@ const ACT = {
     else { const c = itemsOn(state.date, sid).filter(it => it.type === t && !(it.hist||[]).length).pop(); if (c) delRec('items', c.id); }
     save(); render(); },
   wiznext: () => { const w = state.wiz, sid = w.list[w.i];
-    if (w.step === 'err') return wizGo(itemsOn(state.date, sid).some(it => !it.conf) ? 'conf' : 'stuck');
+    const its = itemsOn(state.date, sid);
+    if (w.step === 'err') return wizGo(its.length && taxOf(sid) ? 'sub' : its.some(it => !it.conf) ? 'conf' : 'stuck');
+    if (w.step === 'sub') return wizGo(its.some(it => !it.conf) ? 'conf' : 'stuck');
     wizGo('next'); },
   wizconf: el => { const v = el.dataset.v; if (v !== 'skip') for (const it of itemsOn(state.date, state.wiz.list[state.wiz.i])) if (!it.conf) { it.conf = v; it.u = now(); } save(); wizGo('stuck'); },
-  wizback: () => { const w = state.wiz, order = ['min','intr','err','conf','stuck'];
+  wizback: () => { const w = state.wiz, order = ['min','intr','err','sub','conf','stuck'], its = itemsOn(state.date, w.list[w.i]);
     if (w.step === 'min') { if (w.i > 0) { w.i--; w.step = 'min'; } }
-    else { let k = order.indexOf(w.step) - 1; if (order[k] === 'conf' && !itemsOn(state.date, w.list[w.i]).length) k--; w.step = order[k]; }
+    else { let k = order.indexOf(w.step) - 1; if (order[k] === 'conf' && !its.length) k--; if (order[k] === 'sub' && !(its.length && taxOf(w.list[w.i]))) k--; w.step = order[k]; }
     render(); },
   wizrest: () => { const w = state.wiz, dd = dayObj(state.date) || {subj:{}};
     for (const sid of w.list.slice(w.i)) if (!filledRec(dd.subj[sid])) { const r = rec(state.date, sid, true); r.none = true; r.min = 0; }
@@ -1525,6 +1880,7 @@ document.addEventListener('input', e => {
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
   if (k === 'day') setDayField(state.date, f, v);
   else if (k === 'rec') rec(state.date, el.dataset.s, true)[f] = v;
+  else if (k === 'voice') { state.voice.text = v; const pv = $('#vqprev'); if (pv) pv.innerHTML = v ? speechPreview(parseSpeech(v, state.date)) : ''; return; }
   else if (k === 'item') { const it = DB.items.find(x => x.id === el.dataset.id); if (it) { it[f] = v; it.u = now(); } }
   else if (k === 'week') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w[f] = v; w.u = now(); }
   else if (k === 'anchor') { const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.next = Object.assign({}, anchorsFor(state.week), w.next||{}); w.next[el.dataset.s] = Math.max(0, +v||0); w.u = now(); }
@@ -1534,6 +1890,7 @@ document.addEventListener('input', e => {
   save();
 });
 document.addEventListener('change', e => {
+  if (e.target.id === 'photoin' && e.target.files.length) { toast('正在压缩…'); addPhotos([...e.target.files]); return; }
   if (e.target.id === 'importf' && e.target.files[0]) { const r = new FileReader(); r.onload = () => importData(r.result); r.readAsText(e.target.files[0]); return; }
   if (e.target.closest('[data-in="set"],[data-in="sname"]')) renderChrome();
 });
