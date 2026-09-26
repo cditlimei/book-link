@@ -2234,7 +2234,10 @@ async function recStop(){
   try {
     if (REC.sr) { REC.sr.stop(); await new Promise(r => setTimeout(r, 800)); }
     else { clearTimeout(REC.cut); await new Promise(res => { REC.done = res; if (REC.mr && REC.mr.state === 'recording') REC.mr.stop(); else res(); }); REC.stream.getTracks().forEach(t => t.stop());
-      let txt = ''; for (const b of REC.blobs) txt += await aiASR(b); R.said = txt; }
+      const x = LIB.recite.items.find(i => i.id === R.id), hot = [];
+      if (x) { hot.push(x.title.replace(/[（(].*$/, '')); if (x.author) hot.push(x.author);
+        for (const l of x.text) for (const c of l.split(/[，。；！？、：]/)) { const cc = c.trim(); if (cc.length >= 2 && cc.length <= 8 && [...cc].some(ch => !(PY || {})[ch] || (PY[ch] || '').includes('|'))) hot.push(cc); } }
+      let txt = ''; for (const b of REC.blobs) txt += await aiASR(b, [...new Set(hot)]); R.said = txt; }
   } catch(e) { R.err = '识别失败：' + e.message; }
   REC = null;
   if (!R.said && !R.err) { R.err = '没识别到声音。浏览器的语音识别在国内经常连不上：在「家长 → 设置」填智谱密钥会更稳，或者用「打字默写检验」。'; R.phase = 'ready'; render(); return; }
@@ -2411,11 +2414,29 @@ async function aiChat(messages, opts){
   if (!r.ok) { const t = await r.text(); throw new Error(r.status === 401 ? '密钥不对' : '模型返回 ' + r.status + ' ' + t.slice(0, 80)); }
   const j = await r.json(); return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
 }
-async function aiASR(blob){
+/* 智谱语音识别只收 .wav / .mp3（接口文档原文，2026-09-26 她实测 m4a 返回 400）：录音先在本机解码、重采样成 16k 单声道 WAV */
+async function toWav16k(blob){
+  const AC = window.AudioContext || window.webkitAudioContext, ctx = new AC();
+  const buf = await new Promise((res, rej) => { blob.arrayBuffer().then(ab => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); }, rej); });
+  const rate = 16000, len = Math.ceil(buf.duration * rate);
+  const off = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, len, rate);
+  const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start(0);
+  const out = await new Promise((res, rej) => { const p = off.startRendering(); if (p && p.then) p.then(res, rej); else off.oncomplete = e => res(e.renderedBuffer); });
+  try { ctx.close(); } catch(e) {}
+  const pcm = out.getChannelData(0), v = new DataView(new ArrayBuffer(44 + pcm.length * 2)), w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + pcm.length * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) { const x = Math.max(-1, Math.min(1, pcm[i])); v.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true); }
+  return new Blob([v], {type: 'audio/wav'});
+}
+async function aiASR(blob, hotwords){
+  const wav = /wav|mpeg|mp3/.test(blob.type) ? blob : await toWav16k(blob);
   const fd = new FormData(); fd.append('model', 'glm-asr-2512'); fd.append('stream', 'false');
-  fd.append('file', blob, /mp4|m4a|aac/.test(blob.type) ? 'rec.m4a' : /ogg/.test(blob.type) ? 'rec.ogg' : /wav/.test(blob.type) ? 'rec.wav' : 'rec.webm');
+  if (hotwords && hotwords.length) fd.append('hotwords', JSON.stringify(hotwords.slice(0, 100)));
+  fd.append('file', wav, /mpeg|mp3/.test(wav.type) ? 'rec.mp3' : 'rec.wav');
   const r = await fetch('https://open.bigmodel.cn/api/paas/v4/audio/transcriptions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key}, body: fd});
-  if (!r.ok) throw new Error(r.status === 401 ? '密钥不对' : '语音识别返回 ' + r.status);
+  if (r.status === 400 && hotwords && hotwords.length) return aiASR(wav);          // 热词写法不被接受时，去掉热词再试一次
+  if (!r.ok) { let why = ''; try { const j = await r.json(); why = (j.error && (j.error.message || j.error.code)) || j.msg || ''; } catch(e) {} throw new Error((r.status === 401 ? '密钥不对' : '语音识别返回 ' + r.status) + (why ? '：' + why : '')); }
   const j = await r.json(); return j.text || (j.data && j.data.text) || (j.choices && j.choices[0] && (j.choices[0].text || (j.choices[0].message||{}).content)) || '';
 }
 function syncCard(){
@@ -2485,7 +2506,7 @@ const ACT = {
   tuimgx: () => { state.tutor.img = null; render(); },
   tuadd: () => { const r = state.tutor.result; touchDay(today()); DB.items.push({id: uid('i'), d: today(), sid: r.sid, type: r.type, sub: r.sub || '', conf: null, tag: r.tag || '', q: true, box: 0, due: addD(today(), BOXES[0]), hist: [], done: false, u: now(), from: 'ai'}); save(); toast('记进错题本了，2 天后重做'); state.tutor = null; render(); },
   rcheck: el => { try { window.__poemAudio && window.__poemAudio.pause(); } catch(e) {} state.rcheck = {id: state.learn.poem, mode: el.dataset.v, phase: 'ready', said: ''}; loadPY(); render(); },
-  rcstart: () => recStart(),
+  rcstart: () => loadPY().then(recStart),
   rcstop: () => recStop(),
   rctype: () => { state.rcheck.said = $('#rc-type').value; state.rcheck.phase = 'busy'; finishCheck(); },
   rcagain: () => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: ''}; render(); },
