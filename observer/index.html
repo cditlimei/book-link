@@ -808,9 +808,24 @@ function render(){
 }
 
 /* ================= 今天 ================= */
+/* 按浏览器给「加到桌面」的具体点法：iOS 26 的 Safari UA 冻结在 18_x，分不出新旧版，两种都写 */
+function installGuide(){
+  const ua = navigator.userAgent, android = /Android/i.test(ua);
+  if (/Lark|Feishu/i.test(ua)) return '现在是在<b>飞书</b>里打开的，这里加不了。点右上角 <b>···</b> →「在浏览器中打开」' + (isIOS ? '，选 Safari。' : '。');
+  if (/MicroMessenger/i.test(ua)) return '现在是在<b>微信</b>里打开的，这里加不了。点右上角 <b>···</b> →「在浏览器打开」。';
+  if (isIOS) {
+    if (/CriOS/.test(ua)) return '你用的是 <b>Chrome</b>：点地址栏右边的<b>分享图标</b>（方框加向上箭头）→ 往下滑 →「添加到主屏幕」。找不到就点「复制链接」，换 Safari 打开。';
+    if (/EdgiOS|FxiOS/.test(ua)) return '点底部菜单里的<b>分享</b> →「添加到主屏幕」。找不到就点「复制链接」，换 Safari 打开。';
+    if (/Quark|UCBrowser|baiduboxapp|MQQBrowser|SogouMobile|2345/i.test(ua)) return '这个浏览器<b>不支持</b>加到主屏幕。点下面「复制链接」，打开 iPhone 自带的 <b>Safari</b>（指南针图标），粘贴到地址栏打开。';
+    return '<b>Safari</b>：点地址栏旁边的 <b>···</b>（iOS 26）或屏幕底部中间的<b>分享图标</b>（方框加向上箭头，旧版 iOS）→ 往下滑 →「添加到主屏幕」。底部工具栏看不到就先点一下屏幕最下方。';
+  }
+  if (android) return '点浏览器的<b>菜单</b>（右上角 ⋮ 或底部 ≡）→「添加到主屏幕」/「添加到桌面」/「安装应用」。华为、小米自带浏览器有的放在「工具箱」里。';
+  return '';
+}
 function banners(){
   let h = '';
-  if (!DEMO && isIOS && !standalone() && !lsGet('observer:hideInstall')) h += `<div class="signal info"><span class="k">第一步</span>在 Safari 里点「分享」→「添加到主屏幕」，以后从主屏幕的图标打开。这样 Safari 不会自动清理数据，也能离线用。<div class="row" style="margin-top:6px"><button class="btn sm ghost" data-act="hideinstall">知道了</button></div></div>`;
+  const ig = installGuide();
+  if (!DEMO && ig && !standalone() && !lsGet('observer:hideInstall')) h += `<div class="signal info"><span class="k">第一步：加到桌面</span>${ig}<p class="small faint" style="margin:6px 0 0">加到桌面后从图标打开：数据不会被浏览器自动清理，也能离线用。</p><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copylink">复制链接</button><button class="btn sm ghost" data-act="hideinstall">已经加好了</button></div></div>`;
   const n = Object.keys(DB.days).length;
   if (!DEMO && n >= 3 && !syncReady()) {
     const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
@@ -1469,6 +1484,7 @@ const ACT = {
   saddsub: () => { const n = $('#newsubj').value.trim(); if (!n) return;
     DB.settings.subjects.push({id:uid('c'), name:n, color: EXTRA_COLORS[DB.settings.subjects.length % EXTRA_COLORS.length], zk:100, from:0, to:5, inTotal:false, mode:'on'}); DB.settings.u = now(); save(); render(); },
   setpin: () => { const v = $('#newpin').value.trim(); if (v && !/^\d{4}$/.test(v)) return toast('请输入 4 位数字'); DB.settings.pin = v; DB.settings.u = now(); save(); toast(v ? '密码已设置' : '密码已取消'); render(); },
+  copylink: () => { const u = location.origin + location.pathname; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('链接已复制')).catch(() => prompt('复制这个链接', u)); },
   hideinstall: () => { lsSet('observer:hideInstall', true); render(); },
   syncsave: () => {
     const repo = $('#sy-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/+$/,''), token = $('#sy-token').value.trim(), pass = $('#sy-pass').value;
