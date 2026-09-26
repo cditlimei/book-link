@@ -2210,7 +2210,7 @@ function markedLines(lines, miss){ return lines.map((l, li) => `<div>${[...l].ma
 let REC = null;
 async function recStart(){
   const R = state.rcheck; R.said = ''; R.err = '';
-  if (aiReady() && AI.asrOff !== today() && window.MediaRecorder && navigator.mediaDevices) {   // 智谱余额不足的当天改用设备自带识别
+  if (aiReady() && !asrPaused() && window.MediaRecorder && navigator.mediaDevices) {   // 智谱余额不足后 10 分钟内改用设备自带识别（充值后点设置里的「测试」立即恢复）
     try { const stream = await navigator.mediaDevices.getUserMedia({audio: true});
       const type = ['audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
       REC = {stream, blobs: [], type, on: true, t0: Date.now()};
@@ -2239,7 +2239,7 @@ async function recStop(){
         for (const l of x.text) for (const c of l.split(/[，。；！？、：]/)) { const cc = c.trim(); if (cc.length >= 2 && cc.length <= 8 && [...cc].some(ch => !(PY || {})[ch] || (PY[ch] || '').includes('|'))) hot.push(cc); } }
       let txt = ''; for (const b of REC.blobs) txt += await aiASR(b, [...new Set(hot)]); R.said = txt; }
   } catch(e) {
-    if (e.noMoney) { AI.asrOff = today(); saveAI(); R.err = '智谱语音识别余额不足（它按 0.06 元/分钟收费，和免费的 AI 辅导不是一回事）。今天先改用设备自带的识别，点「开始背」再来一遍；想用更准的智谱识别，去智谱网站充 10 元就能用很久。'; }
+    if (e.noMoney) { AI.asrOff = Date.now(); saveAI(); R.err = '智谱语音识别余额不足（它按 0.06 元/分钟收费，和免费的 AI 辅导不是一回事）。先改用免费的：点「开始背」用设备自带识别，或者点「用键盘话筒背」；想用更准的智谱识别，去智谱网站充 10 元能用很久。'; }
     else R.err = '识别失败：' + e.message; }
   REC = null;
   if (!R.said && R.err) { R.phase = 'ready'; render(); return; }   // 识别失败不记成 0 分
@@ -2259,7 +2259,7 @@ async function finishCheck(){
 }
 function vReciteCheck(){
   const R = state.rcheck, x = LIB.recite.items.find(i => i.id === R.id); if (!x) return '';
-  let h = `<div class="wiz" role="dialog" aria-label="背诵检验"><div class="wiz-top"><div style="flex:1;font-weight:600">${R.mode === 'type' ? '打字默写检验' : '背一遍检验'} · ${esc(x.title)}</div><button class="wiz-x" data-act="rcclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  let h = `<div class="wiz" role="dialog" aria-label="背诵检验"><div class="wiz-top"><div style="flex:1;font-weight:600">${R.mode === 'type' ? '打字默写检验' : R.mode === 'dict' ? '键盘话筒背诵检验' : '背一遍检验'} · ${esc(x.title)}</div><button class="wiz-x" data-act="rcclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
   if (x.mode === 'excerpt') h += `<p class="small faint">这篇只收了默写常考的重点句，检验的也是这些句子。</p>`;
   if (R.phase === 'result') {
     const p = Math.round(R.res.score * 100), good = R.mode === 'type' ? p >= 98 : p >= 90;
@@ -2270,6 +2270,10 @@ function vReciteCheck(){
     h += `</div><div class="wiz-foot"><button class="btn" data-act="rcagain">再来一遍</button><button class="btn primary" data-act="rcclose">好了</button></div></div>`;
     return h;
   }
+  if (R.mode === 'dict') {   // 免费：iPad 键盘自带听写，按拼音宽松对照，和语音检验同一标准
+    h += `<p class="muted">不看原文。点一下下面的框，再点键盘上的 <b>🎤 话筒键</b>，从题目开始背；背完点「对答案」。</p><p class="small faint">这是 iPad 自带的听写，免费。键盘上没有话筒键的话，去「设置 → 通用 → 键盘」打开「启用听写」。同音字按对算。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="点这里，再点键盘上的话筒">${esc(R.said||'')}</textarea>`;
+    return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
+  }
   if (R.mode === 'type') {
     h += `<p class="muted">不看原文，把整篇默写出来（标点可以不打）。写完点「对答案」。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="从第一句开始写">${esc(R.said||'')}</textarea>`;
     return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
@@ -2277,7 +2281,7 @@ function vReciteCheck(){
   h += `<div style="text-align:center;margin-top:30px"><div class="small faint">不看原文，从题目开始背</div><div style="font-family:var(--serif);font-size:24px;font-weight:700;margin:10px 0">${esc(x.title)}</div><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>`;
   if (R.phase === 'rec') h += `<div style="margin:30px auto 10px;width:110px;height:110px;border-radius:50%;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center" class="mic rec">${MIC.replace('<svg','<svg style="width:44px;height:44px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…背完点下面「背完了」</div>`;
   else if (R.phase === 'busy') h += `<div class="muted" style="margin-top:40px">正在对照原文…</div>`;
-  else h += `<button class="btn primary" style="margin-top:30px;min-height:64px;font-size:19px;padding:0 30px" data-act="rcstart">${MIC.replace('<svg','<svg style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-4px"')} 开始背</button><p class="small faint" style="margin-top:12px">${aiReady() ? '用智谱语音识别，每 25 秒自动分段' : '用浏览器语音识别；识别不稳可以在「家长 → 设置」填智谱密钥'}</p>`;
+  else h += `<button class="btn primary" style="margin-top:30px;min-height:64px;font-size:19px;padding:0 30px" data-act="rcstart">${MIC.replace('<svg','<svg style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-4px"')} 开始背</button><p class="small faint" style="margin-top:12px">${aiReady() && !asrPaused() ? '用智谱语音识别（付费，0.06 元/分钟）' : '用设备自带的语音识别（免费）'}</p><button class="btn sm" style="margin-top:4px" data-act="rcdict">识别不了？用键盘话筒背（免费）</button>`;
   if (R.err) h += `<div class="signal" style="text-align:left">${esc(R.err)}</div>`;
   h += `</div></div><div class="wiz-foot">${R.phase === 'rec' ? '<button class="btn primary" data-act="rcstop">背完了</button>' : '<button class="btn ghost" data-act="rcclose">取消</button>'}</div></div>`;
   return h;
@@ -2432,6 +2436,7 @@ async function toWav16k(blob){
   for (let i = 0; i < pcm.length; i++) { const x = Math.max(-1, Math.min(1, pcm[i])); v.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true); }
   return new Blob([v], {type: 'audio/wav'});
 }
+const asrPaused = () => AI.asrOff > 0 && Date.now() - AI.asrOff < 6e5;
 async function aiASR(blob, hotwords){
   const wav = /wav|mpeg|mp3/.test(blob.type) ? blob : await toWav16k(blob);
   const fd = new FormData(); fd.append('model', 'glm-asr-2512'); fd.append('stream', 'false');
@@ -2513,6 +2518,7 @@ const ACT = {
   rcheck: el => { try { window.__poemAudio && window.__poemAudio.pause(); } catch(e) {} state.rcheck = {id: state.learn.poem, mode: el.dataset.v, phase: 'ready', said: ''}; loadPY(); render(); },
   rcstart: () => loadPY().then(recStart),
   rcstop: () => recStop(),
+  rcdict: () => { state.rcheck = {id: state.rcheck.id, mode: 'dict', phase: 'ready', said: ''}; render(); },
   rctype: () => { state.rcheck.said = $('#rc-type').value; state.rcheck.phase = 'busy'; finishCheck(); },
   rcagain: () => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: ''}; render(); },
   rcclose: () => { if (REC) { REC.on = false; try { REC.sr && REC.sr.stop(); REC.mr && REC.mr.state === 'recording' && REC.mr.stop(); REC.stream && REC.stream.getTracks().forEach(t => t.stop()); } catch(e) {} REC = null; } state.rcheck = null; render(); },
