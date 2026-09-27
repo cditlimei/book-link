@@ -1,0 +1,555 @@
+{
+"listen": [
+{
+"id": "l01",
+"kind": "dialogue",
+"title": "Going to the Library",
+"lines": [
+[
+"M",
+"Hi, Lucy. Where are you going?"
+],
+[
+"F",
+"I'm going to the library. I want to borrow some books about animals."
+],
+[
+"M",
+"How do you usually get there?"
+],
+[
+"F",
+"I usually walk, but today it's raining, so I'll take the bus."
+],
+[
+"M",
+"When does the library close?"
+],
+[
+"F",
+"It closes at six o'clock in the evening."
+]
+],
+"qs": [
+{
+"q": "How will Lucy go to the library today?",
+"keys": [
+[
+"bus"
+]
+],
+"ans": "By bus."
+},
+{
+"q": "What time does the library close?",
+"keys": [
+[
+"six"
+],
+[
+"6"
+]
+],
+"ans": "At six o'clock."
+}
+]
+},
+{
+"id": "l02",
+"kind": "dialogue",
+"title": "A Birthday Present",
+"lines": [
+[
+"F",
+"Mike, my brother's birthday is next Sunday. What should I buy for him?"
+],
+[
+"M",
+"How old will he be?"
+],
+[
+"F",
+"He'll be ten. He loves football very much."
+],
+[
+"M",
+"Then why not buy him a football shirt?"
+],
+[
+"F",
+"Good idea! I saw one in a shop near our school. It's eighty yuan."
+]
+],
+"qs": [
+{
+"q": "How old will her brother be?",
+"keys": [
+[
+"ten"
+],
+[
+"10"
+]
+],
+"ans": "Ten."
+},
+{
+"q": "How much is the football shirt?",
+"keys": [
+[
+"eighty"
+],
+[
+"80"
+]
+],
+"ans": "Eighty yuan."
+}
+]
+},
+{
+"id": "l03",
+"kind": "dialogue",
+"title": "Weekend Plans",
+"lines": [
+[
+"M",
+"Amy, do you have any plans for the weekend?"
+],
+[
+"F",
+"Yes. On Saturday morning I have a piano lesson."
+],
+[
+"M",
+"What about Saturday afternoon?"
+],
+[
+"F",
+"I'm going to visit my grandparents with my parents. They live in Longgang."
+],
+[
+"M",
+"That sounds nice. I'll stay at home and finish my science project."
+]
+],
+"qs": [
+{
+"q": "What does Amy have on Saturday morning?",
+"keys": [
+[
+"piano"
+]
+],
+"ans": "A piano lesson."
+},
+{
+"q": "Who will Amy visit on Saturday afternoon?",
+"keys": [
+[
+"grandparents"
+],
+[
+"grandmother"
+],
+[
+"grandfather"
+],
+[
+"grandma"
+],
+[
+"grandpa"
+]
+],
+"ans": "Her grandparents."
+}
+]
+},
+{
+"id": "l04",
+"kind": "dialogue",
+"title": "At the Doctor's",
+"lines": [
+[
+"F",
+"What's wrong with you, young man?"
+],
+[
+"M",
+"I have a headache and a sore throat."
+],
+[
+"F",
+"When did it start?"
+],
+[
+"M",
+"Yesterday afternoon, after I played basketball in the rain."
+],
+[
+"F",
+"You have a cold. Drink more warm water and stay in bed for two days."
+]
+],
+"qs": [
+{
+"q": "When did the boy start to feel ill?",
+"keys": [
+[
+"yesterday"
+]
+],
+"ans": "Yesterday afternoon."
+},
+{
+"q": "How long should he stay in bed?",
+"keys": [
+[
+"two",
+"days"
+],
+[
+"2",
+"days"
+],
+[
+"two"
+],
+[
+"2"
+]
+],
+"ans": "For two days."
+}
+]
+},
+{
+"id": "l05",
+"kind": "passage",
+"title": "A New Student",
+"lines": [
+[
+"F",
+"Hello, everyone. My name is Sarah and I'm a new student in Class Three. I come from Canada, but I've lived in Shenzhen for two years. I like it here because the weather is warm and the food is delicious. My favourite subject is art, and I often draw pictures of the sea on weekends. I also enjoy playing table tennis with my father. I hope to make many friends at this school."
+]
+],
+"qs": [
+{
+"q": "Where does Sarah come from?",
+"keys": [
+[
+"canada"
+]
+],
+"ans": "Canada."
+},
+{
+"q": "How long has she lived in Shenzhen?",
+"keys": [
+[
+"two",
+"years"
+],
+[
+"2",
+"years"
+]
+],
+"ans": "For two years."
+},
+{
+"q": "What is her favourite subject?",
+"keys": [
+[
+"art"
+]
+],
+"ans": "Art."
+},
+{
+"q": "Who does she play table tennis with?",
+"keys": [
+[
+"father"
+],
+[
+"dad"
+]
+],
+"ans": "Her father."
+}
+]
+},
+{
+"id": "l06",
+"kind": "passage",
+"title": "The School Trip",
+"lines": [
+[
+"M",
+"Good morning, students. Next Wednesday we will visit the science museum. Please arrive at school by seven thirty, and the bus will leave at eight. Remember to bring a notebook, a pen and some water. Lunch will be provided at the museum, so you don't need to bring food. We will come back at about four in the afternoon. If it rains, the trip will be on Friday instead."
+]
+],
+"qs": [
+{
+"q": "Where will the students go next Wednesday?",
+"keys": [
+[
+"science",
+"museum"
+],
+[
+"museum"
+]
+],
+"ans": "The science museum."
+},
+{
+"q": "What time will the bus leave?",
+"keys": [
+[
+"eight"
+],
+[
+"8"
+]
+],
+"ans": "At eight."
+},
+{
+"q": "Do the students need to bring food?",
+"keys": [
+[
+"no"
+],
+[
+"don't"
+],
+[
+"not"
+]
+],
+"ans": "No, they don't."
+},
+{
+"q": "When will the trip be if it rains?",
+"keys": [
+[
+"friday"
+]
+],
+"ans": "On Friday."
+}
+]
+}
+],
+"retell": [
+{
+"id": "t01",
+"title": "Jack's New Hobby",
+"text": "Jack is a middle school student. Last year he started to learn to swim, because he wanted to be healthier. At first he was afraid of water, so his coach taught him how to breathe slowly. He practised three times a week after school. Six months later, he could swim two hundred metres without stopping. Now swimming is his favourite sport, and he plans to take part in a competition next summer.",
+"points": [
+{
+"p": "去年开始学游泳",
+"keys": [
+"swim",
+"swimming"
+]
+},
+{
+"p": "原因：想更健康",
+"keys": [
+"healthy",
+"healthier",
+"health"
+]
+},
+{
+"p": "一开始怕水",
+"keys": [
+"afraid",
+"scared"
+]
+},
+{
+"p": "每周练三次",
+"keys": [
+"three times",
+"3 times",
+"three",
+"practice",
+"practised",
+"practiced"
+]
+},
+{
+"p": "半年后能游 200 米",
+"keys": [
+"two hundred",
+"200",
+"six months",
+"metres",
+"meters"
+]
+},
+{
+"p": "打算明年夏天参加比赛",
+"keys": [
+"competition",
+"match",
+"race"
+]
+}
+],
+"map": "Jack → 学游泳（为什么？）→ 一开始的困难 → 怎么练 → 结果 → 计划",
+"asks": [
+{
+"cn": "询问 Jack 的教练叫什么名字",
+"expect": "What is his coach's name? / What's the name of his coach?"
+},
+{
+"cn": "询问 Jack 在哪里练习游泳",
+"expect": "Where does he practise swimming? / Where did he practise?"
+}
+]
+},
+{
+"id": "t02",
+"title": "A Special Market",
+"text": "Every Saturday morning, there is a special market in our community. People bring things they no longer need, such as books, toys and clothes. Instead of paying money, they exchange things with each other. Last week I gave away three storybooks and got a model plane. The market helps people save money and reduces waste. It also gives neighbours a chance to meet and talk. Many families now go there every week.",
+"points": [
+{
+"p": "每周六上午，社区里的市场",
+"keys": [
+"saturday",
+"community",
+"market"
+]
+},
+{
+"p": "带不用的东西：书、玩具、衣服",
+"keys": [
+"books",
+"toys",
+"clothes",
+"no longer need"
+]
+},
+{
+"p": "不付钱，互相交换",
+"keys": [
+"exchange",
+"swap",
+"instead of paying",
+"without money"
+]
+},
+{
+"p": "我换到了飞机模型",
+"keys": [
+"model plane",
+"plane",
+"storybooks"
+]
+},
+{
+"p": "省钱、减少浪费",
+"keys": [
+"save money",
+"waste"
+]
+},
+{
+"p": "邻居见面聊天",
+"keys": [
+"neighbours",
+"neighbors",
+"meet",
+"talk"
+]
+}
+],
+"map": "什么时间、在哪 → 带什么 → 怎么交换 → 我的经历 → 好处（两点）",
+"asks": [
+{
+"cn": "询问这个市场几点结束",
+"expect": "What time does the market end/close? / When does it finish?"
+},
+{
+"cn": "询问你还想换什么东西",
+"expect": "What else do you want to exchange? / What do you want to get next time?"
+}
+]
+},
+{
+"id": "t03",
+"title": "Helping Grandma",
+"text": "Tina's grandma lives alone in an old building without a lift. Her legs are not strong, so it is hard for her to carry heavy things upstairs. Every Sunday, Tina goes shopping for her and helps her clean the kitchen. Last month, Tina also taught her grandma how to make video calls on a smartphone. Now they can see each other every evening. Grandma says she feels much happier than before.",
+"points": [
+{
+"p": "奶奶一个人住，楼里没电梯",
+"keys": [
+"alone",
+"lift",
+"elevator",
+"old building"
+]
+},
+{
+"p": "腿不好，搬重东西难",
+"keys": [
+"legs",
+"heavy",
+"carry"
+]
+},
+{
+"p": "每周日帮她买东西、打扫厨房",
+"keys": [
+"sunday",
+"shopping",
+"clean",
+"kitchen"
+]
+},
+{
+"p": "教奶奶用手机视频通话",
+"keys": [
+"video",
+"smartphone",
+"phone",
+"calls"
+]
+},
+{
+"p": "每天晚上能见面",
+"keys": [
+"every evening",
+"see each other",
+"evening"
+]
+},
+{
+"p": "奶奶更开心了",
+"keys": [
+"happier",
+"happy"
+]
+}
+],
+"map": "奶奶的情况 → 困难 → Tina 每周做什么 → 上个月教了什么 → 变化",
+"asks": [
+{
+"cn": "询问 Tina 的奶奶多大年纪",
+"expect": "How old is Tina's grandma?"
+},
+{
+"cn": "询问 Tina 怎么去奶奶家",
+"expect": "How does Tina get to her grandma's home?"
+}
+]
+}
+],
+"note": "题型参照深圳中考英语听说考试「信息获取」「信息复述及提问」。材料为本应用原创，音频由 edge-tts 生成。"
+}
