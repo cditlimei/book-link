@@ -1162,9 +1162,10 @@ function vToday(){
       {t: '重做错题', s: left ? left + ' 道' : dn ? '做完了' : '今天没有', done: left === 0, act: 'tab', v: 'errors', go: `重做 ${left} 道错题`},
       {t: '背单词', s: !LIB.done ? '…' : !LIB.words ? '词库没加载到' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有', done: wordsOk, opt: !LIB.done, act: 'golearn', v: 'card', go: `背 ${wLeft} 个单词`},
       {t: '背古诗', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
+    const ex = extraTask(d); if (ex) T.push(ex);
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
-    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done' : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + tools + welcomeCard();
+    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done' : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + tools + welcomeCard();
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
       <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">②</span><span class="t">重做</span><span class="s">${left ? left + ' 道' : dn ? '做完了' : '今天没有'}</span></button>
@@ -1976,6 +1977,7 @@ function vWeek(){
     h += `<div class="card"><h3>AI 教育专家的本周建议 <span class="small faint">（自动生成）</span></h3>${adv ? `<div style="white-space:pre-wrap">${esc(adv)}</div>` : `<p class="small muted" style="margin:0">${st.recDays >= 3 ? '正在根据这周的记录生成…' : '这周记录满 3 天后自动生成。'}</p>`}
       ${ses.length ? `<details style="margin-top:8px"><summary class="small muted">本周 AI 辅导 ${ses.length} 次</summary>${ses.map(z => `<p class="small" style="margin:4px 0"><span class="faint">${mdShort(z.d)} ${esc(subjById(z.sid).name)}</span> ${esc(z.summary)}</p>`).join('')}</details>` : ''}</div>`; }
   h += `<div class="card"><h3>这一周的节奏</h3>${weekGrid(st, mon, anchors)}</div>`;
+  { const x = extraWeek(mon, end); if (x) h += `<div class="card"><h3>英语听说 · 体育</h3><p style="margin:0">${esc(extraWeekText(x))}</p><p class="small faint" style="margin:6px 0 0">一三五在「今天」页会自动排一项听说，周六排一次体育，都是可选的。</p></div>`; }
   h += `<div class="card"><div class="row"><h3 style="margin:0">观察到的模式</h3><span class="spacer"></span><button class="btn sm" data-act="copyweek">复制本周小结</button></div>${findingsHTML(state._fs = findings(st, prev, anchors, passed), true)}</div>`;
   const stuck = []; for (const sid in st.S) stuck.push(...st.S[sid].stuck);
   const ans = st.days.filter(d => DB.days[d] && DB.days[d].answer).map(d => ({d, text:DB.days[d].answer}));
@@ -2038,11 +2040,24 @@ function weekSummary(mon){
   L.push('', '观察到的：', ...findings(st, prev, anchors, range(mon,end).length).map(f => '· ' + f.t.replace(/<[^>]+>/g,'')));
   const pl = planFor(mon); if (pl) { L.push('', '这周试的调整：' + pl.act); if (pl.m) { const v = verdict(pl.base, metricValue(pl.m, mon, end)); L.push(`效果：${metricLabel(pl.m)} ${metricFmt(pl.m, pl.base)} → ${metricFmt(pl.m, metricValue(pl.m, mon, end))}（${v.t}）`); } }
   const nx = (DB.weeks[mon] || {}).auto; if (nx && !nx.skip) L.push('下周要试：' + nx.act);
+  { const x = extraWeek(mon, end); if (x) L.push('', extraWeekText(x)); }
   if (w.found) L.push('', '这周发现：' + w.found);
   if (w.adjust) L.push('下周只调：' + w.adjust);
   return L.join('\n');
 }
 // 一页 A4 周报：给孩子、老师或另一位家长看；打印或在打印预览里存成 PDF
+function extraWeek(mon, end){
+  const inW = r => r.d >= mon && r.d <= end, pw = r => r.d >= addD(mon, -7) && r.d <= addD(mon, -1);
+  const sp = DB.speakRecs.filter(inW), spp = DB.speakRecs.filter(pw), avg = a => a.length ? Math.round(a.reduce((x, r) => x + r.acc, 0) / a.length) : null;
+  const pe = DB.peRecs.filter(inW), est = LIB.pe ? peEstimate() : {field: null};
+  if (!sp.length && !pe.length && est.field == null) return null;
+  const kinds = {read: 0, listen: 0, retell: 0}; sp.forEach(r => kinds[r.kind || 'read']++);
+  return {n: sp.length, avg: avg(sp), pavg: avg(spp), kinds, pe: pe.length, est: est.field};
+}
+function extraWeekText(x){ if (!x) return ''; const a = [];
+  if (x.n) a.push(`英语听说练了 ${x.n} 次（朗读 ${x.kinds.read}、听后回答 ${x.kinds.listen}、复述提问 ${x.kinds.retell}），平均 ${x.avg}%${x.pavg != null ? `，上周 ${x.pavg}%` : ''}`); else a.push('英语听说这周没练');
+  if (x.est != null) a.push(`体育现场分估 ${x.est}/36${x.pe ? `（这周测了 ${x.pe} 次）` : ''}`); else if (x.pe) a.push(`体育这周测了 ${x.pe} 次`);
+  return a.join('；') + '。'; }
 function printWeek(mon){
   const sun = addD(mon,6), t = today(), end = sun < t ? sun : t, days = range(mon, sun);
   const st = stats(mon, end), prev = stats(addD(mon,-7), addD(mon,-1)), anchors = anchorsFor(mon), w = DB.weeks[mon] || {};
@@ -2060,6 +2075,7 @@ function printWeek(mon){
   if (pl || (nx && !nx.skip)) { h += `<h2>每周只调一件事</h2>`;
     if (pl) { let ef = ''; if (pl.m) { const v = verdict(pl.base, metricValue(pl.m, mon, end)); ef = `（${metricLabel(pl.m)}：${metricFmt(pl.m, pl.base)} → ${metricFmt(pl.m, metricValue(pl.m, mon, end))}，${v.t}）`; } h += `<p>这周试的：<b>${esc(pl.act)}</b>${ef}</p>`; }
     if (nx && !nx.skip) h += `<p>下周要试：<b>${esc(nx.act)}</b></p>`; }
+  { const x = extraWeek(mon, end); if (x) h += `<h2>英语听说 · 体育</h2><p>${esc(extraWeekText(x))}</p>`; }
   const stuck = []; for (const sid in st.S) stuck.push(...st.S[sid].stuck);
   if (stuck.length) h += `<h2>他说的卡点</h2><ul>` + stuck.sort((a,b) => a.d < b.d ? -1 : 1).slice(0, 8).map(x => `<li>${wd(x.d)} ${esc(subjById(x.sid).name)}：${esc(x.text)}</li>`).join('') + `</ul>`;
   const wo = w.woop || {}; if (wo.w) h += `<h2>他这周的一句话计划</h2><p>想做到：${esc(wo.w)}${wo.p ? '；如果……就：' + esc(wo.p) : ''}</p>`;
@@ -2584,6 +2600,19 @@ function vSpeak(){
   if (hist.length) h += `<div class="small" style="margin-top:4px">` + hist.map(r => `<span class="pill" style="margin:2px 4px 2px 0">${mdShort(r.d)} ${r.acc}% · ${r.sec} 秒</span>`).join('') + `</div>`;
   return h;
 }
+/* 加练：按星期自动排——一三五英语听说（朗读 / 听后回答 / 复述提问轮换），周六测一次体育；可选，不挡「今晚完成」 */
+function extraTask(d){
+  const dow = P(d).getDay();
+  if ([1, 3, 5].includes(dow) && LIB.speak && LIB.speak2) {
+    const kind = {1: 'r', 3: 'l', 5: 't'}[dow], pool = kind === 'r' ? LIB.speak.items : kind === 'l' ? LIB.speak2.listen : LIB.speak2.retell;
+    const cnt = id => DB.speakRecs.filter(r => r.pid === id).length, best = id => Math.max(-1, ...DB.speakRecs.filter(r => r.pid === id).map(r => r.acc));
+    const pick = pool.slice().sort((a, b) => cnt(a.id) - cnt(b.id) || best(a.id) - best(b.id))[0];
+    const done = DB.speakRecs.some(r => r.d === d);
+    return {t: '英语听说', s: done ? '练过了' : ({r: '模仿朗读', l: '听后回答', t: '复述提问'})[kind] + ' · 可选', done, opt: true, act: 'golearn', v: 'speak', sp: pick.id, go: ''};
+  }
+  if (dow === 6 && LIB.pe) { const done = DB.peRecs.some(r => r.d === d); return {t: '测一次体育', s: done ? '测过了' : '一项就行 · 可选', done, opt: true, act: 'golearn', v: 'pe', go: ''}; }
+  return null;
+}
 function vLearn(){
   loadLib();
   const L = state.learn || (state.learn = {view:'home', book:null, unit:null});
@@ -3066,7 +3095,7 @@ const ACT = {
     const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.adjust = m ? m[0] : t.slice(0, 60); w.u = now(); (w.fu = w.fu || {}).adjust = w.u; save(); toast('已写进「下周只调一件事」'); render(); },
   pet: el => { const pe = JSON.parse(JSON.stringify(DB.settings.pe || {})); pe.tests = pe.tests || {}; pe.tests[el.dataset.y] = pe.tests[el.dataset.y] === el.dataset.v ? '' : el.dataset.v; setSetting('pe', pe); save(); render(); },
   explain: el => { const dd = dayObj(today()) || {}; setDayField(today(), 'explain', (dd.explain || 0) + 1); save(); toast(el.dataset.v === '1' ? '好。只听不判，就是在帮他' : '让他换个说法再讲一遍'); render(); },
-  golearn: el => { state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.view = el.dataset.v; state.learn.flip = false; try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
+  golearn: el => { state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.sp = null; state.ls = null; state.rt = null; } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
   toggleq: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.q = !queued(it); it.u = now(); save(); render(); },
   pv: el => { state.pv = el.dataset.v; state.examEdit = null; render(); window.scrollTo(0,0); },
   lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { state.learn.sp = null; state.sp = null; state.ls = null; state.rt = null; stopAudio(); if (EREC) enRecStop().catch(() => {}); } render(); window.scrollTo(0,0); },
