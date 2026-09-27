@@ -1173,7 +1173,9 @@ function vToday(){
     const wordsOk = LIB.done && (!LIB.words || wLeft === 0);
     const allDone = filled >= subs.length && left === 0 && wordsOk && !rDue;
     if (late && !allDone && !isRest(d)) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
+    const dowP = P(d).getDay(); const showProg = allDone || dowP === 0 || dowP === 6;
     if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[filled ? '自己把 ' + filled + ' 科作业记清楚了' : '', dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
+    if (allDone) h += progressCard();
     if (isRest(d) && !dayHasData(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
     const T = [
       {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
@@ -1183,7 +1185,7 @@ function vToday(){
     const ex = extraTask(d); if (ex) T.push(ex);
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
-    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done' : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + tools + welcomeCard();
+    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done' : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
       <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">②</span><span class="t">重做</span><span class="s">${left ? left + ' 道' : dn ? '做完了' : '今天没有'}</span></button>
@@ -2966,6 +2968,28 @@ function noteCard(){ const dd = dayObj(today()) || {};
   let h = '';
   h += `<details class="card" ${dd.note ? 'open' : ''}><summary><h3 style="display:inline">今天的家长观察</h3> <span class="small faint">（可选）</span></summary><div class="withmic" style="margin-top:8px"><textarea id="t-note" data-in="dayt" data-f="note" placeholder="只写看到的事实，比如：21:10 开始数学，21:18 起身倒水">${esc(dd.note||'')}</textarea>${micBtn('t-note')}</div><div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="savenow">保存</button></div></details>`;
   return h; }
+/* 给孩子看的「这周的进步」：只跟自己上周同一段时间比，只说具体的、真实的进步 */
+function kidProgress(){
+  const t = today(), mon = monOf(t), n = dayDiff(mon, t), pm = addD(mon, -7), pt = addD(pm, n);
+  const inA = d => d >= mon && d <= t, inB = d => d >= pm && d <= pt, out = [];
+  let ra = 0, rb = 0; for (const it of allItems()) for (const h of (it.hist || [])) if (h.ok) { if (inA(h.d)) ra++; else if (inB(h.d)) rb++; }
+  if (ra && ra > rb) out.push(`重做做对 <b>${ra}</b> 道${rb ? `，比上周多 ${ra - rb} 道` : ''}`);
+  let wa = 0, wb = 0, ma = 0; for (const k in DB.words) { const w = DB.words[k], hs = w.hist || []; for (const h of hs) if (h.ok) { if (inA(h.d)) wa++; else if (inB(h.d)) wb++; } const last = hs[hs.length - 1]; if (w.done && last && inA(last.d)) ma++; }
+  if (ma) out.push(`新掌握 <b>${ma}</b> 个单词`); else if (wa && wa > wb) out.push(`单词记对 <b>${wa}</b> 次${wb ? `，比上周多 ${wa - wb} 次` : ''}`);
+  const rc = LIB.recite ? LIB.recite.items.filter(x => ((DB.recite[x.id] || {}).hist || []).some(h => inA(h.d) && h.score >= 90)) : [];
+  if (rc.length) out.push(`背下来 <b>${rc.length}</b> 篇：${rc.slice(0, 2).map(x => '《' + esc(x.title.replace(/[（(].*$/, '')) + '》').join('')}`);
+  const sa = DB.speakRecs.filter(r => inA(r.d)), sb = DB.speakRecs.filter(r => inB(r.d)), avg = a => Math.round(a.reduce((x, r) => x + r.acc, 0) / a.length);
+  if (sa.length && sb.length && avg(sa) > avg(sb)) out.push(`英语听说从 ${avg(sb)}% 提高到 <b>${avg(sa)}%</b>`); else if (sa.length >= 2) out.push(`英语听说练了 <b>${sa.length}</b> 次`);
+  const intr = f => { let x = 0, y = 0; for (const d of range(f[0], f[1])) for (const r of Object.values((DB.days[d] || {}).subj || {})) if (!r.none && r.min > 0) { y++; if (r.intr && r.intr !== 'none') x++; } return y ? x / y : null; };
+  const ia = intr([mon, t]), ib = intr([pm, pt]); if (ia != null && ib != null && ib - ia >= 0.15) out.push(`写作业中途停下来的少了（${Math.round(ib * 100)}% → <b>${Math.round(ia * 100)}%</b>）`);
+  const pe = DB.peRecs.filter(r => inA(r.d)); if (pe.length && LIB.pe) { const r = pe[pe.length - 1], it = peItem(r.item), prev = DB.peRecs.filter(x => x.item === r.item && x.d < mon).sort((a, b) => a.d < b.d ? 1 : -1)[0];
+    if (it && prev && peScore(it, r.v) > peScore(it, prev.v)) out.push(`${esc(it.name)}从 ${peScore(it, prev.v)} 分到 <b>${peScore(it, r.v)} 分</b>`); }
+  const days = range(mon, t).filter(dayHasData).length;
+  if (!out.length && days) out.push(`这周坚持记了 <b>${days}</b> 天`);
+  return out.slice(0, 3);
+}
+function progressCard(){ const L = kidProgress(); if (!L.length) return '';
+  return `<div class="card"><h3>这周你的进步</h3>` + L.map(x => `<div style="padding:6px 0;font-size:16px">✓ ${x}</div>`).join('') + `<p class="small faint" style="margin:6px 0 0">跟你自己上周比。</p></div>`; }
 /* 今晚只问一句（家长用）：按今天错得最多的一科挑一个问法 */
 function askCard(){
   const d = today(), dd = dayObj(d) || {subj:{}}, subs = orderedSubjects(d), qi = (P(d).getTime()/864e5|0) % QUESTIONS.length;
