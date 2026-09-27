@@ -574,7 +574,9 @@ function queued(it){
 }
 const queueWhy = it => it.q === true ? '手动加入' : it.ext ? '拍照错题本' : it.conf === 'sure' ? '有把握却错了' : it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2 ? '同一个问题出现了 ' + REP[it.sid + '|' + it.sub] + ' 次' : '';
 const itemsOn = (d, sid) => (IDX[d] || []).filter(it => !sid || it.sid === sid);
-function streak(){ let d = dayHasData(today()) ? today() : addD(today(), -1), n = 0; while (dayHasData(d) && n < 2000) { n++; d = addD(d, -1); } return n; }
+const isRest = d => !!(DB.days[d] && DB.days[d].rest);
+function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0; while (ok(d) && n < 2000) { if (!isRest(d)) n++; d = addD(d, -1); } return n; }
+const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x));
 function dayHasData(d){
   if (itemsOn(d).length) return true;
   const dd = DB.days[d]; if (!dd) return false;
@@ -952,7 +954,7 @@ function mergeDay(x, y){
   const out = clone(x); out.fu = Object.assign({}, x.fu||{}); out.subj = Object.assign({}, x.subj||{});
   let l = false, r = false;
   const ft = (o, f) => o[f] === undefined ? -1 : o.fu ? (o.fu[f] || 0) : (o.u || 0);
-  for (const f of ['mood','q','answer','note']) {
+  for (const f of ['mood','q','answer','note','rest']) {
     if (x[f] === y[f]) continue;
     const a = ft(x, f), b = ft(y, f);
     if (b > a) { out[f] = y[f]; out.fu[f] = b; r = true; } else l = true;
@@ -1145,6 +1147,7 @@ function vToday(){
     const allDone = filled >= subs.length && subs.length && left === 0 && LIB.words && wLeft === 0 && !rDue;
     if (late && !allDone) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
     if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[filled ? '自己把 ' + filled + ' 科作业记清楚了' : '', dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
+    if (isRest(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
     const T = [
       {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length && subs.length > 0, act: filled < subs.length ? 'wizstart' : 'scroll', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
       {t: '重做错题', s: left ? left + ' 道' : dn ? '做完了' : '今天没有', done: left === 0, act: 'tab', v: 'errors', go: `重做 ${left} 道错题`},
@@ -1175,6 +1178,7 @@ function vToday(){
       <label class="f">③ 最可能卡在哪</label><input type="text" data-in="woop" data-f="b" value="${esc(wo.b||'')}" placeholder="比如：遇到不会的题就想先做语文">
       <label class="f">④ 如果……我就……</label><input type="text" data-in="woop" data-f="p" value="${esc(wo.p||'')}" placeholder="比如：如果卡住了，我就先圈出来接着往下做"></details>`;
   }
+  if (isToday && !dayHasData(d)) h += `<div class="card"><h3>今天休息</h3><p class="small muted" style="margin:0 0 8px">生病、出门、考完试放松……点一下，连续天数不会断。每周最多一天。</p>${restUsed(d) ? '<p class="small faint" style="margin:0">这周已经休息过一天了。</p>' : '<button class="btn sm" data-act="rest" data-v="1">今天休息</button>'}</div>`;
   more = h; h = h0; nMore = (more.match(/<h3/g) || []).length;
   h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
     <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
@@ -1914,12 +1918,38 @@ function printWeek(mon){
   if (w.aiAdvice) h += `<h2>AI 教育专家的建议</h2><p style="white-space:pre-wrap">${esc(w.aiAdvice)}</p>`;
   printHTML(h + '</div>');
 }
+function printMonth(m){
+  const from = m+'-01', end = monthEnd(m), t = today(), to = end < t ? end : t, n = range(from, to).length;
+  const st = stats(from, to), pm = addM(m,-1), prev = stats(pm+'-01', monthEnd(pm)), mo = DB.months[m] || {};
+  const avg = st.dayMin.length ? Math.round(sum(st.dayMin) / st.dayMin.length) : 0, pavg = prev.dayMin.length ? Math.round(sum(prev.dayMin) / prev.dayMin.length) : 0;
+  let h = `<div class="pwk"><h1>${esc(DB.settings.child)}的 ${+m.slice(5)} 月</h1><p class="pm">${+m.slice(0,4)} 年 ${+m.slice(5)} 月 · 每日观察 · 打印于 ${md(today())}</p>`;
+  h += `<table class="pw pk"><tr><td><b>${st.recDays}/${n}</b> 天<br><span>有记录</span></td><td><b>${avg || '–'}</b> 分钟${pavg ? `（上月 ${pavg}）` : ''}<br><span>平均每天作业</span></td><td><b>${st.errN}</b> 道${prev.errN ? `（上月 ${prev.errN}）` : ''}<br><span>记下的错题</span></td><td><b>${st.redoN ? Math.round(st.redoOk / st.redoN * 100) + '%' : '–'}</b><br><span>重做做对</span></td></tr></table>`;
+  const pa = (DB.months[pm] || {}).auto, ca = mo.auto;
+  if (pa || ca) { h += `<h2>月目标</h2>`; if (pa) { const cur = metricValue(pa.m, from, to); h += `<p>这个月的目标：<b>${esc(pa.goal)}</b>（到现在 ${metricFmt(pa.m, cur)}${cur != null && cur <= pa.target ? '，已经做到' : ''}）</p>`; } if (ca) h += `<p>下个月的目标：<b>${esc(ca.goal)}</b></p>`; }
+  h += `<h2>各科：本月 vs 上月</h2><table class="pw"><tr><th>科目</th><th>日均分钟（上月）</th><th>中断率</th><th>错题（上月）</th>` + ET.map(t => `<th>${t.s}</th>`).join('') + `</tr>`;
+  for (const sb of subjects(from)) { const x = st.S[sb.id], y = prev.S[sb.id]; if (!x.recOn && !y.recOn) continue;
+    h += `<tr><td>${esc(sb.name)}</td><td>${x.days ? Math.round(x.min/x.days) : '–'}${y.days ? `（${Math.round(y.min/y.days)}）` : ''}</td><td>${x.recOn ? pct(x.intrN, x.recOn) + '%' : '–'}</td><td>${sum(Object.values(x.errs))}（${sum(Object.values(y.errs))}）</td>` + ET.map(t => `<td>${x.errs[t.k] || ''}</td>`).join('') + `</tr>`; }
+  h += `</table>`;
+  const fs = findings(st, prev, anchorsFor(from), n, true);
+  if (fs.length) h += `<h2>这个月观察到的</h2><ul>` + fs.map(f => `<li>${f.k === 'signal' ? '【信号】' : f.k === 'good' ? '【好的变化】' : ''}${f.t.replace(/<[^>]+>/g,'')}</li>`).join('') + `</ul>`;
+  const wks = Object.keys(DB.weeks).filter(k => k >= addD(from,-6) && k <= end).sort().map(k => { const w = DB.weeks[k]; return [k, w.adjust || (w.auto && !w.auto.skip ? w.auto.act : '')]; }).filter(x => x[1]);
+  if (wks.length) h += `<h2>每周试过的调整</h2><ul>` + wks.map(([k, a]) => `<li>${md(addD(k, 7))} 那周：${esc(a)}</li>`).join('') + `</ul>`;
+  const ex = DB.exams.filter(e => e.date >= from && e.date <= end);
+  if (ex.length) h += `<h2>本月考试</h2><ul>` + ex.map(e => { const z = zkRate(e); return `<li>${mdShort(e.date)} ${esc(e.name)}${z ? ' · 中考口径得分率 ' + z.rate + '%' : ''}${e.oneThing ? ' · 考后定的一件事：' + esc(e.oneThing) : ''}</li>`; }).join('') + `</ul>`;
+  if (mo.teacher) h += `<h2>老师说的进步点</h2><p>${esc(mo.teacher)}</p>`;
+  printHTML(h + '</div>');
+}
 function vMonth(){
   const m = state.month, from = m+'-01', end = monthEnd(m), t = today(), to = end < t ? end : t;
   const st = stats(from, to), pm = addM(m,-1), prev = stats(pm+'-01', monthEnd(pm));
   const mo = DB.months[m] || {}, n = range(from, to).length;
   let h = `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="mo" data-v="-1">‹</button><div style="flex:1"><div class="d" style="font-size:20px">${+m.slice(0,4)} 年 ${+m.slice(5)} 月</div><div class="w">记录 ${st.recDays}/${n} 天 · ${esc(termOf(from, DB.settings.startYear).label)}</div></div>
     <button class="navbtn" data-act="mo" data-v="1" ${addM(m,1) > mKey(t) ? 'disabled':''}>›</button></div></div>`;
+  { const avg = st.dayMin.length ? Math.round(sum(st.dayMin) / st.dayMin.length) : 0, pavg = prev.dayMin.length ? Math.round(sum(prev.dayMin) / prev.dayMin.length) : 0;
+    const num = (v, u, sub) => `<div class="kpi"><div class="v">${v}<small>${u}</small></div><div class="l">${sub}</div></div>`;
+    h += `<div class="card"><div class="kpis">${num(st.recDays + '/' + n, '天', '有记录')}${num(avg || '–', avg ? '分' : '', '每天作业' + (avg && pavg ? `（上月 ${pavg}）` : ''))}${num(st.errN, '道', '错题' + (prev.errN ? `（上月 ${prev.errN}）` : ''))}</div>
+      <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="printmonth">打印这月月报 / 存 PDF</a></div></div>`; }
+  const monHead = h.length;
   { const pa = (DB.months[pm] || {}).auto, ca = (DB.months[m] || {}).auto;
     h += `<div class="card" style="border-color:var(--accent)"><h3>这个月的目标 <span class="small faint">（上个月数据自动定）</span></h3>`;
     if (pa) { const cur = metricValue(pa.m, from, to), ok = cur != null && cur <= pa.target;
@@ -1951,6 +1981,8 @@ function vMonth(){
     <label class="f">这个月最重要的发现</label><textarea data-in="month" data-f="found">${esc(mo.found||'')}</textarea>
     <label class="f">下个月调整什么（节奏 / 锚点 / 问法）</label><textarea data-in="month" data-f="adjust">${esc(mo.adjust||'')}</textarea>
     <label class="f">下个月想看到的一个变化（能观察到的，比如「数学中断从每周 3 次降到 1 次」）</label><textarea data-in="month" data-f="goal">${esc(mo.goal||'')}</textarea></details>`;
+  { const cut = h.indexOf('<div class="card"><h3>各科：本月 vs 上月</h3>');
+    if (cut > 0) h = h.slice(0, cut) + `<details class="more" ${state.moMore ? 'open' : ''}><summary data-act="momore">看这月的详细记录（各科、错误类型、模式、考试）</summary>${h.slice(cut)}</details>`; }
   return h;
 }
 
@@ -2224,6 +2256,7 @@ function vLearn(){
     (RI.length ? `<p style="margin:8px 0">本学期 ${cur.length} 篇：会背 ${cur.filter(x=>['can','dict'].includes(rState(x.id))).length} · 默写全对 ${cur.filter(x=>rState(x.id)==='dict').length}</p>
       <div class="bar" style="height:10px;margin-bottom:10px">${cur.length ? `<i style="width:${pct(cur.filter(x=>rState(x.id)==='dict').length,cur.length)}%;background:var(--good)"></i><i style="width:${pct(cur.filter(x=>rState(x.id)==='can').length,cur.length)}%;background:var(--accent)"></i><i style="width:${pct(cur.filter(x=>rState(x.id)==='learning').length,cur.length)}%;background:var(--amber)"></i>` : ''}</div>
       <div class="row"><button class="btn primary" data-act="lv" data-v="recite">背诵篇目 / 打印</button></div>` : `<p class="small muted">${LIB.tried && !LIB.recite ? '背诵数据还没放进来。' : '加载中…'}</p>`) + `</div>`;
+  h += `<div class="card"><div class="row"><h3 style="margin:0">数学练习</h3><span class="spacer"></span><span class="small faint">北师大七上</span></div><p class="small muted" style="margin:6px 0 10px">每天一站补漏，10 分钟左右。</p><a class="btn primary" href="../math/">去做数学练习</a></div>`;
   // 教材与中考
   h += `<div class="card"><div class="row"><h3 style="margin:0">教材与中考</h3></div><p class="small muted" style="margin:6px 0 10px">各科用什么版本、官方免费电子课本在哪看、深圳中考考什么。</p><button class="btn" data-act="lv" data-v="books">打开</button></div>`;
   return h;
@@ -2605,6 +2638,9 @@ const ACT = {
   wkmore: (el, e) => { e && e.preventDefault(); state.wkMore = !state.wkMore; render(); },
   syncedit: () => { state.syncEdit = true; render(); },
   aiedit: () => { state.aiEdit = true; render(); },
+  printmonth: () => printMonth(state.month),
+  momore: (el, e) => { e && e.preventDefault(); state.moMore = !state.moMore; render(); },
+  rest: el => { const on = el.dataset.v === '1'; if (on && restUsed(today())) return toast('这周已经休息过一天了'); setDayField(today(), 'rest', on ? true : ''); save(); render(); },
   printweek: () => printWeek(state.week),
   wkshow: () => { state.showWeek = !state.showWeek; render(); },
   moretog: (el, e) => { e && e.preventDefault(); state.moreOpen = !state.moreOpen; render(); },
