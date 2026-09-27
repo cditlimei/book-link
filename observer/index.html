@@ -275,6 +275,14 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
   #printbox table.pw th,#printbox table.pw td{border:.5pt solid #999;padding:5pt 6pt;height:22pt;text-align:left}
   #printbox .pwen{font-family:Georgia,serif;font-size:13pt}
   #printbox .pp{break-inside:avoid;margin-bottom:14pt}
+  #printbox .pwk{font-size:10.5pt;line-height:1.45}
+  #printbox .pwk h2{font-size:13pt;margin:10pt 0 3pt}
+  #printbox .pwk p{margin:3pt 0}
+  #printbox .pwk table.pw td,#printbox .pwk table.pw th{height:auto;padding:3pt 5pt;font-size:10pt}
+  #printbox table.pk td{text-align:center;height:auto;padding:6pt}
+  #printbox table.pk b{font-size:16pt;font-family:var(--mono)}
+  #printbox table.pk span{font-size:9pt;color:#555}
+  #printbox ul{margin:2pt 0;padding-left:16pt} #printbox li{margin:2pt 0}
   #printbox .ppl{font-family:var(--serif);font-size:14pt;line-height:2;letter-spacing:.06em}
 }
 
@@ -1844,7 +1852,8 @@ function vWeek(){
   const fs = state._fs || [], top = fs.find(f => f.k === 'signal') || fs.find(f => f.k === 'good');
   const num = (v, u, sub) => `<div class="kpi"><div class="v">${v}<small>${u}</small></div><div class="l">${sub}</div></div>`;
   h = h.slice(0, heroLen) + `<div class="card"><div class="kpis">${num(st.recDays + '/' + passed, '天', '有记录')}${num(avg || '–', avg ? '分' : '', '每天作业' + (avg && pavg ? `（上周 ${pavg}）` : ''))}${num(st.redoN ? Math.round(st.redoOk / st.redoN * 100) : '–', st.redoN ? '%' : '', '重做做对' + (st.redoN ? `（${st.redoOk}/${st.redoN}）` : ''))}</div>
-    ${top ? `<div style="margin-top:12px"><div class="small faint" style="margin-bottom:4px">这周最值得看的一条</div>${findingsHTML([top])}</div>` : ''}</div>` + ac +
+    ${top ? `<div style="margin-top:12px"><div class="small faint" style="margin-bottom:4px">这周最值得看的一条</div>${findingsHTML([top])}</div>` : ''}
+    <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="printweek">打印这周周报 / 存 PDF</a><a href="#" class="small" style="color:var(--accent)" data-act="copyweek">复制文字小结</a></div></div>` + ac +
     `<details class="more" ${state.wkMore ? 'open' : ''}><summary data-act="wkmore">看这周的详细记录（节奏、模式、卡点、调整记录）</summary>${rest}</details>`;
   return h;
 }
@@ -1880,6 +1889,30 @@ function weekSummary(mon){
   if (w.found) L.push('', '这周发现：' + w.found);
   if (w.adjust) L.push('下周只调：' + w.adjust);
   return L.join('\n');
+}
+// 一页 A4 周报：给孩子、老师或另一位家长看；打印或在打印预览里存成 PDF
+function printWeek(mon){
+  const sun = addD(mon,6), t = today(), end = sun < t ? sun : t, days = range(mon, sun);
+  const st = stats(mon, end), prev = stats(addD(mon,-7), addD(mon,-1)), anchors = anchorsFor(mon), w = DB.weeks[mon] || {};
+  const avg = st.dayMin.length ? Math.round(sum(st.dayMin) / st.dayMin.length) : 0, pavg = prev.dayMin.length ? Math.round(sum(prev.dayMin) / prev.dayMin.length) : 0;
+  let h = `<div class="pwk"><h1>${esc(DB.settings.child)}的一周（${md(mon)}–${md(sun)}）</h1><p class="pm">每日观察 · 打印于 ${md(today())} · 只记实际发生的，不是考核</p>`;
+  h += `<table class="pw pk"><tr><td><b>${st.recDays}/${range(mon,end).length}</b> 天<br><span>有记录</span></td><td><b>${avg || '–'}</b> 分钟${pavg ? `（上周 ${pavg}）` : ''}<br><span>平均每天作业</span></td><td><b>${st.errN}</b> 道<br><span>记下的错题</span></td><td><b>${st.redoN ? Math.round(st.redoOk / st.redoN * 100) + '%' : '–'}</b>${st.redoN ? `（${st.redoOk}/${st.redoN}）` : ''}<br><span>重做做对</span></td></tr></table>`;
+  h += `<h2>每天各科用时 <span>单位：分钟；「停」= 中途停过；「错」= 记下的错题数</span></h2><table class="pw"><tr><th>科目</th>` + days.map(d => `<th>${WD[P(d).getDay()]}</th>`).join('') + `<th>日均 / 锚点</th></tr>`;
+  for (const sb of subjects(mon)) { const x = st.S[sb.id]; if (!x.recOn) continue;
+    h += `<tr><td>${esc(sb.name)}</td>` + days.map(d => { const r = x.byDay[d], e = x.errDay[d] || 0; return `<td>${!r ? '' : r.none ? '—' : (r.min || '') + (r.intr && r.intr !== 'none' ? ' 停' : '') + (e ? ` 错${e}` : '')}</td>`; }).join('') + `<td>${x.days ? Math.round(x.min / x.days) : 0} / ${anchors[sb.id] || 0}</td></tr>`; }
+  h += `</table>`;
+  if (st.errN) h += `<p class="pm" style="margin-top:4pt">错题类型：${ET.map(t => `${t.n} ${st.errs[t.k]}`).join(' · ')}</p>`;
+  const fs = findings(st, prev, anchors, range(mon,end).length);
+  if (fs.length) h += `<h2>观察到的</h2><ul>` + fs.map(f => `<li>${f.k === 'signal' ? '【信号】' : f.k === 'good' ? '【好的变化】' : ''}${f.t.replace(/<[^>]+>/g,'')}</li>`).join('') + `</ul>`;
+  const pl = planFor(mon), nx = (DB.weeks[mon] || {}).auto;
+  if (pl || (nx && !nx.skip)) { h += `<h2>每周只调一件事</h2>`;
+    if (pl) { let ef = ''; if (pl.m) { const v = verdict(pl.base, metricValue(pl.m, mon, end)); ef = `（${metricLabel(pl.m)}：${metricFmt(pl.m, pl.base)} → ${metricFmt(pl.m, metricValue(pl.m, mon, end))}，${v.t}）`; } h += `<p>这周试的：<b>${esc(pl.act)}</b>${ef}</p>`; }
+    if (nx && !nx.skip) h += `<p>下周要试：<b>${esc(nx.act)}</b></p>`; }
+  const stuck = []; for (const sid in st.S) stuck.push(...st.S[sid].stuck);
+  if (stuck.length) h += `<h2>他说的卡点</h2><ul>` + stuck.sort((a,b) => a.d < b.d ? -1 : 1).slice(0, 8).map(x => `<li>${wd(x.d)} ${esc(subjById(x.sid).name)}：${esc(x.text)}</li>`).join('') + `</ul>`;
+  const wo = w.woop || {}; if (wo.w) h += `<h2>他这周的一句话计划</h2><p>想做到：${esc(wo.w)}${wo.p ? '；如果……就：' + esc(wo.p) : ''}</p>`;
+  if (w.aiAdvice) h += `<h2>AI 教育专家的建议</h2><p style="white-space:pre-wrap">${esc(w.aiAdvice)}</p>`;
+  printHTML(h + '</div>');
 }
 function vMonth(){
   const m = state.month, from = m+'-01', end = monthEnd(m), t = today(), to = end < t ? end : t;
@@ -2455,10 +2488,11 @@ function vMe(part){
   h += `<div class="card"><h3>设置</h3>
     <div class="grid2"><div><label class="f">孩子的称呼</label><input type="text" data-in="set" data-f="child" value="${esc(s.child)}"></div>
     <div><label class="f">七年级入学年份</label><input type="number" data-in="set" data-f="startYear" value="${s.startYear}"></div></div>
-    <label class="f">科目（「自动」按学段出现：物理八上起、化学九上起、生地到八下会考为止）</label>` +
+    <details style="margin-top:12px"><summary class="small" style="color:var(--accent)">科目（现在显示 ${subjects(today()).length} 科，按学段自动增减，一般不用改）</summary>
+    <label class="f">「自动」按学段出现：物理八上起、化学九上起、生地到八下会考为止</label>` +
     s.subjects.map(x => `<div class="row" style="margin:5px 0;flex-wrap:nowrap"><span class="dot" style="background:${x.color}"></span><input type="text" data-in="sname" data-s="${x.id}" value="${esc(x.name)}" style="flex:1;min-width:0;padding:6px 9px"><span class="small faint" style="white-space:nowrap">${TERM_N[x.from]||''}–${TERM_N[x.to]||''}</span><div class="seg sm">` +
       [['auto','自动'],['on','显示'],['off','隐藏']].map(([k,n]) => `<button data-act="smode" data-s="${x.id}" data-v="${k}" class="${(x.mode||'auto')===k?'on':''}">${n}</button>`).join('') + `</div></div>`).join('') +
-    `<div class="row" style="margin-top:8px"><input type="text" id="newsubj" placeholder="新科目" style="flex:1"><button class="btn sm" data-act="saddsub">添加</button></div>
+    `<div class="row" style="margin-top:8px"><input type="text" id="newsubj" placeholder="新科目" style="flex:1"><button class="btn sm" data-act="saddsub">添加</button></div></details>
     <label class="f">家长区密码（4 位数字，留空=不设）</label><div class="row"><input type="password" inputmode="numeric" maxlength="4" id="newpin" style="width:140px" placeholder="${s.pin?'已设置':''}"><button class="btn sm" data-act="setpin">保存密码</button></div></div>`;
   const nDays = Object.keys(DB.days).filter(d=>dayHasData(d)).length;
   h += `</div><div>`;
@@ -2471,6 +2505,10 @@ function vMe(part){
   return h + `</div></div>`;
 }
 function aiCard(){
+  if (aiReady() && !state.aiEdit) return `<div class="card"><h3>AI 学习教练 <span class="pill good">已开启</span></h3>
+    <p class="small muted" style="margin:0 0 8px">${(AI.model || 'glm-4.6v-flash') === 'glm-4.6v-flash' ? 'GLM-4.6V-Flash（免费）' : esc(AI.model)}${asrPaused() ? ' · 语音识别余额不足，暂时用设备自带识别' : ''}</p>
+    <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [10, 15, 20, 30, 45, 60].map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分钟</button>`).join('') + `</div>
+    <div class="row" style="margin-top:10px"><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div></div>`;
   return `<div class="card"><h3>AI 学习教练 · 语音识别 ${aiReady() ? '<span class="pill good">已开启</span>' : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">用智谱大模型：背诵检验时把录音转成文字，以及之后的 AI 辅导。密钥只存在这台设备上，不进备份文件。发给模型的只有学习内容，不含名字、学校、排名和你的情绪记录。</p>
     <label class="f">智谱 API 密钥</label><input type="password" id="ai-key" value="${esc(AI.key||'')}" placeholder="在 open.bigmodel.cn 的「API Keys」里新建" autocomplete="off">
@@ -2515,6 +2553,12 @@ async function aiASR(blob, hotwords){
   const j = await r.json(); return j.text || (j.data && j.data.text) || (j.choices && j.choices[0] && (j.choices[0].text || (j.choices[0].message||{}).content)) || '';
 }
 function syncCard(){
+  if (!DEMO && syncReady() && !SYNC.err && !state.syncEdit) return `<div class="card"><div class="row"><h3 style="margin:0">云同步 <span class="pill good">已开启</span></h3><span class="spacer"></span><button class="btn sm" data-act="syncnow">立即同步</button></div>
+    <p class="small muted" style="margin:8px 0 0">${SYNC.last ? '上次同步：' + new Date(SYNC.last).toLocaleString('zh-CN') : '还没同步过'}${SYNC.exp ? ' · 令牌 ' + md(SYNC.exp) + ' 到期' : ''}</p>${SYNC.photoErr ? `<div class="signal"><span class="k">照片</span>${esc(SYNC.photoErr)}</div>` : ''}
+    <div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="copysetup">复制配置码给另一台设备</a><a href="#" class="small faint" data-act="syncedit">改同步设置</a></div></div>`;
+  return syncCardFull();
+}
+function syncCardFull(){
   if (DEMO) return `<div class="card"><h3>云同步</h3><p class="small muted" style="margin:0">示例模式不同步。</p></div>`;
   const on = syncReady();
   return `<div class="card"><h3>云同步 ${on ? `<span class="pill ${SYNC.err?'amber':'good'}">${SYNC.err ? '出错' : '已开启'}</span>` : '<span class="pill">未开启</span>'}</h3>
@@ -2559,6 +2603,9 @@ const ACT = {
   day: (el, e) => { e.preventDefault(); const v = +el.dataset.v; state.date = v === 0 ? today() : addD(state.date, v); if (state.date > today()) state.date = today(); state.openSubj = null; render(); },
   goday: el => { state.date = el.dataset.v; state.openSubj = null; render(); },
   wkmore: (el, e) => { e && e.preventDefault(); state.wkMore = !state.wkMore; render(); },
+  syncedit: () => { state.syncEdit = true; render(); },
+  aiedit: () => { state.aiEdit = true; render(); },
+  printweek: () => printWeek(state.week),
   wkshow: () => { state.showWeek = !state.showWeek; render(); },
   moretog: (el, e) => { e && e.preventDefault(); state.moreOpen = !state.moreOpen; render(); },
   scroll: el => { const t = document.getElementById(el.dataset.v); if (t) window.scrollTo({top: t.getBoundingClientRect().top + scrollY - 70, behavior:'smooth'}); },
@@ -2590,7 +2637,7 @@ const ACT = {
   rctype: () => { state.rcheck.said = $('#rc-type').value; state.rcheck.phase = 'busy'; finishCheck(); },
   rcagain: () => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: ''}; render(); },
   rcclose: () => { if (REC) { REC.on = false; try { REC.sr && REC.sr.stop(); REC.mr && REC.mr.state === 'recording' && REC.mr.stop(); REC.stream && REC.stream.getTracks().forEach(t => t.stop()); } catch(e) {} REC = null; } state.rcheck = null; render(); },
-  aisave: async () => { const k = $('#ai-key').value.trim(); if (!k) return toast('请粘贴密钥'); AI = {key: k, model: $('#ai-model').value}; saveAI(); toast('测试中…');
+  aisave: async () => { const k = $('#ai-key').value.trim(); if (!k) return toast('请粘贴密钥'); AI = {key: k, model: $('#ai-model').value}; saveAI(); state.aiEdit = false; toast('测试中…');
     try { await aiChat([{role:'user', content:'回复「好」'}], {max_tokens: 10, thinking:{type:'disabled'}}); toast('可以用了'); } catch(e) { toast('测试失败：' + e.message); } render(); },
   aioff: () => { if (!confirm('清除这台设备上的智谱密钥？')) return; AI = {}; saveAI(); render(); },
   plannext: () => { const a = DB.weeks[addD(monOf(today()), -7)].auto; a.idx = (a.idx + 1) % a.cands.length; Object.assign(a, a.cands[a.idx]); a.skip = false; const w = DB.weeks[addD(monOf(today()), -7)]; w.u = now(); (w.fu = w.fu || {}).auto = w.u; save(); toast(a.cands.length > 1 ? '换成下一条' : '只有这一条'); render(); },
@@ -2737,7 +2784,7 @@ const ACT = {
   setpin: () => { const v = $('#newpin').value.trim(); if (v && !/^\d{4}$/.test(v)) return toast('请输入 4 位数字'); setSetting('pin', v); save(); toast(v ? '密码已设置' : '密码已取消'); render(); },
   copylink: () => { const u = location.origin + location.pathname; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('链接已复制')).catch(() => prompt('复制这个链接', u)); },
   hideinstall: () => { lsSet('observer:hideInstall', true); render(); },
-  syncsave: () => {
+  syncsave: () => { state.syncEdit = false;
     const repo = $('#sy-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/+$/,''), token = $('#sy-token').value.trim(), pass = $('#sy-pass').value;
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return toast('仓库格式：用户名/仓库名'); if (!token) return toast('请填访问令牌'); if (pass.length < 10) return toast('口令至少 10 位');
     SYNC = Object.assign(SYNC, {repo, token, pass, err:''}); saveSync(); syncNow(true).then(render);
