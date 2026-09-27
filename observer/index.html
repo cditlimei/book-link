@@ -1244,17 +1244,21 @@ function subjRow(d, s, r){
     h += `<div class="line"><span class="lab">实际用时</span>
       <input type="number" inputmode="numeric" min="0" max="600" class="minin" data-in="recmin" data-s="${s.id}" value="${r.min || ''}" placeholder="分钟" aria-label="实际用时（分钟）"><span class="small muted">分钟</span>` +
       MINS.map(m => `<button class="chip soft ${r.min===m?'on':''}" data-act="minset" data-s="${s.id}" data-v="${m}">${m}</button>`).join('') + `</div>
-      <div class="line"><span class="lab">或几点到几点</span><input type="time" class="timein" data-in="rectime" data-s="${s.id}" data-f="start" value="${r.start||''}" aria-label="开始时间"><span class="muted">到</span><input type="time" class="timein" data-in="rectime" data-s="${s.id}" data-f="end" value="${r.end||''}" aria-label="结束时间"><span class="small faint">填了会自动算分钟</span></div>`;
+      <details class="more" style="margin:0 0 6px" ${r.start || r.end ? 'open' : ''}><summary class="small">按几点到几点填</summary><div class="line"><input type="time" class="timein" data-in="rectime" data-s="${s.id}" data-f="start" value="${r.start||''}" aria-label="开始时间"><span class="muted">到</span><input type="time" class="timein" data-in="rectime" data-s="${s.id}" data-f="end" value="${r.end||''}" aria-label="结束时间"><span class="small faint">自动算分钟</span></div></details>`;
     h += `<div class="line"><span class="lab">中途中断</span><div class="seg">` + INTR.map(i => `<button data-act="intr" data-s="${s.id}" data-v="${i.k}" class="${(r.intr||'none')===i.k?'on':''}">${i.n}</button>`).join('') + `</div></div>`;
-    h += `<div class="line" style="align-items:flex-start"><span class="lab">错题</span><div style="flex:1;min-width:0">
-      <div class="addrow">` + ET.map(t => `<button data-act="additem" data-s="${s.id}" data-t="${t.k}"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> + ${typeNameS(s.id, t.k)}</button>`).join('') + `</div>`;
-    for (const it of its) h += `<div class="item"><span class="it"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}</span>
-      <input type="text" list="tags-${s.id}" data-in="item" data-id="${it.id}" data-f="tag" value="${esc(it.tag||'')}" placeholder="知识点，比如：去括号">
-      <button class="x" data-act="delitem" data-v="${it.id}" aria-label="删除">×</button>
+    h += `<div class="line" style="align-items:flex-start"><span class="lab">错题</span><div style="flex:1;min-width:0">`;
+    if (!its.length) h += `<p class="small faint" style="margin:6px 0">今天这科没记错题。有的话点下面「＋ 记一个问题」。</p>`;
+    for (const it of its) { const op = state.openItem === it.id;
+      h += `<div class="item"><span class="it"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span>
+      <span class="small" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.stem || it.tag || '')}</span>
+      <button class="btn sm ghost" data-act="itemopen" data-v="${it.id}">${op ? '收起' : '详情'}</button><button class="x" data-act="delitem" data-v="${it.id}" aria-label="删除">×</button>`;
+      if (!op) { h += `</div>`; continue; }
+      h += `<input type="text" list="tags-${s.id}" data-in="item" data-id="${it.id}" data-f="tag" value="${esc(it.tag||'')}" placeholder="知识点，比如：去括号" style="margin-top:6px;width:100%">
       ${taxOf(s.id) ? `<div class="cf row">` + taxOf(s.id)[it.type].subs.map(a => `<button class="chip ${it.sub===a[0]?'on':''}" style="min-height:30px;padding:4px 10px;font-size:13px" data-act="setsub" data-v="${it.id}" data-s="${a[0]}">${esc(a[1])}</button>`).join('') + `</div>` : ''}
       <div class="cf row"><span class="small faint">做的时候：</span><div class="seg sm">` + CONF.map(c => `<button data-act="conf" data-v="${it.id}" data-c="${c.k}" class="${it.conf===c.k?'on':''}">${c.n}</button>`).join('') + `</div>
-        <button class="chip ${queued(it)?'soft on':''}" style="min-height:30px;padding:4px 10px;font-size:13px" data-act="toggleq" data-v="${it.id}">${queued(it) ? '进重做' + (queueWhy(it) && it.q !== true ? '（' + queueWhy(it) + '）' : '') : '只记录，不重做'}</button></div></div>`;
-    if (its.length) h += tagList(s.id) + `<p class="small faint" style="margin:6px 0 0">每道错题会在 2 天、7 天、21 天后回到「重做」里。</p>`;
+        <button class="chip ${queued(it)?'soft on':''}" style="min-height:30px;padding:4px 10px;font-size:13px" data-act="toggleq" data-v="${it.id}">${queued(it) ? '进重做' + (queueWhy(it) && it.q !== true ? '（' + queueWhy(it) + '）' : '') : '只记录，不重做'}</button></div></div>`; }
+    if (its.length) h += tagList(s.id);
+    h += `<details class="more" style="margin:4px 0 0"><summary class="small">只记个数，不写内容</summary><div class="addrow">` + ET.map(t => `<button data-act="additem" data-s="${s.id}" data-t="${t.k}"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> + ${typeNameS(s.id, t.k)}</button>`).join('') + `</div></details>`;
     h += `</div></div>`;
     h += `<label class="f">${esc(stuckQ(s.name))}</label><input type="text" data-in="rec" data-s="${s.id}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="孩子的原话">`;
   }
@@ -1785,6 +1789,15 @@ function vWiz(){
       h += `<div class="cnt"><span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:8px"><i class="sw" style="background:${ET_COLOR[t.k]};width:12px;height:12px"></i>${typeNameS(sid, t.k)}</span>${tx ? `<small class="faint" style="font-weight:400;font-size:12.5px">${tx[t.k].subs.slice(0,3).map(a=>a[1]).join(' / ')}…</small>` : ''}</span><button data-act="wizerr" data-t="${t.k}" data-v="-1" aria-label="减少">−</button><span class="v">${n}</span><button data-act="wizerr" data-t="${t.k}" data-v="1" aria-label="增加">+</button></div>`; }
     h += `<p class="small faint">分不清就选「${typeNameS(sid,'concept')}」。老师批改后才知道对错的话，明天再补也行。</p>`;
     foot += `<button class="btn primary" data-act="wiznext">${its.length ? '下一步' : '都做对了'}</button>`;
+  } else if (w.step === 'detail') {
+    const tx = taxOf(sid), c0 = its.every(it => it.conf === its[0].conf) ? its[0].conf : null;
+    h += `<div class="wiz-q">这 ${its.length} 道错在哪？</div><p class="small faint" style="margin:-10px 0 12px">都是选填，说不清就直接点「下一科」。</p>`;
+    if (tx) its.forEach((it, k) => { h += `<div class="card" style="padding:10px 12px"><div class="small muted" style="margin-bottom:6px">第 ${k+1} 道 · ${typeName(it)}</div><div class="row">` +
+      tx[it.type].subs.map(a => `<button class="chip ${it.sub===a[0]?'on':''}" data-act="setsub" data-v="${it.id}" data-s="${a[0]}">${esc(a[1])}</button>`).join('') + `</div></div>`; });
+    h += `<div class="wiz-lab">做的时候有把握吗？<span class="faint">（「有把握却错了」的会优先重做）</span></div><div class="seg wide">` +
+      [['sure','有把握'],['unsure','不太确定'],['no','不会']].map(([k,n]) => `<button data-act="wizconf2" data-v="${k}" class="${c0 === k ? 'on' : ''}">${n}</button>`).join('') + `</div>`;
+    h += `<div class="wiz-lab">${esc(stuckQ(s.name))}</div><div class="withmic"><input type="text" id="w-stuck" class="wiz-in" data-in="rec" data-s="${sid}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="说一句就行">${micBtn('w-stuck')}</div>`;
+    foot += `<button class="btn primary" data-act="wiznext">${w.i + 1 < w.list.length ? '下一科 ›' : '完成'}</button>`;
   } else if (w.step === 'sub') {
     const tx = taxOf(sid);
     h += `<div class="wiz-q">具体是哪种问题？</div><p class="small faint" style="margin:-10px 0 14px">说不清就跳过，家长之后在「今天」页点开这科也能补。</p>`;
@@ -3135,6 +3148,7 @@ const ACT = {
   moretog: (el, e) => { e && e.preventDefault(); state.moreOpen = !state.moreOpen; render(); },
   scroll: el => { const t = document.getElementById(el.dataset.v); if (t) window.scrollTo({top: t.getBoundingClientRect().top + scrollY - 70, behavior:'smooth'}); },
   savenow: () => { const a = document.activeElement; if (a && a.blur) a.blur(); save(); flush(); toast('已保存 ✓'); },
+  itemopen: el => { state.openItem = state.openItem === el.dataset.v ? null : el.dataset.v; render(); },
   sdone: el => { state.openSubj = null; save(); flush(); render(); toast('已保存 ✓'); },
   sopen: el => { state.openSubj = state.openSubj === el.dataset.s ? null : el.dataset.s; render(); },
   mood: el => { const dd = dayObj(state.date) || {}; setDayField(state.date, 'mood', dd.mood === el.dataset.v ? '' : el.dataset.v); save(); render(); },
@@ -3289,15 +3303,17 @@ const ACT = {
     const its = itemsOn(state.date, sid);
     if (w.step === 'min') { const r = (dayObj(state.date) || {subj:{}}).subj[sid] || {};
       if (!r.none && !(r.min > 0)) return toast('先选做了多久');
-      if (its.length && taxOf(sid)) return wizGo('sub'); if (its.some(it => !it.conf)) return wizGo('conf');
-      return (r.intr && r.intr !== 'none') || its.length ? wizGo('stuck') : wizGo('next'); }
+      if (its.length) return wizGo('detail');
+      return r.intr && r.intr !== 'none' ? wizGo('stuck') : wizGo('next'); }
+    if (w.step === 'detail') return wizGo('next');
     if (w.step === 'err') return wizGo(its.length && taxOf(sid) ? 'sub' : its.some(it => !it.conf) ? 'conf' : 'stuck');
     if (w.step === 'sub') return wizGo(its.some(it => !it.conf) ? 'conf' : 'stuck');
     wizGo('next'); },
+  wizconf2: el => { const v = el.dataset.v; for (const it of itemsOn(state.date, state.wiz.list[state.wiz.i])) { it.conf = it.conf === v && itemsOn(state.date, state.wiz.list[state.wiz.i]).every(x => x.conf === v) ? null : v; it.u = now(); } save(); render(); },
   wizconf: el => { const v = el.dataset.v; if (v !== 'skip') for (const it of itemsOn(state.date, state.wiz.list[state.wiz.i])) if (!it.conf) { it.conf = v; it.u = now(); } save(); wizGo('stuck'); },
   wizback: () => { const w = state.wiz, order = ['min','intr','err','sub','conf','stuck'], its = itemsOn(state.date, w.list[w.i]);
     if (w.step === 'min') { if (w.i > 0) { w.i--; w.step = 'min'; } else if (w.canPick) { w.pick = w.list.slice(); w.list = w.all || w.list; w.step = 'pick'; } }
-    else if (w.step === 'sub' || (w.step === 'conf' && !(its.length && taxOf(w.list[w.i]))) || (w.step === 'stuck' && !its.length)) w.step = 'min';
+    else if (w.step === 'detail' || w.step === 'sub' || (w.step === 'conf' && !(its.length && taxOf(w.list[w.i]))) || (w.step === 'stuck' && !its.length)) w.step = 'min';
     else { let k = order.indexOf(w.step) - 1; if (order[k] === 'conf' && !its.length) k--; if (order[k] === 'sub' && !(its.length && taxOf(w.list[w.i]))) k--; w.step = order[k]; }
     render(); },
   wizrest: () => { const w = state.wiz, dd = dayObj(state.date) || {subj:{}};
