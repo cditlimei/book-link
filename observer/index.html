@@ -128,6 +128,7 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .wstrip .rec i{background:var(--accent-bg);border-color:var(--accent-bg);color:var(--accent)}
 .wstrip .sel i{border-color:var(--ink);border-width:2px}
 .wstrip .fut{opacity:.35}
+.examform input.aifill{background:var(--amber-bg);border-color:var(--amber)}
 .sumk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
 .sk .v{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1}
 .sk .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:2px}
@@ -1078,7 +1079,10 @@ function render(){
   if (state.tab === 'exams') { state.tab = 'me'; state.pv = 'grades'; }
   if (state.tab === 'review') { state.tab = 'me'; state.pv = 'review'; }
   const v = {today:vToday, errors:vErrors, learn:vLearn, me:vParent}[state.tab] || vToday;
+  const exKey = el => el.id || ['ex', el.dataset.ex, el.dataset.s, el.dataset.t || ''].join(':');
+  const exSnap = state.examEdit && $('.examform') ? {id: state.examEdit, v: [...document.querySelectorAll('.examform input, .examform textarea')].map(el => [exKey(el), el.value])} : null;
   $('#main').innerHTML = v();
+  if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
   $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
@@ -1303,6 +1307,32 @@ const photoDone = p => EXT.filter(x => x.photoId === p.id).length + DB.items.fil
 function photoStatus(p){ const n = photoDone(p); return n ? `已识别 ${n} 道` : p.kind === 'error' && aiReady() ? '还没识别' : p.up ? '已上传' : syncReady() ? '待上传' : '只在本机'; }
 /* 拍照识别错题：智谱视觉模型读题 + 按本科分类体系归类；结果先给孩子/家长确认，确认后进重做 */
 const blobToDataURL = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+function parseJSONObj(t){
+  t = String(t || '').replace(/```(json)?/g, '').trim(); const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b < a) return null; try { const v = JSON.parse(t.slice(a, b + 1)); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch(e) { return null; }
+}
+async function examFromPhotos(files){
+  const st = t => { state._exAI = t; const el = $('#ex-ai-st'); if (el) el.textContent = t; };
+  st('AI 正在读…（10 到 40 秒）');
+  try {
+    const date = ($('#ex-date') || {}).value || today(), subs = subjects(date);
+    const imgs = []; for (const f of files.slice(0, 4)) imgs.push(await blobToDataURL(await compressImage(f)));
+    const sys = `你帮家长把成绩单或试卷上的分数整理出来。科目代码：${subs.map(x => `${x.id}=${x.name}`).join('，')}。
+看图片：如果是成绩单，读出每科得分和满分；如果是某一科的试卷，读出卷面总分、满分，并估计丢的分各属于哪类：calc=运算执行/计算错误，concept=概念理解，read=审题习惯（没读懂题、漏看条件），time=时间不够没做完，gap=没复习到。
+只输出一个 JSON 对象，不要别的文字：{"name":"考试名称，看不出就空","date":"YYYY-MM-DD，看不出就空","scores":{"科目代码":{"s":得分,"full":满分,"loss":{"calc":丢的分,"concept":0,"read":0,"time":0,"gap":0}}}}。只写图里真的有的科目；loss 估不出就省略。不要输出姓名、学号、学校、排名。`;
+    const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: imgs.map(u => ({type: 'image_url', image_url: {url: u}})).concat([{type: 'text', text: '读出分数'}])}], {temperature: 0.1});
+    const j = parseJSONObj(out); if (!j || !j.scores) throw new Error('AI 返回的格式看不懂，再拍一次试试');
+    let n = 0; const set = (sel, v) => { const el = document.querySelector(sel); if (el && v !== undefined && v !== null && v !== '') { el.value = v; el.classList.add('aifill'); return true; } return false; };
+    if (j.name) set('#ex-name', String(j.name).slice(0, 40));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(j.date || '')) set('#ex-date', j.date);
+    for (const sid in j.scores) { const x = j.scores[sid]; if (!subs.some(q => q.id === sid) || !x) continue;
+      const sv = +x.s, fv = +x.full; if (!(sv >= 0) || (fv && sv > fv)) continue;
+      if (set(`[data-ex=s][data-s="${sid}"]`, sv)) n++; if (fv > 0) set(`[data-ex=full][data-s="${sid}"]`, fv);
+      if (x.loss) { let any = false; for (const l of LOSS) if (+x.loss[l.k] > 0) any = set(`[data-ex=loss][data-s="${sid}"][data-t="${l.k}"]`, +x.loss[l.k]) || any;
+        if (any) { const d = document.querySelector(`[data-ex=s][data-s="${sid}"]`); const det = d && d.closest('.srow') && d.closest('.srow').querySelector('details.loss'); if (det) det.open = true; } } }
+    st(n ? `填好了 ${n} 科，标黄的是 AI 填的，核对一下再保存` : '没读出分数，换一张清楚点的再试');
+  } catch(e) { st('读取失败：' + e.message); }
+}
 function parseJSONList(t){
   t = String(t || '').replace(/```(json)?/g, '').trim(); const a = t.indexOf('['), b = t.lastIndexOf(']');
   if (a < 0 || b < a) return null; try { const v = JSON.parse(t.slice(a, b + 1)); return Array.isArray(v) ? v : null; } catch(e) { return null; }
@@ -2085,6 +2115,7 @@ function examForm(){
   const topT = Object.entries(emo).sort((a,b)=>b[1].lv/b[1].n - a[1].lv/a[1].n)[0];
   let h = `<div class="row"><button class="btn sm ghost" data-act="examcancel">‹ 返回</button><h2 style="margin:0">${isNew?'记一次考试':'编辑考试'}</h2></div>`;
   h += `<div class="tip" style="margin-top:10px">和孩子聊成绩之前：${topT ? `你标记过最强的触发点是<b>「${esc(topT[0])}」</b>。` : ''}先问「哪道题最可惜？」，不问「为什么才考这么点」。</div>`;
+  if (aiReady()) h += `<div class="card" style="padding:12px 14px"><div class="row"><label class="btn primary" style="display:inline-flex;align-items:center;gap:8px">${CAM} 拍成绩单或试卷，自动填分数<input type="file" accept="image/*" multiple id="ex-photo" style="display:none"></label><span class="small faint" id="ex-ai-st">${esc(state._exAI || '')}</span></div><p class="small faint" style="margin:6px 0 0">可以一次选几张。AI 读出来的分数会填进下面，你核对一下再保存。拍的时候别拍到名字。</p></div>`;
   h += `<div class="card examform"><div class="grid2"><div><label class="f">考试名称</label><input type="text" id="ex-name" value="${esc(e.name)}" placeholder="比如：第一单元测验"></div>
     <div><label class="f">日期</label><input type="date" id="ex-date" value="${e.date}"></div></div>
     <label class="f">类型</label><div class="row" id="ex-type">` + EXAM_T.map(t => `<button class="chip ${state._examType===t?'on':''}" data-act="extype" data-v="${t}">${t}</button>`).join('') + `</div>
@@ -2841,7 +2872,7 @@ const ACT = {
   wk: el => { state.week = addD(state.week, +el.dataset.v); render(); },
   wkgo: (el, e) => { e.preventDefault(); state.week = el.dataset.v; state.review = 'week'; render(); window.scrollTo(0,0); },
   mo: el => { state.month = addM(state.month, +el.dataset.v); render(); },
-  examnew: () => { state.examEdit = 'new'; state._examType = null; state._prep = null; render(); window.scrollTo(0,0); },
+  examnew: () => { state._exAI = ''; state.examEdit = 'new'; state._examType = null; state._prep = null; render(); window.scrollTo(0,0); },
   examedit: el => { state.examEdit = el.dataset.v; state._examType = null; state._prep = null; render(); window.scrollTo(0,0); },
   examcancel: () => { state.examEdit = null; render(); },
   extype: el => { state._examType = el.dataset.v; document.querySelectorAll('#ex-type .chip').forEach(c => c.classList.toggle('on', c.dataset.v === el.dataset.v)); },
@@ -2937,6 +2968,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'tu-img' && e.target.files[0] && state.tutor) { const box = $('#tu-in'); if (box) state.tutor.draft = box.value; compressImage(e.target.files[0]).then(b => { const fr = new FileReader(); fr.onload = () => { state.tutor.img = fr.result; render(); }; fr.readAsDataURL(b); }); return; }
+  if (e.target.id === 'ex-photo' && e.target.files.length) { examFromPhotos([...e.target.files]); return; }
   if (e.target.id === 'photoin' && e.target.files.length) { toast('正在压缩…'); addPhotos([...e.target.files]); return; }
   if (e.target.id === 'importf' && e.target.files[0]) { const r = new FileReader(); r.onload = () => importData(r.result); r.readAsText(e.target.files[0]); return; }
   if (e.target.closest('[data-in="set"],[data-in="sname"]')) renderChrome();
