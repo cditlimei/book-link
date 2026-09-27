@@ -129,6 +129,12 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .wstrip .sel i{border-color:var(--ink);border-width:2px}
 .wstrip .fut{opacity:.35}
 .examform input.aifill{background:var(--amber-bg);border-color:var(--amber)}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+@media (min-width:700px){.tiles{grid-template-columns:repeat(3,1fr)}}
+.tile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:108px;padding:14px;border-radius:16px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);text-align:left;color:var(--ink);text-decoration:none}
+.tile .tn{font-weight:700;font-size:17px}
+.tile .ts{font-size:15px;color:var(--accent);font-weight:600}
+.tile .tu{font-size:12.5px;color:var(--ink3);margin-top:auto}
 .sumk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
 .sk .v{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1}
 .sk .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:2px}
@@ -1315,7 +1321,7 @@ function parseJSONObj(t){
 }
 async function examFromPhotos(files){
   const st = t => { state._exAI = t; const el = $('#ex-ai-st'); if (el) el.textContent = t; };
-  st('AI 正在读…（10 到 40 秒）');
+  st('AI 正在读…（10 到 40 秒）'); const form = state.examEdit;
   try {
     const date = ($('#ex-date') || {}).value || today(), subs = subjects(date);
     const imgs = []; for (const f of files.slice(0, 4)) imgs.push(await blobToDataURL(await compressImage(f)));
@@ -1323,6 +1329,7 @@ async function examFromPhotos(files){
 看图片：如果是成绩单，读出每科得分和满分；如果是某一科的试卷，读出卷面总分、满分，并估计丢的分各属于哪类：calc=运算执行/计算错误，concept=概念理解，read=审题习惯（没读懂题、漏看条件），time=时间不够没做完，gap=没复习到。
 只输出一个 JSON 对象，不要别的文字：{"name":"考试名称，看不出就空","date":"YYYY-MM-DD，看不出就空","scores":{"科目代码":{"s":得分,"full":满分,"loss":{"calc":丢的分,"concept":0,"read":0,"time":0,"gap":0}}}}。只写图里真的有的科目；loss 估不出就省略。不要输出姓名、学号、学校、排名。`;
     const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: imgs.map(u => ({type: 'image_url', image_url: {url: u}})).concat([{type: 'text', text: '读出分数'}])}], {temperature: 0.1});
+    if (state.examEdit !== form || !$('.examform')) return;
     const j = parseJSONObj(out); if (!j || !j.scores) throw new Error('AI 返回的格式看不懂，再拍一次试试');
     let n = 0; const set = (sel, v) => { const el = document.querySelector(sel); if (el && v !== undefined && v !== null && v !== '') { el.value = v; el.classList.add('aifill'); return true; } return false; };
     if (j.name) set('#ex-name', String(j.name).slice(0, 40));
@@ -1342,7 +1349,7 @@ function parseJSONList(t){
 async function recogPhoto(pid){
   const p = DB.photos.find(x => x.id === pid); if (!p) return;
   const sid = p.sid, sb = subjById(sid), tx = taxOf(sid);
-  state.precog = {pid, sid, busy: true, list: [], err: ''}; render();
+  const R = state.precog = {pid, sid, busy: true, list: [], err: ''}; render();
   try {
     const blob = await IDB.get('photo:' + pid); if (!blob) throw new Error('照片不在这台设备上');
     const cats = ET.map(t => `${t.k}=${typeNameS(sid, t.k)}` + (tx ? `（细分：${tx[t.k].subs.map(a => a[0] + '=' + a[1]).join('，')}）` : '')).join('\n');
@@ -1351,33 +1358,36 @@ async function recogPhoto(pid){
 ${cats}
 只输出 JSON 数组，不要别的文字。格式：[{"stem":"题目原文，太长就精简到 120 字内，公式用普通文字","type":"calc","sub":"","tag":"知识点，10 字内","why":"一句话：为什么这样分类"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
     const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '识别这张' + sb.name + '错题照片'}]}], {temperature: 0.2});
+    if (state.precog !== R) return;
     const list = parseJSONList(out);
     if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
     const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
-    state.precog.list = list.slice(0, 12).map(x => ({stem: String(x.stem || '').slice(0, 300), type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), why: String(x.why || '').slice(0, 80), keep: true, conf: null}));
-    if (!state.precog.list.length) state.precog.err = '没在照片里找到题目。换个角度、拍近一点再试。';
-  } catch(e) { state.precog.err = '识别失败：' + e.message; }
-  state.precog.busy = false; render();
+    R.list = list.slice(0, 12).map(x => ({stem: String(x.stem || '').slice(0, 300), type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), why: String(x.why || '').slice(0, 80), keep: true, conf: null}));
+    if (!R.list.length) R.err = '没在照片里找到题目。换个角度、拍近一点再试。';
+  } catch(e) { if (state.precog !== R) return; R.err = '识别失败：' + e.message; }
+  if (state.precog !== R) return; R.busy = false; render();
 }
 /* 同类题：换数字换情境、考同一个易错点，防止重做原题变成背答案。判对错只给提示，不给答案 */
 const findItem = id => DB.items.find(x => x.id === id) || EXT.find(x => x.id === id);
 async function varGen(){
   const V = state.variant, it = findItem(V.iid); if (!it) return;
-  const sb = subjById(it.sid); V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; render();
+  const sb = subjById(it.sid), gen = V.gen = (V.gen || 0) + 1; V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; render();
   try {
     V.q = (await aiChat([{role: 'system', content: `你是有经验的初中${sb.name}老师。根据学生做错的题，出一道「同类题」：考同一个知识点、同一个容易错的地方，但换数字或换情境，难度相当，七年级学生 5 分钟内能做完。只输出题目本身，不要答案、不要提示、不要解析。数学公式用普通文字写，比如 x^2、3/4。`},
       {role: 'user', content: `原题：${it.stem || '（没有原文）'}\n知识点：${it.tag || '—'}\n错因：${typeName(it)}${subName(it) ? ' · ' + subName(it) : ''}`}], {temperature: 0.7})).trim().slice(0, 600);
+    if (state.variant !== V || V.gen !== gen) return;
     if (!V.q) throw new Error('AI 没出题');
-  } catch(e) { V.err = '出题失败：' + e.message; }
+  } catch(e) { if (state.variant !== V || V.gen !== gen) return; V.err = '出题失败：' + e.message; }
   V.busy = false; render();
 }
 async function varCheck(){
-  const V = state.variant, it = findItem(V.iid), sb = subjById(it.sid); V.ans = ($('#var-ans') || {}).value || V.ans;
+  const V = state.variant, it = findItem(V.iid), sb = subjById(it.sid); if (V.busy) return; V.ans = ($('#var-ans') || {}).value || V.ans;
   if (!V.ans.trim()) return toast('先写你的答案');
-  V.busy = true; render();
+  const gen = V.gen, q = V.q; V.busy = true; render();
   try {
     const out = await aiChat([{role: 'system', content: `你是初中${sb.name}老师，判断学生这道题做得对不对。只输出 JSON：{"ok":true 或 false,"hint":"做错时给一句提示，指出该检查哪一步，绝对不能说出正确答案或完整过程；做对时写一句具体的肯定"}。`},
       {role: 'user', content: `题目：${V.q}\n学生的答案和过程：${V.ans}`}], {temperature: 0.1});
+    if (state.variant !== V || V.gen !== gen || V.q !== q) return;
     const j = parseJSONObj(out); if (!j) throw new Error('判断结果看不懂');
     V.res = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)}; V.tries++;
     it.vh = (it.vh || []).concat([{d: today(), ok: V.res.ok}]).slice(-10); it.u = now(); if (!it.ext) save();
@@ -1400,6 +1410,7 @@ function vVariant(){
   if (V.res && V.res.ok) foot = `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">算这道重做做对了</button>`;
   else if (V.res) foot = `<button class="btn ghost" data-act="vardone" data-ok="0">还是不会</button><button class="btn primary" data-act="varcheck">改好了，再看看</button>`;
   else foot = `<button class="btn ghost" data-act="vargen">换一道</button><button class="btn primary" data-act="varcheck">对答案</button>`;
+  if (V.busy) foot = foot.replace(/<button /g, '<button disabled ');
   return h + `</div><div class="wiz-foot">${foot}</div></div>`;
 }
 function vPhotoRecog(){
@@ -1623,7 +1634,7 @@ async function tutorEnd(){
 }
 /* 学习档案：每科一份长期记忆，每次辅导后由 AI 合并更新，控制在 300 字内；家长能看、能改、能清空 */
 async function updateMem(sid, dialog, summary){
-  const old = ((DB.aiMem || {})[sid] || {}).text || '', sb = subjById(sid);
+  const o0 = (DB.aiMem || {})[sid] || {}, old = o0.text || '', u0 = o0.u || 0, sb = subjById(sid);
   try {
     const t = (await aiChat([{role: 'system', content: `你在维护一个七年级学生${sb.name}科的学习档案，给以后辅导他的老师看。把「旧档案」和「这次辅导」合并成新档案。
 固定四段，每段 1 到 3 条，每条一句话，总共不超过 300 字：
@@ -1633,6 +1644,7 @@ async function updateMem(sid, dialog, summary){
 【下次重点】（下次辅导先检查什么）
 只写学习相关的事实，不写姓名、学校、排名，不用负面评价词。只输出档案正文。`},
       {role: 'user', content: `旧档案：\n${old || '（还没有）'}\n\n这次辅导（${today()}）摘要：${summary}\n对话节选：\n${dialog}`}], {temperature: 0.3})).trim();
+    if (((DB.aiMem || {})[sid] || {}).u > u0) return;   // 这期间家长改过档案，不覆盖
     if (t.length > 20) { DB.aiMem = DB.aiMem || {}; const o = DB.aiMem[sid] || {}; DB.aiMem[sid] = {text: t.slice(0, 600), n: (o.n || 0) + 1, d: today(), u: now()}; save(); }
   } catch(e) {}
 }
@@ -2049,7 +2061,7 @@ function weekSummary(mon){
 function extraWeek(mon, end){
   const inW = r => r.d >= mon && r.d <= end, pw = r => r.d >= addD(mon, -7) && r.d <= addD(mon, -1);
   const sp = DB.speakRecs.filter(inW), spp = DB.speakRecs.filter(pw), avg = a => a.length ? Math.round(a.reduce((x, r) => x + r.acc, 0) / a.length) : null;
-  const pe = DB.peRecs.filter(inW), est = LIB.pe ? peEstimate() : {field: null};
+  const pe = DB.peRecs.filter(inW), est = LIB.pe ? peEstimate(end) : {field: null};
   if (!sp.length && !pe.length && est.field == null) return null;
   const kinds = {read: 0, listen: 0, retell: 0}; sp.forEach(r => kinds[r.kind || 'read']++);
   return {n: sp.length, avg: avg(sp), pavg: avg(spp), kinds, pe: pe.length, est: est.field};
@@ -2303,6 +2315,7 @@ function peCard(){
   let h = `<div class="card"><h3>体育（50 分）</h3><p class="small muted" style="margin:0 0 8px">每学年体测及格 = 当年 3 分过程分。现场考三类各选一项，选好就长期练，球类技术要早练。</p>`;
   for (let i = 0; i < 3; i++) { const k = String(y0 + i), v = tests[k] || '';
     h += `<div class="row" style="margin:6px 0"><span class="small" style="width:118px">${['七','八','九'][i]}年级体测（${y0+i}–${y0+i+1}）</span><div class="seg sm">` + PE_LV.map(l => `<button data-act="pet" data-y="${k}" data-v="${l}" class="${v===l?'on':''}">${l}</button>`).join('') + `</div>${v ? (v === '不及格' ? '<span class="pill amber">这 3 分还没拿到</span>' : '<span class="pill good">3 分到手</span>') : ''}</div>`; }
+  if (LIB.pe) { const ch = peChoice(); h += `<p class="small" style="margin:10px 0 0">现场考选的项目：${[1,2,3].map(k => esc((peItem(ch[k]) || {}).name || '')).join(' · ')}　<a href="#" data-act="golearn" data-v="pe" style="color:var(--accent)">去记成绩 / 换项目 ›</a></p></div>`; return h; }
   h += `<div class="grid2" style="margin-top:8px">` + PE_C.map(([c, n, opts]) => `<div><label class="f">${n}</label><select data-in="pepick" data-c="${c}"><option value="">还没选</option>` + opts.map(o => `<option ${picks[c]===o?'selected':''}>${o}</option>`).join('') + `</select></div>`).join('') + `</div></div>`;
   return h;
 }
@@ -2399,7 +2412,7 @@ const reciteDue = () => (LIB.recite ? LIB.recite.items : []).filter(x => { const
 /* 体育：深圳中考 50 分 = 现场 36（三类各选一项，百分制平均 × 0.36）+ 过程性评价 14。评分表来自市教育局 2026 年文件（data/pe.json） */
 const PE_DEF = {1: 'run1000', 2: 'rope1', 3: 'basket'};
 const peItem = id => ((LIB.pe || {}).items || []).find(x => x.id === id);
-const peChoice = () => Object.assign({}, PE_DEF, DB.settings.pe || {});
+const peChoice = () => { const o = DB.settings.pe || {}, old = {}; for (const k of ['1','2','3']) if (o[k]) old[k] = o[k]; return Object.assign({}, PE_DEF, old, DB.settings.peItems || {}); };
 function peScore(it, v){
   const R = it.rows; if (v == null || isNaN(v)) return null;
   const better = (a, b) => it.low ? a <= b : a >= b;
@@ -2410,10 +2423,15 @@ function peScore(it, v){
 }
 const peFmt = (it, v) => it.unit === 'time' ? `${Math.floor(v / 60)}:${String(Math.round((v % 60) * 10) / 10).padStart(2, '0')}` : `${v} ${it.unit}`;
 function peParse(it, t){ t = String(t || '').trim().replace('：', ':').replace(/[′']/, ':').replace(/[″"]/, '');
-  if (it.unit === 'time') { const m = t.match(/^(\d+):(\d{1,2}(?:\.\d+)?)$/); if (m) return +m[1] * 60 + +m[2]; const n = +t; return n > 0 ? n : null; }
-  const n = +t; return n > 0 ? n : null; }
-const peLast = id => DB.peRecs.filter(r => r.item === id).sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : b.u - a.u)[0];
-function peEstimate(){ const ch = peChoice(), sc = [1, 2, 3].map(k => { const it = peItem(ch[k]), r = it && peLast(it.id); return r ? peScore(it, r.v) : null; });
+  let v = null;
+  if (it.unit === 'time') { const m = t.match(/^(\d+)(?::(\d{1,2}(?:\.\d+)?)|\.(\d{2}))$/); if (m) m[2] = m[2] || m[3]; if (m && +m[2] < 60) v = +m[1] * 60 + +m[2]; else if (/^\d+(\.\d+)?$/.test(t)) v = +t; }
+  else if (/^\d+(\.\d+)?$/.test(t)) v = +t;
+  if (!(v > 0)) return null;
+  const best = it.rows[0][1], worst = it.rows[it.rows.length - 1][1];   // 明显不可能的成绩不收（比如 1000 米填成 4.2 秒）
+  if (it.low ? (v < best * 0.6 || v > worst * 2) : (v > best * 1.6)) return NaN;
+  return v; }
+const peLast = (id, upTo) => DB.peRecs.filter(r => r.item === id && (!upTo || r.d <= upTo)).sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : b.u - a.u)[0];
+function peEstimate(upTo){ const ch = peChoice(), sc = [1, 2, 3].map(k => { const it = peItem(ch[k]), r = it && peLast(it.id, upTo); return r ? peScore(it, r.v) : null; });
   return sc.every(x => x != null) ? {field: Math.round(sc.reduce((a, b) => a + b, 0) / 3 * 0.36 * 10) / 10, sc} : {field: null, sc}; }
 function peNext(it, v){ const s = peScore(it, v); if (s >= 100) return '已经满分'; const R = it.rows, tgt = R.find(r => r[0] > s && r[0] <= Math.ceil((s + 0.01) / 5) * 5) || R[0];
   const need = Math.abs(tgt[1] - v); return `到 ${tgt[0]} 分还差 ${it.unit === 'time' ? Math.round(need) + ' 秒' : (Math.round(need * 100) / 100) + ' ' + it.unit}${tgt[0] < 100 ? `，满分要 ${peFmt(it, R[0][1])}` : ''}`; }
@@ -2435,7 +2453,14 @@ function vPE(){
   return h;
 }
 /* 英语听说 · 模仿朗读：听标准示范 → 看着原文朗读（≤50 秒）→ 识别后逐词对照，标出漏读 / 读错的词 */
-const enWords = t => (String(t).toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) || []);
+const NUMW = {zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16, seventeen:17, eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fifty:50, sixty:60, seventy:70, eighty:80, ninety:90};
+// 数字统一成英文数词再比：识别常把 one thousand 写成 1000、six 写成 6
+const NW1 = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'], NW10 = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+function numWords(n){ if (n < 20) return [NW1[n]]; if (n < 100) return [NW10[Math.floor(n / 10)]].concat(n % 10 ? [NW1[n % 10]] : []);
+  if (n < 1000) return [NW1[Math.floor(n / 100)], 'hundred'].concat(n % 100 ? numWords(n % 100) : []);
+  if (n < 1000000) return numWords(Math.floor(n / 1000)).concat(['thousand'], n % 1000 ? numWords(n % 1000) : []); return [String(n)]; }
+const enTok = w => /^\d+$/.test(w) ? numWords(+w) : [w];
+const enWords = t => (String(t).toLowerCase().replace(/(\d),(\d{3})/g, '$1$2').match(/[a-z0-9]+(?:'[a-z]+)?/g) || []).flatMap(enTok);
 function alignWords(text, said){
   const A = enWords(text), B = enWords(said), n = A.length, m = B.length;
   const dp = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
@@ -2444,15 +2469,16 @@ function alignWords(text, said){
   while (i > 0 && j > 0) { if (A[i-1] === B[j-1]) { ok.add(i-1); i--; j--; } else if (dp[i-1][j] >= dp[i][j-1]) i--; else j--; }
   return {score: n ? ok.size / n : 0, ok, total: n, got: ok.size};
 }
-function markedEn(text, ok){ let k = -1; return esc(text).replace(/[A-Za-z]+(?:&#39;[A-Za-z]+|'[A-Za-z]+)?/g, w => { k++; return ok.has(k) ? w : `<span style="background:var(--amber-bg);color:var(--amber);border-bottom:2px solid var(--amber)">${w}</span>`; }); }
+function markedEn(text, ok){ let k = -1; return esc(text).replace(/[A-Za-z0-9]+(?:&#39;[A-Za-z]+|'[A-Za-z]+)?/g, w => { const n = /^\d+$/.test(w) ? numWords(+w).length : 1, hit = [...Array(n)].map(() => ok.has(++k)).every(Boolean); return hit ? w : `<span style="background:var(--amber-bg);color:var(--amber);border-bottom:2px solid var(--amber)">${w}</span>`; }); }
 let SREC = null;
 /* 通用英语录音识别：enRecStart(秒数上限, 到时回调) → enRecStop() 返回识别到的文字 */
 let EREC = null;
 async function enRecStart(maxSec, onTimeout){
   if (aiReady() && !asrPaused() && window.MediaRecorder && navigator.mediaDevices) {
-    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    const R = EREC = {blobs: [], on: true, t0: Date.now()};             // 先占位：麦克风还没开好时点「说完了」也能正确停
+    let stream; R.ready = navigator.mediaDevices.getUserMedia({audio: true}); try { stream = await R.ready; } catch(e) { if (EREC === R) EREC = null; throw new Error('没拿到麦克风权限'); }
+    R.stream = stream; if (!R.on) { stream.getTracks().forEach(t => t.stop()); return; }
     const type = ['audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
-    const R = EREC = {stream, blobs: [], on: true, t0: Date.now()};
     const next = () => { if (!R.on) return; const mr = new MediaRecorder(stream, type ? {mimeType: type} : undefined); R.mr = mr; const parts = [];
       mr.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
       mr.onstop = () => { if (parts.length) R.blobs.push(new Blob(parts, {type: mr.mimeType || type})); if (R.on) next(); else if (R.done) R.done(); };
@@ -2462,24 +2488,38 @@ async function enRecStart(maxSec, onTimeout){
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) throw new Error('这台设备不能语音识别，在「家长 → 设置」填智谱密钥后再试');
     const sr = new SR(); sr.lang = 'en-US'; sr.continuous = true; sr.interimResults = false;
-    EREC = {sr, on: true, t0: Date.now(), said: ''}; sr.onresult = e => { for (let k = e.resultIndex; k < e.results.length; k++) if (e.results[k].isFinal) EREC.said += ' ' + e.results[k][0].transcript; };
-    sr.onend = () => { if (EREC && EREC.on && EREC.sr === sr) { try { sr.start(); } catch(e) {} } }; sr.start();
+    const R = EREC = {sr, on: true, t0: Date.now(), said: ''}; sr.onresult = e => { for (let k = e.resultIndex; k < e.results.length; k++) if (e.results[k].isFinal) R.said += ' ' + e.results[k][0].transcript; };
+    sr.onerror = e => { if (/not-allowed|service-not-allowed|audio-capture|language-not-supported/.test(e.error)) { R.on = false; R.err = '浏览器不给用语音识别，在「家长 → 设置」填智谱密钥后再试'; } };
+    sr.onend = () => { if (R.on) { try { sr.start(); } catch(e) {} } }; sr.start();
   }
   const me = EREC; clearInterval(window.__erT);
   window.__erT = setInterval(() => { if (EREC !== me || !me.on) return clearInterval(window.__erT); const left = maxSec - Math.floor((Date.now() - me.t0) / 1000); const el = $('#er-left'); if (el) el.textContent = Math.max(0, left); if (left <= 0) { clearInterval(window.__erT); onTimeout && onTimeout(); } }, 300);
 }
-async function enRecStop(){
+async function enRecStop(discard){
   const R = EREC; if (!R) return ''; R.on = false; R.sec = Math.round((Date.now() - R.t0) / 1000); EREC = null; clearInterval(window.__erT);
-  if (R.sr) { R.sr.stop(); await new Promise(r => setTimeout(r, 800)); return R.said; }
+  if (R.sr) { try { R.sr.stop(); } catch(e) {} if (discard) return ''; await new Promise(r => setTimeout(r, 800)); if (R.err && !R.said) throw new Error(R.err); return R.said; }
+  if (!R.stream && R.ready) { try { R.stream = await R.ready; } catch(e) { return ''; } }
+  if (!R.stream) return '';
+  if (discard) { clearTimeout(R.cut); try { R.mr && R.mr.state === 'recording' && R.mr.stop(); } catch(e) {} R.stream.getTracks().forEach(t => t.stop()); return ''; }
   clearTimeout(R.cut); await new Promise(res => { R.done = res; if (R.mr && R.mr.state === 'recording') R.mr.stop(); else res(); }); R.stream.getTracks().forEach(t => t.stop());
   let txt = ''; try { for (const b of R.blobs) txt += ' ' + await aiASR(b); } catch(e) { if (e.noMoney) { AI.asrOff = Date.now(); saveAI(); throw new Error('智谱语音识别余额不足，先用设备自带识别（再点一次开始）'); } throw e; }
   return txt;
 }
 const recUI = (sec, label) => `<div class="card" style="text-align:center"><div class="mic rec" style="margin:6px auto;width:80px;height:80px;border-radius:50%;background:var(--danger);display:flex;align-items:center;justify-content:center">${MIC.replace('<svg','<svg style="width:36px;height:36px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…还剩 <b id="er-left">${sec}</b> 秒</div><button class="btn primary" style="margin-top:10px" data-act="${label}">说完了</button></div>`;
 /* 播放材料两遍（考试就是放两遍） */
-function playTwice(src, done){ const a = window.__enAudio || (window.__enAudio = new Audio()); let n = 0; a.onended = () => { n++; if (n < 2) { setTimeout(() => { a.currentTime = 0; a.play().catch(() => {}); }, 1500); } else { a.onended = null; done && done(); } }; a.src = src; a.play().catch(() => {}); }
-function stopAudio(){ const a = window.__enAudio; if (a) { a.onended = null; try { a.pause(); } catch(e) {} } }
-const hasKeys = (said, keys) => { const w = new Set(enWords(said)), t = ' ' + enWords(said).join(' ') + ' '; return keys.some(alt => alt.every(k => k.includes(' ') ? t.includes(' ' + k + ' ') : w.has(k))); };
+function playTwice(src, done){ const a = window.__enAudio || (window.__enAudio = new Audio()); let n = 0; a.onended = () => { n++; if (n < 2) { clearTimeout(window.__p2T); window.__p2T = setTimeout(() => { a.currentTime = 0; a.play().catch(() => {}); }, 1500); } else { a.onended = null; done && done(); } }; a.src = src; a.play().catch(() => {}); }
+function stopAudio(){ clearTimeout(window.__p2T); const a = window.__enAudio; if (a) { a.onended = null; try { a.pause(); } catch(e) {} } }
+/* 离开听说页 / 切 tab / 切到后台：停掉所有录音、倒计时、播放，免得麦克风一直开着、后台自己答题 */
+function stopAllEn(){
+  stopAudio(); clearInterval(window.__spT); clearInterval(window.__erT);
+  if (EREC) enRecStop(true).catch(() => {});
+  if (SREC) { const R = SREC; SREC = null; R.on = false; clearTimeout(R.cut); try { R.sr ? R.sr.stop() : (R.mr && R.mr.state === 'recording' && R.mr.stop()); } catch(e) {} if (R.stream) R.stream.getTracks().forEach(t => t.stop()); }
+  if (state.sp && ['rec','busy'].includes(state.sp.phase)) state.sp = null;
+  if (state.ls) state.ls = null; if (state.rt) state.rt = null;
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && (EREC || SREC)) { stopAllEn(); render(); } });
+const keyNorm = k => enWords(k).join(' ');
+const hasKeys = (said, keys) => { const w = new Set(enWords(said)), t = ' ' + enWords(said).join(' ') + ' '; return keys.some(alt => alt.every(k0 => { const k = keyNorm(k0); return k.includes(' ') ? t.includes(' ' + k + ' ') : w.has(k); })); };
 /* 信息获取：听两遍 → 每题 8 秒口头回答 → 按关键词判对错 */
 function vListen(x){
   const S = state.ls && state.ls.id === x.id ? state.ls : (state.ls = {id: x.id, phase: 'intro', i: 0, ans: []});
@@ -2496,9 +2536,10 @@ function vListen(x){
   if (S.err) h += `<div class="signal">${esc(S.err)}</div>`;
   return h;
 }
-async function lsAsk(){ const S = state.ls; S.rec = true; S.err = ''; render(); try { await enRecStart(8, () => lsStop()); } catch(e) { S.rec = false; S.err = e.message; S.phase = 'result'; render(); } }
+async function lsAsk(){ const S = state.ls; if (!S) return; S.rec = true; S.err = ''; render(); try { await enRecStart(8, () => lsStop()); } catch(e) { S.rec = false; S.err = e.message; S.phase = 'result'; render(); } }
 async function lsStop(){ const S = state.ls; if (!S || !S.rec) return; S.rec = false; render();
   const x = LIB.speak2.listen.find(i => i.id === S.id); let said = ''; try { said = await enRecStop(); } catch(e) { S.err = e.message; }
+  if (state.ls !== S) return;
   S.ans[S.i] = {said: said.trim(), ok: hasKeys(said, x.qs[S.i].keys)};
   if (S.i + 1 < x.qs.length) { S.i++; render(); lsAsk(); }
   else { S.phase = 'result'; DB.speakRecs.push({id: uid('sp'), d: today(), kind: 'listen', pid: x.id, acc: Math.round(S.ans.filter(a => a.ok).length / x.qs.length * 100), u: now()}); save(); render(); } }
@@ -2518,17 +2559,19 @@ function vRetell(x){
   if (S.err) h += `<div class="signal">${esc(S.err)}</div>`;
   return h;
 }
-async function rtRec(phase, sec){ const S = state.rt; S.phase = phase; S.rec = true; S.err = ''; render(); try { await enRecStart(sec, () => phase === 'retell' ? rtStop() : rtAskStop()); } catch(e) { S.rec = false; S.err = e.message; S.phase = 'result'; render(); } }
+async function rtRec(phase, sec){ const S = state.rt; if (!S) return; S.phase = phase; S.rec = true; S.err = ''; render(); try { await enRecStart(sec, () => phase === 'retell' ? rtStop() : rtAskStop()); } catch(e) { S.rec = false; S.err = e.message; S.phase = 'result'; render(); } }
 async function rtStop(){ const S = state.rt; if (!S || !S.rec) return; S.rec = false; render(); const x = LIB.speak2.retell.find(i => i.id === S.id);
   try { S.retell = (await enRecStop()).trim(); } catch(e) { S.err = e.message; S.retell = ''; }
+  if (state.rt !== S) return;
   const t = ' ' + enWords(S.retell).join(' ') + ' ', w = new Set(enWords(S.retell));
-  S.hit = x.points.map(pt => pt.keys.some(k => k.includes(' ') ? t.includes(' ' + k + ' ') : w.has(k)));
+  S.hit = x.points.map(pt => pt.keys.some(k0 => { const k = keyNorm(k0); return k.includes(' ') ? t.includes(' ' + k + ' ') : w.has(k); }));
   S.i = 0; rtRec('ask', 8); }
 async function rtAskStop(){ const S = state.rt; if (!S || !S.rec) return; S.rec = false; render(); const x = LIB.speak2.retell.find(i => i.id === S.id), a = x.asks[S.i];
   let said = ''; try { said = (await enRecStop()).trim(); } catch(e) { S.err = e.message; }
+  if (state.rt !== S) return;
   const r = {said};
   if (said && aiReady()) { try { const j = parseJSONObj(await aiChat([{role: 'system', content: '你是初中英语老师，检查学生的口头提问。语音识别会丢掉标点和大小写，忽略这些。只输出 JSON：{"ok":true 或 false,"hint":"一句中文点评：对的话说好在哪，不对的话指出问题（语序、助动词、疑问词、意思不符）","sample":"一个标准问法"}'},
-      {role: 'user', content: `情景要求：${a.cn}\n参考问法：${a.expect}\n短文：${x.text}\n学生说的：${said}`}], {temperature: 0.1})); if (j) Object.assign(r, {ok: !!j.ok, hint: String(j.hint || '').slice(0, 120), sample: String(j.sample || '').slice(0, 120)}); } catch(e) { r.hint = 'AI 没判断成：' + e.message; } }
+      {role: 'user', content: `情景要求：${a.cn}\n参考问法：${a.expect}\n短文：${x.text}\n学生说的：${said}`}], {temperature: 0.1})); if (state.rt !== S) return; if (j) Object.assign(r, {ok: !!j.ok, hint: String(j.hint || '').slice(0, 120), sample: String(j.sample || '').slice(0, 120)}); } catch(e) { r.hint = 'AI 没判断成：' + e.message; } }
   S.asks[S.i] = r;
   if (S.i + 1 < x.asks.length) { S.i++; rtRec('ask', 8); }
   else { S.phase = 'result'; const pts = (S.hit || []).filter(Boolean).length / x.points.length, qs = S.asks.filter(q => q.ok).length / x.asks.length;
@@ -2539,11 +2582,11 @@ async function spStart(){
   if (aiReady() && !asrPaused() && window.MediaRecorder && navigator.mediaDevices) {
     try { const stream = await navigator.mediaDevices.getUserMedia({audio: true});
       const type = ['audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
-      SREC = {stream, blobs: [], on: true, t0: Date.now()};
-      const next = () => { if (!SREC || !SREC.on) return; const mr = new MediaRecorder(stream, type ? {mimeType: type} : undefined); SREC.mr = mr; const parts = [];
+      const R = SREC = {stream, blobs: [], on: true, t0: Date.now()};
+      const next = () => { if (!R.on) return; const mr = new MediaRecorder(stream, type ? {mimeType: type} : undefined); R.mr = mr; const parts = [];
         mr.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
-        mr.onstop = () => { if (parts.length) SREC.blobs.push(new Blob(parts, {type: mr.mimeType || type})); if (SREC.on) next(); else if (SREC.done) SREC.done(); };
-        mr.start(); SREC.cut = setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 25000); };
+        mr.onstop = () => { if (parts.length) R.blobs.push(new Blob(parts, {type: mr.mimeType || type})); if (R.on) next(); else if (R.done) R.done(); };
+        mr.start(); R.cut = setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 25000); };
       next(); S.phase = 'rec'; S.t0 = Date.now(); spTick(); render(); return;
     } catch(e) { S.err = '没拿到麦克风权限'; }
   }
@@ -2557,13 +2600,14 @@ async function spStart(){
 }
 function spTick(){ clearInterval(window.__spT); window.__spT = setInterval(() => { const S = state.sp; if (!S || S.phase !== 'rec') return clearInterval(window.__spT); const left = 50 - Math.floor((Date.now() - S.t0) / 1000); const el = $('#sp-left'); if (el) el.textContent = Math.max(0, left); if (left <= 0) spStop(); }, 500); }
 async function spStop(){
-  const S = state.sp; if (!SREC) return; SREC.on = false; S.sec = Math.round((Date.now() - S.t0) / 1000); S.phase = 'busy'; render();
+  const S = state.sp; if (!SREC || !S || S.phase !== 'rec') return; const R = SREC; R.on = false; S.sec = Math.round((Date.now() - S.t0) / 1000); S.phase = 'busy'; render();
   try {
-    if (SREC.sr) { SREC.sr.stop(); await new Promise(r => setTimeout(r, 800)); }
-    else { clearTimeout(SREC.cut); await new Promise(res => { SREC.done = res; if (SREC.mr && SREC.mr.state === 'recording') SREC.mr.stop(); else res(); }); SREC.stream.getTracks().forEach(t => t.stop());
-      let txt = ''; for (const b of SREC.blobs) txt += ' ' + await aiASR(b); S.said = txt; }
+    if (R.sr) { R.sr.stop(); await new Promise(r => setTimeout(r, 800)); }
+    else { clearTimeout(R.cut); await new Promise(res => { R.done = res; if (R.mr && R.mr.state === 'recording') R.mr.stop(); else res(); }); R.stream.getTracks().forEach(t => t.stop());
+      let txt = ''; for (const b of R.blobs) txt += ' ' + await aiASR(b); S.said = txt; }
   } catch(e) { S.err = e.noMoney ? '智谱语音识别余额不足（0.06 元/分钟）。先用设备自带识别，或者去智谱充值。' : '识别失败：' + e.message; if (e.noMoney) { AI.asrOff = Date.now(); saveAI(); } }
-  SREC = null;
+  if (SREC === R) SREC = null;
+  if (state.sp !== S) return;
   if (!enWords(S.said).length) { S.phase = 'ready'; if (!S.err) S.err = '没识别到声音，靠近一点再读一遍。'; render(); return; }
   const x = LIB.speak.items.find(i => i.id === S.id); S.res = alignWords(x.text, S.said); S.phase = 'result';
   DB.speakRecs.push({id: uid('sp'), d: today(), pid: x.id, acc: Math.round(S.res.score * 100), sec: S.sec, u: now()}); save(); render();
@@ -2623,31 +2667,19 @@ function vLearn(){
   if (L.view === 'recite') return vRecite();
   if (L.view === 'poem') return vPoem();
   if (L.view === 'books') return vBooks();
-  let h = `<h2>学习</h2><p class="sub">背单词、背古诗文、查教材和中考要求。每样都能打印成纸版给孩子用。</p>`;
   if (!LIB.tried || (LIB.words === null && LIB.recite === null && LIB.books === null && !LIB.done)) { LIB.done = true; }
-  // 单词
-  const W = uniqWords();
-  const mastered = W.filter(w => (wState(w)||{}).done).length, learning = W.filter(w => { const s = wState(w); return s && !s.done; }).length;
-  const dueN = W.filter(w => { const s = wState(w); return s && !s.done && s.due <= today(); }).length;
-  h += `<div class="card"><div class="row"><h3 style="margin:0">英语单词</h3><span class="spacer"></span><span class="small faint">${LIB.words ? esc(LIB.words.title || '') : '加载中…'}</span></div>` +
-    (W.length ? `<div class="kpis" style="margin:10px 0"><div class="kpi"><b>${dueN}</b><span>今天要复习</span></div><div class="kpi"><b>${learning}</b><span>在背</span></div><div class="kpi"><b>${mastered}<span class="faint" style="font-size:15px">/${W.length}</span></b><span>已掌握</span></div></div>
-      <div class="row"><button class="btn primary" data-act="lv" data-v="card">背单词（${Math.min(wordQueue().length, 99)} 个）</button><button class="btn" data-act="lv" data-v="words">单词表 / 打印</button></div>
-      <p class="small faint" style="margin:8px 0 0">看中文想英文，想完再翻面听发音。每天新学 ${newPerDay()} 个（按他最近的正确率自动调：记得牢就多学，记不住就少学），记住的隔 1、3、7、21 天再考，第 4 次还记得就算掌握。</p>` : `<p class="small muted">${LIB.tried && !LIB.words ? '单词数据还没放进来。' : '加载中…'}</p>`) + `</div>`;
-  // 背诵
-  const RI = LIB.recite ? LIB.recite.items : [];
-  const tk = termKey(today());
-  const cur = RI.filter(x => x.term === tk);
-  h += `<div class="card"><div class="row"><h3 style="margin:0">语文背诵</h3><span class="spacer"></span><span class="small faint">${esc(termName(tk))}</span></div>` +
-    (RI.length ? `<p style="margin:8px 0">本学期 ${cur.length} 篇：会背 ${cur.filter(x=>['can','dict'].includes(rState(x.id))).length} · 默写全对 ${cur.filter(x=>rState(x.id)==='dict').length}</p>
-      <div class="bar" style="height:10px;margin-bottom:10px">${cur.length ? `<i style="width:${pct(cur.filter(x=>rState(x.id)==='dict').length,cur.length)}%;background:var(--good)"></i><i style="width:${pct(cur.filter(x=>rState(x.id)==='can').length,cur.length)}%;background:var(--accent)"></i><i style="width:${pct(cur.filter(x=>rState(x.id)==='learning').length,cur.length)}%;background:var(--amber)"></i>` : ''}</div>
-      <div class="row"><button class="btn primary" data-act="lv" data-v="recite">背诵篇目 / 打印</button></div>` : `<p class="small muted">${LIB.tried && !LIB.recite ? '背诵数据还没放进来。' : '加载中…'}</p>`) + `</div>`;
-  { const rs = DB.speakRecs, last = rs[rs.length - 1];
-    h += `<div class="card"><div class="row"><h3 style="margin:0">英语听说 · 中考 25 分</h3><span class="spacer"></span><span class="small faint">${last ? '最近 ' + last.acc + '%' : '中考听说 25 分'}</span></div><p class="small muted" style="margin:6px 0 10px">模仿朗读、听后回答、复述及提问，三类题都能练。每天一小项，2 到 3 分钟。</p><button class="btn" data-act="lv" data-v="speak">打开</button></div>`; }
-  { const est = LIB.pe ? peEstimate() : {field: null}, n = DB.peRecs.length;
-    h += `<div class="card"><div class="row"><h3 style="margin:0">体育 · 中考 50 分</h3><span class="spacer"></span><span class="small faint">${est.field != null ? '现场估 ' + est.field + ' / 36' : n ? '记了 ' + n + ' 次' : '三项各测一次就能估分'}</span></div><p class="small muted" style="margin:6px 0 10px">1000 米、跳绳、篮球……测完记一下，看离满分还差多少。</p><button class="btn" data-act="lv" data-v="pe">打开</button></div>`; }
-  h += `<div class="card"><div class="row"><h3 style="margin:0">数学练习</h3><span class="spacer"></span><span class="small faint">北师大七上</span></div><p class="small muted" style="margin:6px 0 10px">每天一站补漏，10 分钟左右。</p><a class="btn primary" href="../math/">去做数学练习</a></div>`;
-  // 教材与中考
-  h += `<div class="card"><div class="row"><h3 style="margin:0">教材与中考</h3></div><p class="small muted" style="margin:6px 0 10px">各科用什么版本、官方免费电子课本在哪看、深圳中考考什么。</p><button class="btn" data-act="lv" data-v="books">打开</button></div>`;
+  // 一屏方块：名称 + 一行现状，点进去再看说明和打印
+  const W = uniqWords(), mastered = W.filter(w => (wState(w)||{}).done).length, wq = LIB.words ? Math.min(wordQueue().length, 99) : 0;
+  const RI = LIB.recite ? LIB.recite.items : [], tk = termKey(today()), cur = RI.filter(x => x.term === tk), can = cur.filter(x => ['can','dict'].includes(rState(x.id))).length;
+  const sr = DB.speakRecs, last = sr[sr.length - 1], est = LIB.pe ? peEstimate() : {field: null};
+  const tile = (act, v, name, st, sub, extra) => `<${act === 'link' ? `a href="${v}"` : `button data-act="${act}" data-v="${v}"`} class="tile"${extra || ''}><span class="tn">${name}</span><span class="ts">${st}</span>${sub ? `<span class="tu">${sub}</span>` : ''}</${act === 'link' ? 'a' : 'button'}>`;
+  let h = `<h2>学习</h2><div class="tiles">` +
+    tile('lv', 'card', '英语单词', !LIB.words ? '加载中…' : wq ? `今天 ${wq} 个` : '今天背完了', W.length ? `已掌握 ${mastered}/${W.length}` : '') +
+    tile('lv', 'recite', '语文背诵', RI.length ? `会背 ${can}/${cur.length}` : '加载中…', esc(termName(tk))) +
+    tile('lv', 'speak', '英语听说', last ? `最近 ${last.acc}%` : '还没练过', '中考 25 分') +
+    tile('lv', 'pe', '体育', est.field != null ? `现场估 ${est.field}/36` : DB.peRecs.length ? `记了 ${DB.peRecs.length} 次` : '还没测过', '中考 50 分') +
+    tile('link', '../math/', '数学练习', '每天一站', '北师大七上') +
+    tile('lv', 'books', '教材与中考', '版本 · 电子课本', '中考考什么') + `</div>`;
   return h;
 }
 const termKey = d => { const t = termOf(d, DB.settings.startYear); return ['7a','7b','8a','8b','9a','9b'][Math.max(0, Math.min(5, t.cidx))]; };
@@ -2674,7 +2706,7 @@ function vWords(){
 }
 function vWordCard(){
   const L = state.learn, q = wordQueue();
-  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">背单词</h2><span class="spacer"></span><span class="small faint">还剩 ${q.length}</span></div>`;
+  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">背单词</h2><span class="spacer"></span><span class="small faint">还剩 ${q.length}</span><button class="btn sm ghost" data-act="lv" data-v="words">单词表 / 打印</button></div>` + `<details style="margin-top:6px"><summary class="small faint">怎么背</summary><p class="small faint" style="margin:6px 0 0">看中文想英文，想完再翻面听发音。每天新学 ${newPerDay()} 个（按最近的正确率自动调：记得牢就多学，记不住就少学），记住的隔 1、3、7、21 天再考，第 4 次还记得就算掌握。</p></details>`;
   if (!q.length) return h + `<div class="card empty" style="margin-top:12px">今天的单词背完了。明天再来，隔天复习才记得牢。<div style="margin-top:12px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button></div></div>`;
   const w = q[0], s = wState(w), flip = L.flip;
   h += `<div class="card" style="margin-top:12px;text-align:center;padding:28px 16px">
@@ -2958,9 +2990,10 @@ function aiCard(){
 }
 async function aiChat(messages, opts, tries){
   tries = tries || 0; let r;
-  try { r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key, 'Content-Type':'application/json'},
-    body: JSON.stringify(Object.assign({model: AI.model || 'glm-4.6v-flash', messages, stream:false}, opts || {}))}); }
-  catch(e) { if (tries < 1) { await new Promise(res => setTimeout(res, 1500)); return aiChat(messages, opts, tries + 1); } throw new Error('连不上智谱，检查一下网络'); }
+  const ac = window.AbortController ? new AbortController() : null, to = ac && setTimeout(() => ac.abort(), 90000);
+  try { r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key, 'Content-Type':'application/json'}, signal: ac ? ac.signal : undefined,
+    body: JSON.stringify(Object.assign({model: AI.model || 'glm-4.6v-flash', messages, stream:false}, opts || {}))}); clearTimeout(to); }
+  catch(e) { clearTimeout(to); if (e.name === 'AbortError') throw new Error('智谱 90 秒没回应，再试一次'); if (tries < 1) { await new Promise(res => setTimeout(res, 1500)); return aiChat(messages, opts, tries + 1); } throw new Error('连不上智谱，检查一下网络'); }
   if (!r.ok) { const t = await r.text(); let code = '', why = ''; try { const j = JSON.parse(t); code = String((j.error && j.error.code) || ''); why = (j.error && j.error.message) || ''; } catch(e) {}
     // 免费模型并发满了（429）或服务端临时出错（5xx）：等一会儿自动重试；欠费（1113）不重试
     if ((r.status === 429 && code !== '1113' && !/余额|欠费/.test(why)) || r.status >= 500) { if (tries < 2) { await new Promise(res => setTimeout(res, [2000, 5000][tries])); return aiChat(messages, opts, tries + 1); } throw new Error('智谱现在太忙（' + r.status + '），过一两分钟再试'); }
@@ -3040,7 +3073,7 @@ function methodCard(){
 }
 
 /* ================= 事件 ================= */
-function setTab(t){ state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0); }
+function setTab(t){ if (t !== state.tab) stopAllEn(); state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0); }
 const ACT = {
   tab: el => setTab(el.dataset.v),
   day: (el, e) => { e.preventDefault(); const v = +el.dataset.v; state.date = v === 0 ? today() : addD(state.date, v); if (state.date > today()) state.date = today(); state.openSubj = null; render(); },
@@ -3095,10 +3128,10 @@ const ACT = {
     const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.adjust = m ? m[0] : t.slice(0, 60); w.u = now(); (w.fu = w.fu || {}).adjust = w.u; save(); toast('已写进「下周只调一件事」'); render(); },
   pet: el => { const pe = JSON.parse(JSON.stringify(DB.settings.pe || {})); pe.tests = pe.tests || {}; pe.tests[el.dataset.y] = pe.tests[el.dataset.y] === el.dataset.v ? '' : el.dataset.v; setSetting('pe', pe); save(); render(); },
   explain: el => { const dd = dayObj(today()) || {}; setDayField(today(), 'explain', (dd.explain || 0) + 1); save(); toast(el.dataset.v === '1' ? '好。只听不判，就是在帮他' : '让他换个说法再讲一遍'); render(); },
-  golearn: el => { state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.sp = null; state.ls = null; state.rt = null; } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
+  golearn: el => { stopAllEn(); state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.sp = null; state.ls = null; state.rt = null; } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
   toggleq: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.q = !queued(it); it.u = now(); save(); render(); },
   pv: el => { state.pv = el.dataset.v; state.examEdit = null; render(); window.scrollTo(0,0); },
-  lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { state.learn.sp = null; state.sp = null; state.ls = null; state.rt = null; stopAudio(); if (EREC) enRecStop().catch(() => {}); } render(); window.scrollTo(0,0); },
+  lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { stopAllEn(); state.learn.sp = null; state.sp = null; } render(); window.scrollTo(0,0); },
   wbook: el => { state.learn.book = el.dataset.v; state.learn.unit = null; render(); },
   wunit: el => { state.learn.unit = el.dataset.v || null; render(); },
   say: el => speak(el.dataset.v, 'en-US'),
@@ -3131,17 +3164,17 @@ const ACT = {
   pkind: el => { state.photo.kind = el.dataset.v; render(); },
   psubj: el => { state.photo.sid = el.dataset.v; render(); },
   varopen: el => { state.variant = {iid: el.dataset.v}; varGen(); },
-  vargen: () => { state.variant.err = ''; varGen(); },
+  vargen: () => { if (state.variant.busy) return; state.variant.err = ''; varGen(); },
   varcheck: () => { state.variant.err = ''; varCheck(); },
   varclose: () => { state.variant = null; render(); },
   vardone: el => { const id = state.variant.iid; state.variant = null; redoItem(id, el.dataset.ok === '1'); },
   memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
-  spopen: el => { state.learn.sp = el.dataset.v; state.sp = null; state.ls = null; state.rt = null; stopAudio(); render(); window.scrollTo(0,0); },
-  lsplay: () => { const S = state.ls; S.phase = 'play'; S.n2 = false; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.ls === S && S.phase === 'play') { S.phase = 'q'; S.i = 0; lsAsk(); } }); },
+  spopen: el => { stopAllEn(); state.learn.sp = el.dataset.v; state.sp = null; render(); window.scrollTo(0,0); },
+  lsplay: () => { const S = state.ls; S.phase = 'play'; S.n2 = false; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.ls === S && S.phase === 'play' && state.tab === 'learn') { S.phase = 'q'; S.i = 0; lsAsk(); } }); },
   lsgo: () => { stopAudio(); const S = state.ls; S.phase = 'q'; S.i = 0; lsAsk(); },
   lsstop: () => lsStop(),
   lsagain: () => { state.ls = null; render(); },
-  rtplay: () => { const S = state.rt; S.phase = 'play'; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.rt === S && S.phase === 'play') rtRec('retell', 60); }); },
+  rtplay: () => { const S = state.rt; S.phase = 'play'; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.rt === S && S.phase === 'play' && state.tab === 'learn') rtRec('retell', 60); }); },
   rtgo: () => { stopAudio(); rtRec('retell', 60); },
   rtstop: () => rtStop(),
   rtastop: () => rtAskStop(),
@@ -3149,9 +3182,9 @@ const ACT = {
   spplay: () => { const x = LIB.speak.items.find(i => i.id === state.learn.sp); const a = window.__enAudio || (window.__enAudio = new Audio()); if (!a.paused) { a.pause(); return; } a.src = x.audio; a.play().catch(() => speak(x.text, 'en-US')); },
   spstart: () => { state.sp = {id: state.learn.sp, phase: 'ready'}; spStart(); },
   spstop: () => spStop(),
-  pepick: el => { const c = Object.assign({}, DB.settings.pe || {}); c[el.dataset.v] = el.dataset.s; setSetting('pe', c); save(); render(); },
+  pepick: el => { const c = Object.assign({}, DB.settings.peItems || {}); c[el.dataset.v] = el.dataset.s; setSetting('peItems', c); save(); render(); },
   peadd: el => { const k = el.dataset.v, it = peItem(peChoice()[k]), v = peParse(it, ($('#pe-in-' + k) || {}).value);
-    if (v == null) return toast(it.unit === 'time' ? '按「分:秒」填，比如 4:20' : '填一个数字');
+    if (v == null) return toast(it.unit === 'time' ? '按「分:秒」填，比如 4:20' : '填一个数字'); if (isNaN(v)) return toast('这个成绩看起来不对，再核对一下' + (it.unit === 'time' ? '（按「分:秒」填，比如 4:20）' : ''));
     DB.peRecs.push({id: uid('pe'), d: today(), item: it.id, v, u: now()}); save(); render(); toast(`${peFmt(it, v)} = ${peScore(it, v)} 分`); },
   aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; aiSelfTest(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
@@ -3162,7 +3195,8 @@ const ACT = {
   rgsub: el => { const x = state.precog.list[+el.dataset.v]; x.sub = x.sub === el.dataset.s ? '' : el.dataset.s; render(); },
   rgconf: el => { const x = state.precog.list[+el.dataset.v]; x.conf = x.conf === el.dataset.c ? null : el.dataset.c; render(); },
   rgsave: () => { const R = state.precog, p = DB.photos.find(x => x.id === R.pid), d = p ? p.d : state.date; let n = 0;
-    for (const x of R.list) if (x.keep && x.stem.trim()) { DB.items.push({id: uid('i'), d, sid: R.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: x.conf, photoId: R.pid, src: '拍照识别', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); n++; }
+    const had = new Set(DB.items.filter(i => i.photoId === R.pid).map(i => (i.stem || '').trim()));
+    for (const x of R.list) if (x.keep && x.stem.trim() && !had.has(x.stem.trim())) { DB.items.push({id: uid('i'), d, sid: R.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: x.conf, photoId: R.pid, src: '拍照识别', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); n++; }
     touchDay(d); save(); state.precog = null; render(); toast(`加入了 ${n} 道，${BOXES[0]} 天后出现在「重做」`); },
   photoview: el => { state.pview = el.dataset.v; render(); },
   pviewclose: () => { state.pview = null; render(); },
