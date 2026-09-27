@@ -572,7 +572,7 @@ function queued(it){
   if (it.q === true) return true; if (it.q === false) return false;
   return !!(it.ext || it.conf === 'sure' || (it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2));
 }
-const queueWhy = it => it.q === true ? '手动加入' : it.ext ? '拍照错题本' : it.conf === 'sure' ? '有把握却错了' : it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2 ? '同一个问题出现了 ' + REP[it.sid + '|' + it.sub] + ' 次' : '';
+const queueWhy = it => it.q === true ? (it.src === '拍照识别' ? '拍照识别' : '手动加入') : it.ext ? '拍照错题本' : it.conf === 'sure' ? '有把握却错了' : it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2 ? '同一个问题出现了 ' + REP[it.sid + '|' + it.sub] + ' 次' : '';
 const itemsOn = (d, sid) => (IDX[d] || []).filter(it => !sid || it.sid === sid);
 const isRest = d => !!(DB.days[d] && DB.days[d].rest);
 function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0; while (ok(d) && n < 2000) { if (dayHasData(d)) n++; d = addD(d, -1); } return n; }
@@ -1081,9 +1081,9 @@ function render(){
   $('#main').innerHTML = v();
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
-  document.body.style.overflow = (state.wiz || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
+  document.body.style.overflow = (state.wiz || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
   hydratePhotos();
 }
 
@@ -1263,6 +1263,7 @@ async function addPhotos(files){
     } catch(e) { toast('有一张照片读不出来'); }
   }
   touchDay(state.date); save(); state.photo = null; render();
+  if (n && ps.kind === 'error' && aiReady() && !DEMO) { recogPhoto(DB.photos[DB.photos.length - 1].id); return; }
   toast(n ? `存了 ${n} 张` + (syncReady() ? '，稍后自动加密上传' : '（没开同步，只存在这台设备）') : '没有存上');
 }
 const photoPath = p => `photos/${p.d}/${p.sid || 'x'}-${p.kind}-${p.id}.enc`;
@@ -1298,8 +1299,49 @@ async function photoSrc(p){
   return blob ? (photoURL[p.id] = URL.createObjectURL(blob)) : null;
 }
 function hydratePhotos(){ document.querySelectorAll('img[data-pid]').forEach(async img => { const p = DB.photos.find(x => x.id === img.dataset.pid); if (!p) return; const u = await photoSrc(p); if (u) img.src = u; else img.alt = '在别的设备上'; }); }
-const photoDone = p => EXT.filter(x => x.photoId === p.id).length;
-function photoStatus(p){ const n = photoDone(p); return n ? `已识别 ${n} 道` : p.up ? '等 Claude 识别' : syncReady() ? '待上传' : '只在本机'; }
+const photoDone = p => EXT.filter(x => x.photoId === p.id).length + DB.items.filter(x => x.photoId === p.id).length;
+function photoStatus(p){ const n = photoDone(p); return n ? `已识别 ${n} 道` : p.kind === 'error' && aiReady() ? '还没识别' : p.up ? '已上传' : syncReady() ? '待上传' : '只在本机'; }
+/* 拍照识别错题：智谱视觉模型读题 + 按本科分类体系归类；结果先给孩子/家长确认，确认后进重做 */
+const blobToDataURL = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+function parseJSONList(t){
+  t = String(t || '').replace(/```(json)?/g, '').trim(); const a = t.indexOf('['), b = t.lastIndexOf(']');
+  if (a < 0 || b < a) return null; try { const v = JSON.parse(t.slice(a, b + 1)); return Array.isArray(v) ? v : null; } catch(e) { return null; }
+}
+async function recogPhoto(pid){
+  const p = DB.photos.find(x => x.id === pid); if (!p) return;
+  const sid = p.sid, sb = subjById(sid), tx = taxOf(sid);
+  state.precog = {pid, sid, busy: true, list: [], err: ''}; render();
+  try {
+    const blob = await IDB.get('photo:' + pid); if (!blob) throw new Error('照片不在这台设备上');
+    const cats = ET.map(t => `${t.k}=${typeNameS(sid, t.k)}` + (tx ? `（细分：${tx[t.k].subs.map(a => a[0] + '=' + a[1]).join('，')}）` : '')).join('\n');
+    const sys = `你是经验丰富的初中${sb.name}老师，帮学生整理错题。看图片，找出做错的题：老师打叉、扣分、订正过、或学生圈出来的题。看不出对错时，就列出图里所有题。
+每道题按下面的分类归类（type 必须是 calc / concept / read 之一，sub 用细分里的英文 key，拿不准就空着）：
+${cats}
+只输出 JSON 数组，不要别的文字。格式：[{"stem":"题目原文，太长就精简到 120 字内，公式用普通文字","type":"calc","sub":"","tag":"知识点，10 字内","why":"一句话：为什么这样分类"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
+    const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '识别这张' + sb.name + '错题照片'}]}], {temperature: 0.2});
+    const list = parseJSONList(out);
+    if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
+    const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
+    state.precog.list = list.slice(0, 12).map(x => ({stem: String(x.stem || '').slice(0, 300), type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), why: String(x.why || '').slice(0, 80), keep: true, conf: null}));
+    if (!state.precog.list.length) state.precog.err = '没在照片里找到题目。换个角度、拍近一点再试。';
+  } catch(e) { state.precog.err = '识别失败：' + e.message; }
+  state.precog.busy = false; render();
+}
+function vPhotoRecog(){
+  const R = state.precog, sid = R.sid, tx = taxOf(sid), sb = subjById(sid);
+  let h = `<div class="wiz" role="dialog" aria-label="识别错题"><div class="wiz-top"><div style="flex:1;font-weight:600">识别错题 · ${esc(sb.name)}</div><button class="wiz-x" data-act="rgclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (R.busy) return h + `<div style="text-align:center;margin-top:60px"><div class="wiz-q">AI 正在看题…</div><p class="muted">一般 10 到 30 秒</p></div></div></div>`;
+  if (R.err) h += `<div class="signal">${esc(R.err)}</div>`;
+  if (R.list.length) h += `<p class="muted" style="margin:6px 0 12px">认出 ${R.list.length} 道。看一眼对不对：题目可以改，分类点一下就换，不是错题的取消勾选。</p>`;
+  R.list.forEach((x, k) => {
+    h += `<div class="card" style="padding:12px 14px;${x.keep ? '' : 'opacity:.5'}"><div class="row" style="flex-wrap:nowrap;align-items:flex-start"><button class="chip ${x.keep ? 'on' : ''}" data-act="rgkeep" data-v="${k}" aria-label="保留">${x.keep ? '✓' : '　'}</button><textarea data-in="rgstem" data-v="${k}" style="flex:1;min-height:60px">${esc(x.stem)}</textarea></div>
+      <div class="row" style="margin-top:8px">` + ET.map(t => `<button class="chip ${x.type === t.k ? 'on' : ''}" data-act="rgtype" data-v="${k}" data-t="${t.k}"><i class="sw" style="background:${ET_COLOR[t.k]}"></i> ${typeNameS(sid, t.k)}</button>`).join('') + `</div>` +
+      (tx ? `<div class="row" style="margin-top:6px">` + tx[x.type].subs.map(a => `<button class="chip ${x.sub === a[0] ? 'on' : ''}" style="min-height:30px;padding:4px 10px;font-size:13px" data-act="rgsub" data-v="${k}" data-s="${a[0]}">${esc(a[1])}</button>`).join('') + `</div>` : '') +
+      `<div class="row" style="margin-top:6px"><span class="small faint">做的时候：</span><div class="seg sm">` + CONF.map(c => `<button data-act="rgconf" data-v="${k}" data-c="${c.k}" class="${x.conf === c.k ? 'on' : ''}">${c.n}</button>`).join('') + `</div></div>` +
+      (x.why ? `<div class="small faint" style="margin-top:6px">AI：${esc(x.why)}${x.tag ? ' · 知识点：' + esc(x.tag) : ''}</div>` : '') + `</div>`; });
+  const n = R.list.filter(x => x.keep).length;
+  return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rgretry">重新识别</button><button class="btn primary" data-act="rgsave" ${n ? '' : 'disabled'}>${n ? `加入 ${n} 道到重做` : '没有要加的'}</button></div></div>`;
+}
 function photoStrip(ps){
   if (!ps.length) return '';
   return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px">` + ps.map(p => `<div><img data-pid="${p.id}" data-act="photoview" data-v="${p.id}" alt="" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--surface2);display:block;cursor:pointer">
@@ -1309,14 +1351,14 @@ function vPhotoView(){
   const p = DB.photos.find(x => x.id === state.pview); if (!p) { state.pview = null; return ''; }
   return `<div class="wiz" style="background:#000"><div class="wiz-top"><div style="flex:1;color:#ddd">${esc(subjById(p.sid).name||'')} · ${PKIND.find(k=>k[0]===p.kind)[1]} · ${md(p.d)} · ${photoStatus(p)}</div><button class="wiz-x" data-act="pviewclose" aria-label="关闭">×</button></div>
     <div class="wiz-body" style="display:flex;align-items:center;justify-content:center"><img data-pid="${p.id}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>
-    <div class="wiz-foot"><button class="btn danger" data-act="photodel" data-v="${p.id}">删除这张</button><button class="btn" data-act="pviewclose">关闭</button></div></div>`;
+    <div class="wiz-foot"><button class="btn danger" data-act="photodel" data-v="${p.id}">删除这张</button>${p.kind === 'error' && aiReady() ? `<button class="btn primary" data-act="rgphoto" data-v="${p.id}">${photoDone(p) ? '再识别一次' : '用 AI 识别错题'}</button>` : ''}<button class="btn" data-act="pviewclose">关闭</button></div></div>`;
 }
 function vPhotoSheet(){
   const ps = state.photo, subs = orderedSubjects(state.date);
   return `<div class="wiz" role="dialog" aria-label="拍照"><div class="wiz-top"><div style="flex:1;font-weight:600">拍照记录 · ${md(state.date)}</div><button class="wiz-x" data-act="photoclose" aria-label="关闭">×</button></div><div class="wiz-body">
     <div class="wiz-q" style="font-size:22px;margin-top:6px">拍的是什么？</div><div class="big">` + PKIND.map(([k,n]) => `<button class="${ps.kind===k?'on':''}" data-act="pkind" data-v="${k}">${n}</button>`).join('') + `</div>
     <div class="wiz-q" style="font-size:22px;margin-top:22px">哪一科？</div><div class="row">` + subs.map(s => `<button class="chip ${ps.sid===s.id?'on':''}" style="min-height:42px;font-size:16px" data-act="psubj" data-v="${s.id}"><span class="dot" style="background:${s.color};margin-right:5px"></span>${esc(s.name)}</button>`).join('') + `</div>
-    <p class="small faint" style="margin-top:18px">错题照片：只拍做错的题，一张可以拍多道，字小就拍近一点。存好后，在和 Claude 的对话里说「识别错题」，识别结果会先给你确认，确认后题目自动进「重做」。</p></div>
+    <p class="small faint" style="margin-top:18px">${ps.kind === 'error' ? (aiReady() ? '错题照片：只拍做错的题，一张可以拍多道，字小就拍近一点，别拍到名字。拍完 AI 会自动认题、分好类，你确认后进「重做」。' : '错题照片：只拍做错的题，一张可以拍多道。在「家长 → 设置」填了智谱密钥，拍完就能自动识别成错题。') : '照片会存起来，开了同步会加密上传。'}</p></div>
     <div class="wiz-foot"><label class="btn primary" style="display:flex;align-items:center;justify-content:center;gap:8px;${ps.sid?'':'opacity:.45;pointer-events:none'}">${CAM} ${ps.sid ? '拍照 / 从相册选' : '先选科目'}<input type="file" accept="image/*" multiple id="photoin" style="display:none"></label></div></div>`;
 }
 
@@ -2727,6 +2769,16 @@ const ACT = {
   photoclose: () => { state.photo = null; render(); },
   pkind: el => { state.photo.kind = el.dataset.v; render(); },
   psubj: el => { state.photo.sid = el.dataset.v; render(); },
+  rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
+  rgclose: () => { if (state.precog && state.precog.list.some(x => x.keep) && !confirm('还没加入重做，确定关掉？（照片留着，之后点照片能再识别）')) return; state.precog = null; render(); },
+  rgretry: () => recogPhoto(state.precog.pid),
+  rgkeep: el => { const x = state.precog.list[+el.dataset.v]; x.keep = !x.keep; render(); },
+  rgtype: el => { const x = state.precog.list[+el.dataset.v]; if (x.type !== el.dataset.t) { x.type = el.dataset.t; x.sub = ''; } render(); },
+  rgsub: el => { const x = state.precog.list[+el.dataset.v]; x.sub = x.sub === el.dataset.s ? '' : el.dataset.s; render(); },
+  rgconf: el => { const x = state.precog.list[+el.dataset.v]; x.conf = x.conf === el.dataset.c ? null : el.dataset.c; render(); },
+  rgsave: () => { const R = state.precog, p = DB.photos.find(x => x.id === R.pid), d = p ? p.d : state.date; let n = 0;
+    for (const x of R.list) if (x.keep && x.stem.trim()) { DB.items.push({id: uid('i'), d, sid: R.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: x.conf, photoId: R.pid, src: '拍照识别', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); n++; }
+    touchDay(d); save(); state.precog = null; render(); toast(`加入了 ${n} 道，${BOXES[0]} 天后出现在「重做」`); },
   photoview: el => { state.pview = el.dataset.v; render(); },
   pviewclose: () => { state.pview = null; render(); },
   photodel: el => { if (!confirm('删除这张照片？（已上传到私有仓库的那份会留着）')) return; IDB.del('photo:' + el.dataset.v); delRec('photos', el.dataset.v); state.pview = null; save(); render(); },
@@ -2866,6 +2918,7 @@ document.addEventListener('click', e => { const el = e.target.closest('[data-act
 document.addEventListener('input', e => {
   const el = e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
+  if (k === 'rgstem') { if (state.precog) state.precog.list[+el.dataset.v].stem = v; return; }
   if (k === 'day') setDayField(state.date, f, v);
   else if (k === 'dayt') setDayField(today(), f, v);
   else if (k === 'rec') rec(state.date, el.dataset.s, true)[f] = v;
