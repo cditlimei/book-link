@@ -2660,11 +2660,27 @@ function vMe(part){
     <div class="row" style="margin-top:12px"><a class="small" href="?demo" style="color:var(--accent)">打开示例模式看看效果</a><span class="spacer"></span>${DEMO?'':'<button class="btn danger sm" data-act="wipe">清空本机数据</button>'}</div></div>`;
   return h + `</div></div>`;
 }
+async function aiSelfTest(){
+  const rows = state.aiTest = [];
+  const step = async (name, fn) => { const row = {name, st: '…'}; rows.push(row); render(); const t0 = Date.now();
+    try { row.msg = await fn(); row.st = 'ok'; } catch(e) { row.st = 'bad'; row.msg = e.message; } row.ms = Date.now() - t0; render(); };
+  await step('文字对话（AI 老师）', async () => { const t = await aiChat([{role: 'user', content: '只回复两个字：你好'}]); if (!t.trim()) throw new Error('返回是空的'); return '回复：' + t.trim().slice(0, 20); });
+  await step('看图识别（拍照错题、成绩单）', async () => {
+    const cv = document.createElement('canvas'); cv.width = 480; cv.height = 160; const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 480, 160); g.fillStyle = '#000'; g.font = 'bold 64px sans-serif'; g.fillText('37 + 48 = 85', 20, 105);
+    const t = await aiChat([{role: 'user', content: [{type: 'image_url', image_url: {url: cv.toDataURL('image/jpeg', 0.9)}}, {type: 'text', text: '图里写的算式是什么？只输出 JSON：{"text":"算式"}'}]}], {temperature: 0});
+    const j = parseJSONObj(t); if (!j) throw new Error('返回的不是 JSON：' + t.slice(0, 40)); if (!/37/.test(j.text) || !/85/.test(j.text)) throw new Error('没认对：' + j.text); return '认出：' + j.text; });
+  await step('出同类题', async () => { const t = await aiChat([{role: 'system', content: '你是初中数学老师。出一道和下面同类的题，只输出题目，不要答案。'}, {role: 'user', content: '原题：解方程 2(x-1)=3x+4'}], {temperature: 0.7}); if (!t.trim()) throw new Error('返回是空的'); return t.trim().slice(0, 40); });
+  rows.push({name: '语音识别（背诵检验）', st: asrPaused() ? 'bad' : 'skip', msg: asrPaused() ? '刚才余额不足，10 分钟内先用设备自带识别' : '按分钟收费，这里不自动测；背一遍古诗就知道'}); render();
+}
+function aiTestHTML(){
+  if (!state.aiTest) return '';
+  return `<div style="margin-top:10px">` + state.aiTest.map(r => `<div class="row" style="flex-wrap:nowrap;padding:5px 0;border-top:1px solid var(--line);align-items:flex-start"><span style="width:22px">${r.st === 'ok' ? '✅' : r.st === 'bad' ? '❌' : r.st === 'skip' ? '➖' : '⏳'}</span><div style="flex:1"><div>${esc(r.name)}${r.ms ? ` <span class="small faint">${(r.ms / 1000).toFixed(1)} 秒</span>` : ''}</div>${r.msg ? `<div class="small ${r.st === 'bad' ? '' : 'faint'}" style="${r.st === 'bad' ? 'color:var(--danger)' : ''}">${esc(r.msg)}</div>` : ''}</div></div>`).join('') + `</div>`;
+}
 function aiCard(){
   if (aiReady() && !state.aiEdit) return `<div class="card"><h3>AI 学习教练 <span class="pill good">已开启</span></h3>
     <p class="small muted" style="margin:0 0 8px">${(AI.model || 'glm-4.6v-flash') === 'glm-4.6v-flash' ? 'GLM-4.6V-Flash（免费）' : esc(AI.model)}${asrPaused() ? ' · 语音识别余额不足，暂时用设备自带识别' : ''}</p>
     <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [10, 15, 20, 30, 45, 60].map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分钟</button>`).join('') + `</div>
-    <div class="row" style="margin-top:10px"><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div></div>`;
+    <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="aitest">检查 AI 功能</a><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div>${aiTestHTML()}</div>`;
   return `<div class="card"><h3>AI 学习教练 · 语音识别 ${aiReady() ? '<span class="pill good">已开启</span>' : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">用智谱大模型：背诵检验时把录音转成文字，以及之后的 AI 辅导。密钥只存在这台设备上，不进备份文件。发给模型的只有学习内容，不含名字、学校、排名和你的情绪记录。</p>
     <label class="f">智谱 API 密钥</label><input type="password" id="ai-key" value="${esc(AI.key||'')}" placeholder="在 open.bigmodel.cn 的「API Keys」里新建" autocomplete="off">
@@ -2674,10 +2690,15 @@ function aiCard(){
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="aisave">保存并测试</button>${aiReady() ? '<button class="btn ghost danger" data-act="aioff">清除密钥</button>' : ''}</div>
     <details style="margin-top:10px"><summary class="small muted">怎么拿到密钥（约 3 分钟）</summary><ol class="guide"><li>打开 open.bigmodel.cn，用手机号注册并实名。</li><li>右上角头像 →「API Keys」→「添加新的 API Key」，复制。</li><li>粘贴到上面，点「保存并测试」。免费模型不花钱；语音识别按量计费，背一首诗约几分钱。</li></ol></details></div>`;
 }
-async function aiChat(messages, opts){
-  const r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key, 'Content-Type':'application/json'},
-    body: JSON.stringify(Object.assign({model: AI.model || 'glm-4.6v-flash', messages, stream:false}, opts || {}))});
-  if (!r.ok) { const t = await r.text(); throw new Error(r.status === 401 ? '密钥不对' : '模型返回 ' + r.status + ' ' + t.slice(0, 80)); }
+async function aiChat(messages, opts, tries){
+  tries = tries || 0; let r;
+  try { r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key, 'Content-Type':'application/json'},
+    body: JSON.stringify(Object.assign({model: AI.model || 'glm-4.6v-flash', messages, stream:false}, opts || {}))}); }
+  catch(e) { if (tries < 1) { await new Promise(res => setTimeout(res, 1500)); return aiChat(messages, opts, tries + 1); } throw new Error('连不上智谱，检查一下网络'); }
+  if (!r.ok) { const t = await r.text(); let code = '', why = ''; try { const j = JSON.parse(t); code = String((j.error && j.error.code) || ''); why = (j.error && j.error.message) || ''; } catch(e) {}
+    // 免费模型并发满了（429）或服务端临时出错（5xx）：等一会儿自动重试；欠费（1113）不重试
+    if ((r.status === 429 && code !== '1113' && !/余额|欠费/.test(why)) || r.status >= 500) { if (tries < 2) { await new Promise(res => setTimeout(res, [2000, 5000][tries])); return aiChat(messages, opts, tries + 1); } throw new Error('智谱现在太忙（' + r.status + '），过一两分钟再试'); }
+    throw new Error(r.status === 401 ? '密钥不对' : code === '1113' || /余额|欠费/.test(why) ? '智谱账户余额不足' : '模型返回 ' + r.status + ' ' + (why || t).slice(0, 80)); }
   const j = await r.json(); return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
 }
 /* 智谱语音识别只收 .wav / .mp3（接口文档原文，2026-09-26 她实测 m4a 返回 400）：录音先在本机解码、重采样成 16k 单声道 WAV */
@@ -2848,6 +2869,7 @@ const ACT = {
   varcheck: () => { state.variant.err = ''; varCheck(); },
   varclose: () => { state.variant = null; render(); },
   vardone: el => { const id = state.variant.iid; state.variant = null; redoItem(id, el.dataset.ok === '1'); },
+  aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; aiSelfTest(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
   rgclose: () => { if (state.precog && state.precog.list.some(x => x.keep) && !confirm('还没加入重做，确定关掉？（照片留着，之后点照片能再识别）')) return; state.precog = null; render(); },
   rgretry: () => recogPhoto(state.precog.pid),
