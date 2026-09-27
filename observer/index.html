@@ -303,7 +303,7 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 }
 
 /* 一步一步填：全屏、一次只问一件事、大按钮、点完自动下一步 */
-.wiz{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
+.wiz{position:fixed;left:0;right:0;top:var(--vvt,0px);height:var(--vvh,100%);z-index:60;background:var(--bg);display:flex;flex-direction:column}
 .wiz-top{display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) 16px 8px;max-width:680px;margin:0 auto;width:100%}
 .wiz-dots{display:flex;gap:4px;flex:1}
 .wiz-dots i{flex:1;height:6px;border-radius:3px;background:var(--surface2)}
@@ -3494,6 +3494,12 @@ document.addEventListener('change', e => {
   if (e.target.closest('[data-in="recmin"],[data-in="rectime"]')) render();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.wiz) { state.wiz = null; render(); } if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.id === 'tu-in') { e.preventDefault(); tutorSend(); } });
+/* iPad 键盘弹出时，全屏弹窗缩到键盘上方：Safari 不会因为键盘改变固定定位元素的高度，底部的输入框和按钮会被盖住 */
+(function(){ const vv = window.visualViewport; if (!vv) return; const root = document.documentElement;
+  const fit = () => { const kb = window.innerHeight - vv.height > 80;   // 高度差明显才当作键盘弹出
+    if (kb) { root.style.setProperty('--vvh', vv.height + 'px'); root.style.setProperty('--vvt', vv.offsetTop + 'px'); } else { root.style.removeProperty('--vvh'); root.style.removeProperty('--vvt'); }
+    if (kb) { const a = document.activeElement; if (a && a.closest && a.closest('.wiz') && a.scrollIntoView) setTimeout(() => a.scrollIntoView({block: 'nearest'}), 30); } };
+  vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); })();
 let lastToday = today();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; const t = today(); if (t === lastToday) return;
   if (state.date === lastToday) state.date = t; if (state.week === monOf(lastToday)) state.week = monOf(t); if (state.month === mKey(lastToday)) state.month = mKey(t);
