@@ -135,6 +135,7 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .tile .tn{font-weight:700;font-size:17px}
 .tile .ts{font-size:15px;color:var(--accent);font-weight:600}
 .tile .tu{font-size:12.5px;color:var(--ink3);margin-top:auto}
+.btn.primary-soft{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);font-weight:600}
 .sumk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
 .sk .v{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1}
 .sk .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:2px}
@@ -1041,6 +1042,9 @@ async function syncNow(manual, depth){
 }
 const isTyping = () => { const a = document.activeElement; return a && /INPUT|TEXTAREA/.test(a.tagName); };
 let pendingRender = false;
+let focusVal = null;
+document.addEventListener('focusin', e => { const el = e.target; focusVal = el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') ? el.value : null; });
+document.addEventListener('focusout', e => { const el = e.target; if (focusVal != null && el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') && el.value !== focusVal) { onDataIn({target: el}); flush(); toast('已保存 ✓'); } focusVal = null; });
 document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(() => { if (!isTyping()) render(); }, 50); } });
 function renderSyncState(){
   const el = $('#syncst'); if (!el) return;
@@ -1092,9 +1096,9 @@ function render(){
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.qp ? vQuick() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
-  document.body.style.overflow = (state.wiz || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
+  document.body.style.overflow = (state.wiz || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
   hydratePhotos();
 }
 
@@ -1147,7 +1151,7 @@ function vToday(){
 </div>
     ${!state.showWeek && isToday ? '</div>' : `<div class="wstrip">` + range(mon, addD(mon,6)).map(x => `<button data-act="goday" data-v="${x}" class="${dayHasData(x)?'rec':''} ${x===d?'sel':''} ${x>today()?'fut':''}" ${x>today()?'disabled':''}>${WD[P(x).getDay()]}<i>${P(x).getDate()}</i></button>`).join('') + `</div></div>`}`;
   if (!isToday && filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
-  const tools = `<div class="tools"><button class="btn sm ghost" data-act="voiceopen">${MIC.replace('<svg','<svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 说一句话记今天</button><button class="btn" style="flex:1" data-act="photoopen">${CAM} 拍照</button><button class="btn" style="flex:1" data-act="tuopen">问 AI 老师</button></div>`;
+  const tools = `<div class="tools"><button class="btn sm primary-soft" data-act="qpopen">＋ 记一个问题</button><button class="btn" style="flex:1" data-act="photoopen">${CAM} 拍照</button><button class="btn" style="flex:1" data-act="tuopen">问 AI 老师</button></div>`;
   if (!isToday) h += tools;
   if (isToday) { const pl = planFor(monOf(d)); if (pl && !pl.manual && pl.m && pl.m.kind !== 'total') h += `<div class="tip">这周的小调整：<b>${esc(pl.act)}</b></div>`; }
   if (isToday) {
@@ -1195,6 +1199,7 @@ function vToday(){
       <label class="f">④ 如果……我就……</label><input type="text" data-in="woop" data-f="p" value="${esc(wo.p||'')}" placeholder="比如：如果卡住了，我就先圈出来接着往下做"></details>`;
   }
   if (isToday && !dayHasData(d)) h += `<div class="card"><h3>今天休息</h3><p class="small muted" style="margin:0 0 8px">生病、出门、考完试放松……点一下，连续天数不会断。每周最多一天。</p>${restUsed(d) ? '<p class="small faint" style="margin:0">这周已经休息过一天了。</p>' : '<button class="btn sm" data-act="rest" data-v="1">今天休息</button>'}</div>`;
+  if (isToday) h += `<div class="card"><h3>说一句话记今天</h3><p class="small muted" style="margin:0 0 8px">不想一科一科点，就把今天的作业情况一口气说出来，app 会拆成各科记录。</p><button class="btn sm" data-act="voiceopen">${MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 说一句话记今天</button></div>`;
   more = h; h = h0; nMore = (more.match(/<h3/g) || []).length;
   h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
     <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
@@ -1208,7 +1213,7 @@ function vToday(){
   more += `<div class="card" id="askq"><h3>今晚只问一句 <span class="small faint">（家长）</span></h3>
     <div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div style="flex:1;font-family:var(--serif);font-size:17px">「${esc(q)}」</div><button class="btn sm ghost" data-act="nextq">换一句</button></div>
     <label class="f">孩子怎么回答的（可选，原话就好）</label>
-    <div class="withmic"><textarea id="t-ans" data-in="day" data-f="answer" placeholder="比如：第二题第三步，不确定用相遇还是追及">${esc(dd.answer||'')}</textarea>${micBtn('t-ans')}</div>
+    <div class="withmic"><textarea id="t-ans" data-in="day" data-f="answer" placeholder="比如：第二题第三步，不确定用相遇还是追及">${esc(dd.answer||'')}</textarea>${micBtn('t-ans')}</div><div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="savenow">保存</button></div>
     <p class="small faint" style="margin:8px 0 0">问「卡在哪一步」，不问「为什么又错」。只听，不批改。</p></div>`;
   const tp = DB.photos.filter(p => p.d === d);
   if (tp.length) h += `<div class="card"><div class="row"><h3 style="margin:0">${isToday ? '今天' : '这天'}的照片</h3><span class="spacer"></span><button class="btn sm" data-act="photoopen">${CAM} 再拍</button></div><div style="margin-top:10px">${photoStrip(tp)}</div></div>`;
@@ -1253,7 +1258,30 @@ function subjRow(d, s, r){
     h += `</div></div>`;
     h += `<label class="f">${esc(stuckQ(s.name))}</label><input type="text" data-in="rec" data-s="${s.id}" data-f="stuck" value="${esc(r.stuck||'')}" placeholder="孩子的原话">`;
   }
+  if (!r.none) h += `<div class="row" style="margin-top:12px"><button class="btn sm" data-act="qpopen" data-s="${s.id}">＋ 记一个问题</button><span class="spacer"></span><button class="btn sm primary" data-act="sdone" data-s="${s.id}">完成</button></div>`;
+  else h += `<div class="row" style="margin-top:12px"><span class="spacer"></span><button class="btn sm primary" data-act="sdone" data-s="${s.id}">完成</button></div>`;
   return h + `</div></div>`;
+}
+/* 记一个问题：孩子只管选科、说一句话，分类交给关键词 + AI 自动做 */
+function kwGuess(sid, t){ const kws = (KW[sid] || []).concat(KW['*'] || []); const hit = kws.find(([kw]) => new RegExp(kw).test(t)); return hit ? {type: hit[1], sub: hit[2] || ''} : {type: 'concept', sub: ''}; }
+function vQuick(){
+  const Q = state.qp, subs = orderedSubjects(state.date);
+  return `<div class="wiz" role="dialog" aria-label="记一个问题"><div class="wiz-top"><div style="flex:1;font-weight:600">记一个问题 · ${md(state.date)}</div><button class="wiz-x" data-act="qpclose" aria-label="关闭">×</button></div><div class="wiz-body">
+    <div class="wiz-q" style="font-size:21px;margin-top:4px">哪一科？</div><div class="row">` + subs.map(x => `<button class="chip ${Q.sid === x.id ? 'on' : ''}" style="min-height:44px;font-size:16px" data-act="qpsubj" data-v="${x.id}"><span class="dot" style="background:${x.color};margin-right:5px"></span>${esc(x.name)}</button>`).join('') + `</div>
+    <div class="wiz-q" style="font-size:21px;margin-top:20px">遇到什么问题？</div>
+    <div class="withmic"><textarea id="qp-text" class="wiz-in" style="min-height:110px" placeholder="说一句就行，比如：&#10;去括号后面的项忘了变号&#10;第 3 题不知道用哪个公式&#10;作文不知道怎么开头">${esc(Q.text || '')}</textarea>${micBtn('qp-text')}</div>
+    <button class="btn primary" style="width:100%;min-height:52px;font-size:18px;margin-top:12px" data-act="qpsave">保存</button>
+    <p class="small faint" style="margin-top:8px">不用选是计算还是概念问题，${aiReady() ? 'AI' : 'app'} 会自动归类。会进「重做」，隔几天再考一次。</p></div></div>`;
+}
+async function qpClassify(id){
+  const it = DB.items.find(x => x.id === id); if (!it || !aiReady()) return; const tx = taxOf(it.sid), sb = subjById(it.sid), u0 = it.u;
+  const cats = ET.map(t => `${t.k}=${typeNameS(it.sid, t.k)}` + (tx ? `（细分：${tx[t.k].subs.map(a => a[0] + '=' + a[1]).join('，')}）` : '')).join('\n');
+  try { const j = parseJSONObj(await aiChat([{role: 'system', content: `你是初中${sb.name}老师。学生用一句话说了自己遇到的问题，帮他归类。type 只能是 calc / concept / read，sub 用细分的英文 key，拿不准就空。只输出 JSON：{"type":"concept","sub":"","tag":"知识点，10 字内"}。\n${cats}`}, {role: 'user', content: it.stem}], {temperature: 0.1}));
+    const cur = DB.items.find(x => x.id === id); if (!j || !cur || cur.u !== u0) return;
+    if (['calc','concept','read'].includes(j.type)) cur.type = j.type;
+    const ok = tx && j.sub && tx[cur.type].subs.some(a => a[0] === j.sub); cur.sub = ok ? j.sub : cur.type === j.type ? cur.sub : '';
+    if (j.tag && !cur.tag) cur.tag = String(j.tag).slice(0, 20); cur.u = now(); save(); if (!isTyping()) render();
+  } catch(e) {}
 }
 /* ================= 拍照：本机压缩 → IndexedDB → 同步时加密上传私有仓库 photos/ ；识别在 Claude 对话里做 ================= */
 const CAM = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
@@ -2930,7 +2958,7 @@ function parentNotes(){
   const recent = DB.emotions.filter(e => e.date >= addD(today(), -3));
   if (recent.filter(e => +e.level >= 4).length >= 2) h += `<div class="tip">这几天你的情绪标记偏高。今晚建议：<b>只听孩子说卡点，不讲题</b>。</div>`;
   const t = today(), dd = dayObj(t) || {};
-  h += `<details class="card" ${dd.note ? 'open' : ''}><summary><h3 style="display:inline">今天的家长观察</h3> <span class="small faint">（可选）</span></summary><div class="withmic" style="margin-top:8px"><textarea id="t-note" data-in="dayt" data-f="note" placeholder="只写看到的事实，比如：21:10 开始数学，21:18 起身倒水">${esc(dd.note||'')}</textarea>${micBtn('t-note')}</div></details>`;
+  h += `<details class="card" ${dd.note ? 'open' : ''}><summary><h3 style="display:inline">今天的家长观察</h3> <span class="small faint">（可选）</span></summary><div class="withmic" style="margin-top:8px"><textarea id="t-note" data-in="dayt" data-f="note" placeholder="只写看到的事实，比如：21:10 开始数学，21:18 起身倒水">${esc(dd.note||'')}</textarea>${micBtn('t-note')}</div><div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="savenow">保存</button></div></details>`;
   return h;
 }
 function vMe(part){
@@ -3106,6 +3134,8 @@ const ACT = {
   wkshow: () => { state.showWeek = !state.showWeek; render(); },
   moretog: (el, e) => { e && e.preventDefault(); state.moreOpen = !state.moreOpen; render(); },
   scroll: el => { const t = document.getElementById(el.dataset.v); if (t) window.scrollTo({top: t.getBoundingClientRect().top + scrollY - 70, behavior:'smooth'}); },
+  savenow: () => { const a = document.activeElement; if (a && a.blur) a.blur(); save(); flush(); toast('已保存 ✓'); },
+  sdone: el => { state.openSubj = null; save(); flush(); render(); toast('已保存 ✓'); },
   sopen: el => { state.openSubj = state.openSubj === el.dataset.s ? null : el.dataset.s; render(); },
   mood: el => { const dd = dayObj(state.date) || {}; setDayField(state.date, 'mood', dd.mood === el.dataset.v ? '' : el.dataset.v); save(); render(); },
   nextq: () => { const dd = dayObj(state.date) || {}; const cur = dd.q || QUESTIONS[(P(state.date).getTime()/864e5|0) % QUESTIONS.length]; setDayField(state.date, 'q', QUESTIONS[(QUESTIONS.indexOf(cur)+1) % QUESTIONS.length]); save(); render(); },
@@ -3204,6 +3234,15 @@ const ACT = {
   peadd: el => { const k = el.dataset.v, it = peItem(peChoice()[k]), v = peParse(it, ($('#pe-in-' + k) || {}).value);
     if (v == null) return toast(it.unit === 'time' ? '按「分:秒」填，比如 4:20' : '填一个数字'); if (isNaN(v)) return toast('这个成绩看起来不对，再核对一下' + (it.unit === 'time' ? '（按「分:秒」填，比如 4:20）' : ''));
     DB.peRecs.push({id: uid('pe'), d: today(), item: it.id, v, u: now()}); save(); render(); toast(`${peFmt(it, v)} = ${peScore(it, v)} 分`); },
+  qpopen: el => { state.qp = {sid: (el && el.dataset.s) || state.openSubj || state._lastQp || null, text: ''}; render(); setTimeout(() => { const t = $('#qp-text'); if (t && state.qp.sid) t.focus(); }, 50); },
+  qpsubj: el => { state.qp.text = ($('#qp-text') || {}).value || state.qp.text; state.qp.sid = el.dataset.v; render(); },
+  qpclose: () => { const t = ($('#qp-text') || {}).value || ''; if (t.trim() && !confirm('还没保存，确定不要了？')) return; state.qp = null; render(); },
+  qpsave: () => { const Q = state.qp, t = (($('#qp-text') || {}).value || Q.text || '').trim();
+    if (!Q.sid) return toast('先选是哪一科'); if (!t) return toast('写一句遇到的问题，或者点话筒说');
+    const d = state.date, g = kwGuess(Q.sid, t), conf = /有把握|以为(是)?对|以为做对/.test(t) ? 'sure' : /不确定|犹豫|拿不准/.test(t) ? 'unsure' : /不会|不知道怎么/.test(t) ? 'no' : null;
+    const it = {id: uid('i'), d, sid: Q.sid, type: g.type, sub: g.sub || undefined, tag: '', stem: t.slice(0, 300), conf, src: '随手记', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()};
+    DB.items.push(it); const r = rec(d, Q.sid, true); if (!r.stuck) r.stuck = t.slice(0, 80); r.none = false; touchDay(d); save();
+    state._lastQp = Q.sid; state.qp = null; render(); toast('记下了 ✓' + (aiReady() ? ' AI 正在归类' : '')); qpClassify(it.id); },
   aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; if (!DB.settings.aiTested) { setSetting('aiTested', true); save(); } aiSelfTest(); },
   hintoff: el => { const o = Object.assign({}, DB.settings.hintOff || {}); o[el.dataset.v] = true; setSetting('hintOff', o); save(); render(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
@@ -3353,8 +3392,8 @@ function importData(txt){
   } catch(e) { toast('这不是有效的备份'); }
 }
 document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.stopPropagation(); if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault(); f(el, e); } });
-document.addEventListener('input', e => {
-  const el = e.target.closest('[data-in]'); if (!el) return;
+function onDataIn(e){
+  const el = e.target.closest && e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
   if (k === 'aimem') { const m = DB.aiMem[el.dataset.s]; if (m) { m.text = v; m.u = now(); save(); } return; }
   if (k === 'rgstem') { if (state.precog) state.precog.list[+el.dataset.v].stem = v; return; }
@@ -3373,7 +3412,10 @@ document.addEventListener('input', e => {
   else if (k === 'set') { setSetting(f, f === 'startYear' ? (+v || 2026) : v); }
   else if (k === 'sname') { const x = DB.settings.subjects.find(s => s.id === el.dataset.s); if (x && v.trim()) { x.name = v.trim(); x.u = now(); DB.settings.u = now(); } }
   save();
-});
+}
+document.addEventListener('input', onDataIn);
+document.addEventListener('compositionend', onDataIn);   // iPad 拼音选字确认后，Safari 有时不再发 input
+
 document.addEventListener('change', e => {
   if (e.target.id === 'tu-img' && e.target.files[0] && state.tutor) { const box = $('#tu-in'); if (box) state.tutor.draft = box.value; compressImage(e.target.files[0]).then(b => { const fr = new FileReader(); fr.onload = () => { state.tutor.img = fr.result; render(); }; fr.readAsDataURL(b); }); return; }
   if (e.target.id === 'ex-photo' && e.target.files.length) { examFromPhotos([...e.target.files]); return; }
