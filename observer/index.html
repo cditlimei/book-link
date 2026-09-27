@@ -482,14 +482,14 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, peRecs:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
   for (const k of ['days','weeks','months','del','extReview','words','recite']) x[k] = x[k] || {};
-  for (const k of ['items','exams','emotions','photos','aiS']) x[k] = x[k] || [];
+  for (const k of ['items','exams','emotions','photos','aiS','peRecs']) x[k] = x[k] || [];
   x.aiMem = x.aiMem || {};
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
   const subs = x.settings.subjects || [];
@@ -990,7 +990,7 @@ function mergeDB(L, R){
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
   }
-  for (const k of ['items','exams','emotions','photos','aiS']) {
+  for (const k of ['items','exams','emotions','photos','aiS','peRecs']) {
     const a = new Map((L[k]||[]).map(x=>[x.id,x])), b = new Map((R[k]||[]).map(x=>[x.id,x]));
     const out = [];
     for (const id of new Set([...a.keys(), ...b.keys()])) {
@@ -2328,7 +2328,7 @@ const LIB = {words:null, recite:null, books:null, tried:false};
 async function loadLib(){
   if (LIB.tried) return; LIB.tried = true;
   const get = f => fetch('data/' + f, {cache:'no-cache'}).then(r => r.ok ? r.json() : null).catch(() => null);
-  [LIB.words, LIB.recite, LIB.books] = await Promise.all([get('words.json'), get('recite.json'), get('books.json')]);
+  [LIB.words, LIB.recite, LIB.books, LIB.pe] = await Promise.all([get('words.json'), get('recite.json'), get('books.json'), get('pe.json')]);
   LIB.done = true;
   if (state.tab === 'learn' || (state.tab === 'today' && !state.wiz && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)))) render();
 }
@@ -2380,9 +2380,48 @@ function reviewRecite(id, ok){ const r = DB.recite[id]; if (!r) return; const t 
   r.u = now(); save(); }
 const reciteDue = () => (LIB.recite ? LIB.recite.items : []).filter(x => { const r = DB.recite[x.id]; return r && r.due && r.due <= today(); });
 
+/* 体育：深圳中考 50 分 = 现场 36（三类各选一项，百分制平均 × 0.36）+ 过程性评价 14。评分表来自市教育局 2026 年文件（data/pe.json） */
+const PE_DEF = {1: 'run1000', 2: 'rope1', 3: 'basket'};
+const peItem = id => ((LIB.pe || {}).items || []).find(x => x.id === id);
+const peChoice = () => Object.assign({}, PE_DEF, DB.settings.pe || {});
+function peScore(it, v){
+  const R = it.rows; if (v == null || isNaN(v)) return null;
+  const better = (a, b) => it.low ? a <= b : a >= b;
+  if (better(v, R[0][1])) return 100;
+  for (let i = 0; i < R.length - 1; i++) { const [sa, a] = R[i], [, b] = R[i + 1];
+    if (better(v, b)) return a === b ? sa : Math.round((sa - (v - a) / (b - a) * 5) * 100) / 100; }
+  return 0;
+}
+const peFmt = (it, v) => it.unit === 'time' ? `${Math.floor(v / 60)}:${String(Math.round((v % 60) * 10) / 10).padStart(2, '0')}` : `${v} ${it.unit}`;
+function peParse(it, t){ t = String(t || '').trim().replace('：', ':').replace(/[′']/, ':').replace(/[″"]/, '');
+  if (it.unit === 'time') { const m = t.match(/^(\d+):(\d{1,2}(?:\.\d+)?)$/); if (m) return +m[1] * 60 + +m[2]; const n = +t; return n > 0 ? n : null; }
+  const n = +t; return n > 0 ? n : null; }
+const peLast = id => DB.peRecs.filter(r => r.item === id).sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : b.u - a.u)[0];
+function peEstimate(){ const ch = peChoice(), sc = [1, 2, 3].map(k => { const it = peItem(ch[k]), r = it && peLast(it.id); return r ? peScore(it, r.v) : null; });
+  return sc.every(x => x != null) ? {field: Math.round(sc.reduce((a, b) => a + b, 0) / 3 * 0.36 * 10) / 10, sc} : {field: null, sc}; }
+function peNext(it, v){ const s = peScore(it, v); if (s >= 100) return '已经满分'; const R = it.rows, tgt = R.find(r => r[0] > s && r[0] <= Math.ceil((s + 0.01) / 5) * 5) || R[0];
+  const need = Math.abs(tgt[1] - v); return `到 ${tgt[0]} 分还差 ${it.unit === 'time' ? Math.round(need) + ' 秒' : (Math.round(need * 100) / 100) + ' ' + it.unit}${tgt[0] < 100 ? `，满分要 ${peFmt(it, R[0][1])}` : ''}`; }
+function vPE(){
+  const P = LIB.pe; let h = `<div class="row">${backBtn('home', '学习')}<h2 style="margin:0">体育 · 中考 50 分</h2></div>`;
+  if (!P) return h + `<div class="card empty">评分表还没加载到，联网后再打开。</div>`;
+  const ch = peChoice(), est = peEstimate();
+  h += `<div class="card"><div class="sumk" style="grid-template-columns:1fr 1fr"><div class="sk"><div class="v">${est.field != null ? est.field : '–'}<small>/36</small></div><div class="l">现场考试（按最近一次成绩估）</div></div><div class="sk"><div class="v">14<small>分</small></div><div class="l">过程性评价，学校按平时评</div></div></div>
+    <p class="small faint" style="margin:10px 0 0">三类各考一项，每项百分制，三项平均 × 0.36。${esc(P.note.split('。').slice(-2).join('。'))}</p></div>`;
+  for (const k of [1, 2, 3]) {
+    const it = peItem(ch[k]), opts = P.items.filter(x => x.cls === k), recs = DB.peRecs.filter(r => r.item === it.id).sort((a, b) => a.d < b.d ? 1 : -1), last = recs[0];
+    h += `<div class="card"><div class="row"><h3 style="margin:0">${['', '一', '二', '三'][k]}类 · ${esc(it.name)}</h3><span class="spacer"></span>${last ? `<b style="font-family:var(--mono);font-size:22px">${peScore(it, last.v)}</b><span class="small faint">分</span>` : ''}</div>
+      <details style="margin:4px 0 8px"><summary class="small faint">换项目（${opts.length} 选 1）</summary><div class="row" style="margin-top:6px">` + opts.map(o => `<button class="chip ${o.id === it.id ? 'on' : ''}" data-act="pepick" data-v="${k}" data-s="${o.id}">${esc(o.name)}</button>`).join('') + `</div></details>
+      ${last ? `<p style="margin:0 0 4px">最近：<b>${peFmt(it, last.v)}</b>（${md(last.d)}）· ${peNext(it, last.v)}</p>` : `<p class="small muted" style="margin:0 0 4px">还没测过。满分标准：${peFmt(it, it.rows[0][1])}；60 分：${peFmt(it, it.rows[8][1])}。</p>`}
+      <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input type="text" id="pe-in-${k}" inputmode="${it.unit === 'time' ? 'text' : 'decimal'}" placeholder="${it.unit === 'time' ? '今天测的，比如 4:20' : '今天测的' + it.unit}" style="flex:1;min-width:0"><button class="btn primary" data-act="peadd" data-v="${k}">记下</button></div>
+      ${recs.length > 1 ? `<div class="small" style="margin-top:8px">` + recs.slice(0, 6).map(r => `<span class="pill" style="margin:2px 4px 2px 0">${mdShort(r.d)} ${peFmt(it, r.v)} · ${peScore(it, r.v)}分</span>`).join('') + `</div>` : ''}</div>`;
+  }
+  h += `<p class="small faint">评分表：<a href="${P.url}" style="color:var(--accent)">${esc(P.source)}</a>，男生标准。</p>`;
+  return h;
+}
 function vLearn(){
   loadLib();
   const L = state.learn || (state.learn = {view:'home', book:null, unit:null});
+  if (L.view === 'pe') return vPE();
   if (L.view === 'words') return vWords();
   if (L.view === 'card') return vWordCard();
   if (L.view === 'recite') return vRecite();
@@ -2406,6 +2445,8 @@ function vLearn(){
     (RI.length ? `<p style="margin:8px 0">本学期 ${cur.length} 篇：会背 ${cur.filter(x=>['can','dict'].includes(rState(x.id))).length} · 默写全对 ${cur.filter(x=>rState(x.id)==='dict').length}</p>
       <div class="bar" style="height:10px;margin-bottom:10px">${cur.length ? `<i style="width:${pct(cur.filter(x=>rState(x.id)==='dict').length,cur.length)}%;background:var(--good)"></i><i style="width:${pct(cur.filter(x=>rState(x.id)==='can').length,cur.length)}%;background:var(--accent)"></i><i style="width:${pct(cur.filter(x=>rState(x.id)==='learning').length,cur.length)}%;background:var(--amber)"></i>` : ''}</div>
       <div class="row"><button class="btn primary" data-act="lv" data-v="recite">背诵篇目 / 打印</button></div>` : `<p class="small muted">${LIB.tried && !LIB.recite ? '背诵数据还没放进来。' : '加载中…'}</p>`) + `</div>`;
+  { const est = LIB.pe ? peEstimate() : {field: null}, n = DB.peRecs.length;
+    h += `<div class="card"><div class="row"><h3 style="margin:0">体育 · 中考 50 分</h3><span class="spacer"></span><span class="small faint">${est.field != null ? '现场估 ' + est.field + ' / 36' : n ? '记了 ' + n + ' 次' : '三项各测一次就能估分'}</span></div><p class="small muted" style="margin:6px 0 10px">1000 米、跳绳、篮球……测完记一下，看离满分还差多少。</p><button class="btn" data-act="lv" data-v="pe">打开</button></div>`; }
   h += `<div class="card"><div class="row"><h3 style="margin:0">数学练习</h3><span class="spacer"></span><span class="small faint">北师大七上</span></div><p class="small muted" style="margin:6px 0 10px">每天一站补漏，10 分钟左右。</p><a class="btn primary" href="../math/">去做数学练习</a></div>`;
   // 教材与中考
   h += `<div class="card"><div class="row"><h3 style="margin:0">教材与中考</h3></div><p class="small muted" style="margin:6px 0 10px">各科用什么版本、官方免费电子课本在哪看、深圳中考考什么。</p><button class="btn" data-act="lv" data-v="books">打开</button></div>`;
@@ -2897,6 +2938,10 @@ const ACT = {
   varclose: () => { state.variant = null; render(); },
   vardone: el => { const id = state.variant.iid; state.variant = null; redoItem(id, el.dataset.ok === '1'); },
   memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
+  pepick: el => { const c = Object.assign({}, DB.settings.pe || {}); c[el.dataset.v] = el.dataset.s; setSetting('pe', c); save(); render(); },
+  peadd: el => { const k = el.dataset.v, it = peItem(peChoice()[k]), v = peParse(it, ($('#pe-in-' + k) || {}).value);
+    if (v == null) return toast(it.unit === 'time' ? '按「分:秒」填，比如 4:20' : '填一个数字');
+    DB.peRecs.push({id: uid('pe'), d: today(), item: it.id, v, u: now()}); save(); render(); toast(`${peFmt(it, v)} = ${peScore(it, v)} 分`); },
   aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; aiSelfTest(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
   rgclose: () => { if (state.precog && state.precog.list.some(x => x.keep) && !confirm('还没加入重做，确定关掉？（照片留着，之后点照片能再识别）')) return; state.precog = null; render(); },
