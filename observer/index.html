@@ -128,10 +128,10 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .wstrip .rec i{background:var(--accent-bg);border-color:var(--accent-bg);color:var(--accent)}
 .wstrip .sel i{border-color:var(--ink);border-width:2px}
 .wstrip .fut{opacity:.35}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
-.kpi .v{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1}
-.kpi .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:2px}
-.kpi .l{font-size:13px;color:var(--ink2);margin-top:4px}
+.sumk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.sk .v{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1}
+.sk .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:2px}
+.sk .l{font-size:13px;color:var(--ink2);margin-top:4px}
 .todo{padding:4px 0}
 .todo-r{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:none;border:0;border-top:1px solid var(--line);text-align:left;font-size:17px;color:var(--ink)}
 .todo-r:first-child{border-top:0}
@@ -143,7 +143,7 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .todo-r .s{font-size:14px;color:var(--ink2)}
 .todo-r .chev{color:var(--ink3);font-size:20px}
 .tools{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:-4px 0 14px}
-.tools .btn{color:var(--ink2)}
+.tools .btn{color:var(--ink2);flex:1;background:var(--surface);border:1px solid var(--line)}
 .streak{font-size:14px;color:var(--amber);background:var(--amber-bg);border-radius:20px;padding:4px 10px;white-space:nowrap}
 .streak b{font-family:var(--mono);font-size:16px}
 details.more{margin:6px 0 14px}
@@ -575,7 +575,7 @@ function queued(it){
 const queueWhy = it => it.q === true ? '手动加入' : it.ext ? '拍照错题本' : it.conf === 'sure' ? '有把握却错了' : it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2 ? '同一个问题出现了 ' + REP[it.sid + '|' + it.sub] + ' 次' : '';
 const itemsOn = (d, sid) => (IDX[d] || []).filter(it => !sid || it.sid === sid);
 const isRest = d => !!(DB.days[d] && DB.days[d].rest);
-function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0; while (ok(d) && n < 2000) { if (!isRest(d)) n++; d = addD(d, -1); } return n; }
+function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0; while (ok(d) && n < 2000) { if (dayHasData(d)) n++; d = addD(d, -1); } return n; }
 const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x));
 function dayHasData(d){
   if (itemsOn(d).length) return true;
@@ -1079,7 +1079,10 @@ function render(){
   if (state.tab === 'review') { state.tab = 'me'; state.pv = 'review'; }
   const v = {today:vToday, errors:vErrors, learn:vLearn, me:vParent}[state.tab] || vToday;
   $('#main').innerHTML = v();
+  const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
+  state._wk = wk;
   $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
   document.body.style.overflow = (state.wiz || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
   hydratePhotos();
 }
@@ -1129,7 +1132,7 @@ function vToday(){
   let h = isToday ? banners() : '';
   h += `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="day" data-v="-1">‹</button>
     <div style="flex:1;min-width:0"><div class="d">${md(d)}</div><div class="w">${wd(d)}${isToday?' · 今天':' · <a href="#" data-act="day" data-v="0" style="color:var(--accent)">回到今天</a>'}</div></div>
-    ${isToday && streak() > 1 ? `<span class="streak">连续 <b>${streak()}</b> 天</span>` : ''}<button class="navbtn" data-act="wkshow" aria-label="看这周">${state.showWeek ? '▴' : '▾'}</button><button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
+    ${isToday && streak() > 1 ? `<span class="streak">连续 <b>${streak()}</b> 天</span>` : ''}${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${state.showWeek ? '▴' : '▾'}</button>` : ''}<button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
 </div>
     ${!state.showWeek && isToday ? '</div>' : `<div class="wstrip">` + range(mon, addD(mon,6)).map(x => `<button data-act="goday" data-v="${x}" class="${dayHasData(x)?'rec':''} ${x===d?'sel':''} ${x>today()?'fut':''}" ${x>today()?'disabled':''}>${WD[P(x).getDay()]}<i>${P(x).getDate()}</i></button>`).join('') + `</div></div>`}`;
   if (!isToday && filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
@@ -1144,14 +1147,15 @@ function vToday(){
     const wLeft = Math.max(0, Math.min(wq, WORDS_PER_NIGHT - wDone));
     const learning = LIB.recite ? LIB.recite.items.filter(x => rState(x.id) === 'learning').length : 0;
     const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today())), rDue = reciteDue().length;
-    const allDone = filled >= subs.length && subs.length && left === 0 && LIB.words && wLeft === 0 && !rDue;
-    if (late && !allDone) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
+    const wordsOk = LIB.done && (!LIB.words || wLeft === 0);
+    const allDone = filled >= subs.length && left === 0 && wordsOk && !rDue;
+    if (late && !allDone && !isRest(d)) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
     if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[filled ? '自己把 ' + filled + ' 科作业记清楚了' : '', dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
-    if (isRest(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
+    if (isRest(d) && !dayHasData(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
     const T = [
-      {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length && subs.length > 0, act: filled < subs.length ? 'wizstart' : 'scroll', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
+      {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length, act: filled < subs.length ? 'wizstart' : 'scroll', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
       {t: '重做错题', s: left ? left + ' 道' : dn ? '做完了' : '今天没有', done: left === 0, act: 'tab', v: 'errors', go: `重做 ${left} 道错题`},
-      {t: '背单词', s: !LIB.words ? '…' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有', done: !!LIB.words && wLeft === 0, act: 'golearn', v: 'card', go: `背 ${wLeft} 个单词`},
+      {t: '背单词', s: !LIB.done ? '…' : !LIB.words ? '词库没加载到' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有', done: wordsOk, opt: !LIB.done, act: 'golearn', v: 'card', go: `背 ${wLeft} 个单词`},
       {t: '背古诗', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
@@ -1196,7 +1200,7 @@ function vToday(){
     <p class="small faint" style="margin:8px 0 0">问「卡在哪一步」，不问「为什么又错」。只听，不批改。</p></div>`;
   const tp = DB.photos.filter(p => p.d === d);
   if (tp.length) h += `<div class="card"><div class="row"><h3 style="margin:0">${isToday ? '今天' : '这天'}的照片</h3><span class="spacer"></span><button class="btn sm" data-act="photoopen">${CAM} 再拍</button></div><div style="margin-top:10px">${photoStrip(tp)}</div></div>`;
-  if (more) h += `<details class="more" ${state.moreOpen || !isToday ? 'open' : ''}><summary data-act="moretog">还可以做的 ${nMore} 件事（可选）</summary>${more}</details>`;
+  if (more) h += `<details class="more" ${state.moreOpen ? 'open' : ''}><summary data-act="moretog">还可以做的 ${nMore} 件事（可选）</summary>${more}</details>`;
   if (isToday) h += installBanner();
   return h;
 }
@@ -1544,7 +1548,9 @@ function wizStart(){
   // 默认勾上：最近两周同一个星期几有作业的科目；没有历史就全勾
   const had = sid => [7, 14].some(k => { const r = ((DB.days[addD(state.date, -k)] || {}).subj || {})[sid]; return r && !r.none && r.min > 0; });
   const anyHist = subs.some(s => had(s.id));
-  state.wiz = {list: subs.map(s => s.id), i, step: fresh ? 'pick' : 'min', pick: fresh ? subs.filter(s => !anyHist || had(s.id)).map(s => s.id) : null}; render();
+  let list = subs.map(s => s.id);
+  if (!fresh) { const act = list.filter(x => !((dd.subj[x] || {}).none)); if (act.length) list = act; i = Math.max(0, list.findIndex(x => !filledRec(dd.subj[x]))); }
+  state.wiz = {list, all: subs.map(s => s.id), i, step: fresh ? 'pick' : 'min', canPick: true, pick: fresh ? subs.filter(s => !anyHist || had(s.id)).map(s => s.id) : null}; render();
 }
 function wizGo(step){ const w = state.wiz; if (step === 'next') { w.i++; w.step = 'min'; } else w.step = step; render(); const b = $('.wiz-body'); if (b) b.scrollTop = 0; }
 function vWiz(){
@@ -1552,7 +1558,7 @@ function vWiz(){
   const dots = w.list.map((sid, k) => `<i class="${k === w.i ? 'cur' : filledRec(dd.subj[sid]) ? 'done' : ''}"></i>`).join('');
   let h = `<div class="wiz" role="dialog" aria-label="一步一步填"><div class="wiz-top"><div class="wiz-dots">${dots}</div><span class="small faint num">${Math.min(w.i+1, w.list.length)}/${w.list.length}</span><button class="wiz-x" data-act="wizclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
   if (w.i >= w.list.length) {
-    h += `<div class="wiz-q" style="margin-top:24px">填完了 ✓</div>`;
+    h += `<div class="wiz-q" style="margin-top:24px">${w.list.length ? '填完了 ✓' : '今天都没作业 ✓'}</div>`;
     for (const sid of w.list) { const s = subjById(sid), r = dd.subj[sid], n = itemsOn(d, sid).length;
       h += `<div class="wiz-sum"><span class="dot" style="background:${s.color}"></span><b style="width:3em">${esc(s.name)}</b><span class="muted">${!r ? '没填' : r.none ? '没作业' : [r.min+' 分钟', n ? '记了 ' + n + ' 道题' : ''].filter(Boolean).join(' · ')}</span></div>`; }
     const left = redoLeftToday();
@@ -1566,7 +1572,7 @@ function vWiz(){
   }
   const sid = w.list[w.i], s = subjById(sid), r = (dd.subj[sid]) || {}, its = itemsOn(d, sid);
   h += `<div class="wiz-subj"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</div>`;
-  let foot = w.i > 0 || w.step !== 'min' ? `<button class="btn ghost" data-act="wizback">‹ 上一步</button>` : '';
+  let foot = w.i > 0 || w.step !== 'min' || w.canPick ? `<button class="btn ghost" data-act="wizback">‹ 上一步</button>` : '';
   if (w.step === 'min') {
     h += `<div class="wiz-q">${esc(s.name)}今天做了多久？</div><div class="big">`;
     if (r.min && !WIZ_MIN.includes(r.min)) h += `<button class="wide on" data-act="wizmin" data-v="keep">${r.min} 分钟<small>计时器 / 已填</small></button>`;
@@ -1646,8 +1652,8 @@ function vRedo(){
   }
   const quota = Math.max(0, RQ - dn);
   const shown = state.showAllDue ? due : due.slice(0, quota);
-  if (!due.length) h += `<div class="card empty">${dn ? `今天重做了 ${dn} 道，够了。` : AI.length ? '今天没有到期的题。' : '还没有错题。在「今天」页点开科目，点「+ 计算错误」这类按钮记一道。'}</div>`;
-  else if (!shown.length) h += `<div class="card empty">今天做了 ${dn} 道，够了，明天再来。<div style="margin-top:8px"><button class="btn sm ghost" data-act="alldue">还想多做几道</button></div></div>`;
+  if (!due.length) h += `<div class="card empty">${dn ? `今天重做了 ${dn} 道，够了。` : AI.length ? '今天没有到期的题。' : '还没有错题。在「今天」页点开科目，点「+ 计算错误」这类按钮记一道。'}<div style="margin-top:12px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button></div></div>`;
+  else if (!shown.length) h += `<div class="card empty">今天做了 ${dn} 道，够了，明天再来。<div style="margin-top:8px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button> <button class="btn sm ghost" data-act="alldue">还想多做几道</button></div></div>`;
   for (const it of shown) {
     const s = subjById(it.sid); const r = DB.days[it.d] && DB.days[it.d].subj[it.sid];
     if (it.ext) { h += extCard(it, s); continue; }
@@ -1854,8 +1860,8 @@ function vWeek(){
   const ac = autoWeekCard(mon, end), rest = h.slice(heroLen).replace(ac, '');
   const avg = st.dayMin.length ? Math.round(sum(st.dayMin) / st.dayMin.length) : 0, pavg = prev.dayMin.length ? Math.round(sum(prev.dayMin) / prev.dayMin.length) : 0;
   const fs = state._fs || [], top = fs.find(f => f.k === 'signal') || fs.find(f => f.k === 'good');
-  const num = (v, u, sub) => `<div class="kpi"><div class="v">${v}<small>${u}</small></div><div class="l">${sub}</div></div>`;
-  h = h.slice(0, heroLen) + `<div class="card"><div class="kpis">${num(st.recDays + '/' + passed, '天', '有记录')}${num(avg || '–', avg ? '分' : '', '每天作业' + (avg && pavg ? `（上周 ${pavg}）` : ''))}${num(st.redoN ? Math.round(st.redoOk / st.redoN * 100) : '–', st.redoN ? '%' : '', '重做做对' + (st.redoN ? `（${st.redoOk}/${st.redoN}）` : ''))}</div>
+  const num = (v, u, sub) => `<div class="sk"><div class="v">${v}<small>${u}</small></div><div class="l">${sub}</div></div>`;
+  h = h.slice(0, heroLen) + `<div class="card"><div class="sumk">${num(st.recDays + '/' + passed, '天', '有记录')}${num(avg || '–', avg ? '分' : '', '每天作业' + (avg && pavg ? `（上周 ${pavg}）` : ''))}${num(st.redoN ? Math.round(st.redoOk / st.redoN * 100) : '–', st.redoN ? '%' : '', '重做做对' + (st.redoN ? `（${st.redoOk}/${st.redoN}）` : ''))}</div>
     ${top ? `<div style="margin-top:12px"><div class="small faint" style="margin-bottom:4px">这周最值得看的一条</div>${findingsHTML([top])}</div>` : ''}
     <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="printweek">打印这周周报 / 存 PDF</a><a href="#" class="small" style="color:var(--accent)" data-act="copyweek">复制文字小结</a></div></div>` + ac +
     `<details class="more" ${state.wkMore ? 'open' : ''}><summary data-act="wkmore">看这周的详细记录（节奏、模式、卡点、调整记录）</summary>${rest}</details>`;
@@ -1946,8 +1952,8 @@ function vMonth(){
   let h = `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="mo" data-v="-1">‹</button><div style="flex:1"><div class="d" style="font-size:20px">${+m.slice(0,4)} 年 ${+m.slice(5)} 月</div><div class="w">记录 ${st.recDays}/${n} 天 · ${esc(termOf(from, DB.settings.startYear).label)}</div></div>
     <button class="navbtn" data-act="mo" data-v="1" ${addM(m,1) > mKey(t) ? 'disabled':''}>›</button></div></div>`;
   { const avg = st.dayMin.length ? Math.round(sum(st.dayMin) / st.dayMin.length) : 0, pavg = prev.dayMin.length ? Math.round(sum(prev.dayMin) / prev.dayMin.length) : 0;
-    const num = (v, u, sub) => `<div class="kpi"><div class="v">${v}<small>${u}</small></div><div class="l">${sub}</div></div>`;
-    h += `<div class="card"><div class="kpis">${num(st.recDays + '/' + n, '天', '有记录')}${num(avg || '–', avg ? '分' : '', '每天作业' + (avg && pavg ? `（上月 ${pavg}）` : ''))}${num(st.errN, '道', '错题' + (prev.errN ? `（上月 ${prev.errN}）` : ''))}</div>
+    const num = (v, u, sub) => `<div class="sk"><div class="v">${v}<small>${u}</small></div><div class="l">${sub}</div></div>`;
+    h += `<div class="card"><div class="sumk">${num(st.recDays + '/' + n, '天', '有记录')}${num(avg || '–', avg ? '分' : '', '每天作业' + (avg && pavg ? `（上月 ${pavg}）` : ''))}${num(st.errN, '道', '错题' + (prev.errN ? `（上月 ${prev.errN}）` : ''))}</div>
       <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="printmonth">打印这月月报 / 存 PDF</a></div></div>`; }
   const monHead = h.length;
   { const pa = (DB.months[pm] || {}).auto, ca = (DB.months[m] || {}).auto;
@@ -2180,7 +2186,8 @@ async function loadLib(){
   if (LIB.tried) return; LIB.tried = true;
   const get = f => fetch('data/' + f, {cache:'no-cache'}).then(r => r.ok ? r.json() : null).catch(() => null);
   [LIB.words, LIB.recite, LIB.books] = await Promise.all([get('words.json'), get('recite.json'), get('books.json')]);
-  if (state.tab === 'learn') render();
+  LIB.done = true;
+  if (state.tab === 'learn' || (state.tab === 'today' && !state.wiz && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)))) render();
 }
 const WBOX = [1, 3, 7, 21];                   // 单词复习间隔：记得越牢隔得越久，第 4 次记住 = 掌握
 const NEW_PER_DAY = 10;
@@ -2286,7 +2293,7 @@ function vWords(){
 function vWordCard(){
   const L = state.learn, q = wordQueue();
   let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">背单词</h2><span class="spacer"></span><span class="small faint">还剩 ${q.length}</span></div>`;
-  if (!q.length) return h + `<div class="card empty" style="margin-top:12px">今天的单词背完了。明天再来，隔天复习才记得牢。</div>`;
+  if (!q.length) return h + `<div class="card empty" style="margin-top:12px">今天的单词背完了。明天再来，隔天复习才记得牢。<div style="margin-top:12px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button></div></div>`;
   const w = q[0], s = wState(w), flip = L.flip;
   h += `<div class="card" style="margin-top:12px;text-align:center;padding:28px 16px">
     <div class="small faint">${s ? '复习 · 第 ' + ((s.hist||[]).length + 1) + ' 次' : '新词'}${w.unit ? ' · ' + esc(w.unit) : ''}</div>
@@ -2735,11 +2742,13 @@ const ACT = {
   wizclose: () => { state.wiz = null; render(); },
   wizredo: () => { state.wiz = null; setTab('errors'); },
   wizmin: el => { const w = state.wiz, sid = w.list[w.i], v = el.dataset.v, r = rec(state.date, sid, true);
-    if (v === 'none') { r.none = true; r.min = 0; r.intr = 'none'; save(); return wizGo('next'); }
-    r.none = false; if (v !== 'keep') r.min = +v; if (!r.intr) r.intr = 'none'; save(); render(); },
+    if (v === 'none') { const its = itemsOn(state.date, sid).filter(it => !(it.hist||[]).length);
+      if (its.length && !confirm(`这科记了 ${its.length} 道错题，标成「没作业」会把它们删掉，确定吗？`)) return;
+      its.forEach(it => delRec('items', it.id)); r.none = true; r.min = 0; r.intr = 'none'; save(); return wizGo('next'); }
+    r.none = false; if (v !== 'keep') r.min = +v; if (!r.intr) r.intr = 'none'; save(); state._wk = ''; render(); },
   wizpick: el => { const w = state.wiz, v = el.dataset.v; w.pick = w.pick.includes(v) ? w.pick.filter(x => x !== v) : w.pick.concat([v]); render(); },
   wizpicked: () => { const w = state.wiz;
-    for (const sid of w.list) if (!w.pick.includes(sid)) { const r = rec(state.date, sid, true); r.none = true; r.min = 0; r.intr = 'none'; }
+    for (const sid of w.list) { const r = rec(state.date, sid, true); if (!w.pick.includes(sid)) { r.none = true; r.min = 0; r.intr = 'none'; } else if (r.none) r.none = false; }
     w.list = w.list.filter(x => w.pick.includes(x)); w.i = 0; w.step = 'min'; w.pick = null; save(); render(); },
   wizadj: el => { const r = rec(state.date, state.wiz.list[state.wiz.i], true); r.none = false; r.min = Math.max(0, (r.min||0) + +el.dataset.v); save(); render(); },
   wizintr: el => { const r = rec(state.date, state.wiz.list[state.wiz.i], true); r.intr = el.dataset.v; save(); if (state.wiz.step === 'intr') wizGo('err'); else render(); },
@@ -2758,7 +2767,7 @@ const ACT = {
     wizGo('next'); },
   wizconf: el => { const v = el.dataset.v; if (v !== 'skip') for (const it of itemsOn(state.date, state.wiz.list[state.wiz.i])) if (!it.conf) { it.conf = v; it.u = now(); } save(); wizGo('stuck'); },
   wizback: () => { const w = state.wiz, order = ['min','intr','err','sub','conf','stuck'], its = itemsOn(state.date, w.list[w.i]);
-    if (w.step === 'min') { if (w.i > 0) { w.i--; w.step = 'min'; } }
+    if (w.step === 'min') { if (w.i > 0) { w.i--; w.step = 'min'; } else if (w.canPick) { w.pick = w.list.slice(); w.list = w.all || w.list; w.step = 'pick'; } }
     else if (w.step === 'sub' || (w.step === 'conf' && !(its.length && taxOf(w.list[w.i]))) || (w.step === 'stuck' && !its.length)) w.step = 'min';
     else { let k = order.indexOf(w.step) - 1; if (order[k] === 'conf' && !its.length) k--; if (order[k] === 'sub' && !(its.length && taxOf(w.list[w.i]))) k--; w.step = order[k]; }
     render(); },
@@ -2820,10 +2829,10 @@ const ACT = {
   setpin: () => { const v = $('#newpin').value.trim(); if (v && !/^\d{4}$/.test(v)) return toast('请输入 4 位数字'); setSetting('pin', v); save(); toast(v ? '密码已设置' : '密码已取消'); render(); },
   copylink: () => { const u = location.origin + location.pathname; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('链接已复制')).catch(() => prompt('复制这个链接', u)); },
   hideinstall: () => { lsSet('observer:hideInstall', true); render(); },
-  syncsave: () => { state.syncEdit = false;
+  syncsave: () => {
     const repo = $('#sy-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/+$/,''), token = $('#sy-token').value.trim(), pass = $('#sy-pass').value;
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return toast('仓库格式：用户名/仓库名'); if (!token) return toast('请填访问令牌'); if (pass.length < 10) return toast('口令至少 10 位');
-    SYNC = Object.assign(SYNC, {repo, token, pass, err:''}); saveSync(); syncNow(true).then(render);
+    state.syncEdit = false; SYNC = Object.assign(SYNC, {repo, token, pass, err:''}); saveSync(); syncNow(true).then(render);
   },
   usesetup: () => { const cfg = parseSetupCode($('#sy-code').value); if (!cfg) return toast('配置码不对，要以 OBS1. 开头'); applySetup(cfg); },
   copysetup: () => { const code = makeSetupCode(); (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => toast('配置码已复制')).catch(() => prompt('复制这段配置码', code)); },
