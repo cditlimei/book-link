@@ -482,14 +482,14 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, peRecs:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, peRecs:[], speakRecs:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
   for (const k of ['days','weeks','months','del','extReview','words','recite']) x[k] = x[k] || {};
-  for (const k of ['items','exams','emotions','photos','aiS','peRecs']) x[k] = x[k] || [];
+  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs']) x[k] = x[k] || [];
   x.aiMem = x.aiMem || {};
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
   const subs = x.settings.subjects || [];
@@ -990,7 +990,7 @@ function mergeDB(L, R){
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
   }
-  for (const k of ['items','exams','emotions','photos','aiS','peRecs']) {
+  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs']) {
     const a = new Map((L[k]||[]).map(x=>[x.id,x])), b = new Map((R[k]||[]).map(x=>[x.id,x]));
     const out = [];
     for (const id of new Set([...a.keys(), ...b.keys()])) {
@@ -2328,7 +2328,7 @@ const LIB = {words:null, recite:null, books:null, tried:false};
 async function loadLib(){
   if (LIB.tried) return; LIB.tried = true;
   const get = f => fetch('data/' + f, {cache:'no-cache'}).then(r => r.ok ? r.json() : null).catch(() => null);
-  [LIB.words, LIB.recite, LIB.books, LIB.pe] = await Promise.all([get('words.json'), get('recite.json'), get('books.json'), get('pe.json')]);
+  [LIB.words, LIB.recite, LIB.books, LIB.pe, LIB.speak] = await Promise.all([get('words.json'), get('recite.json'), get('books.json'), get('pe.json'), get('speak.json')]);
   LIB.done = true;
   if (state.tab === 'learn' || (state.tab === 'today' && !state.wiz && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)))) render();
 }
@@ -2418,10 +2418,83 @@ function vPE(){
   h += `<p class="small faint">评分表：<a href="${P.url}" style="color:var(--accent)">${esc(P.source)}</a>，男生标准。</p>`;
   return h;
 }
+/* 英语听说 · 模仿朗读：听标准示范 → 看着原文朗读（≤50 秒）→ 识别后逐词对照，标出漏读 / 读错的词 */
+const enWords = t => (String(t).toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) || []);
+function alignWords(text, said){
+  const A = enWords(text), B = enWords(said), n = A.length, m = B.length;
+  const dp = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) dp[i][j] = A[i-1] === B[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  const ok = new Set(); let i = n, j = m;
+  while (i > 0 && j > 0) { if (A[i-1] === B[j-1]) { ok.add(i-1); i--; j--; } else if (dp[i-1][j] >= dp[i][j-1]) i--; else j--; }
+  return {score: n ? ok.size / n : 0, ok, total: n, got: ok.size};
+}
+function markedEn(text, ok){ let k = -1; return esc(text).replace(/[A-Za-z]+(?:&#39;[A-Za-z]+|'[A-Za-z]+)?/g, w => { k++; return ok.has(k) ? w : `<span style="background:var(--amber-bg);color:var(--amber);border-bottom:2px solid var(--amber)">${w}</span>`; }); }
+let SREC = null;
+async function spStart(){
+  const S = state.sp; S.said = ''; S.err = ''; S.res = null;
+  try { window.__enAudio && window.__enAudio.pause(); } catch(e) {}
+  if (aiReady() && !asrPaused() && window.MediaRecorder && navigator.mediaDevices) {
+    try { const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+      const type = ['audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+      SREC = {stream, blobs: [], on: true, t0: Date.now()};
+      const next = () => { if (!SREC || !SREC.on) return; const mr = new MediaRecorder(stream, type ? {mimeType: type} : undefined); SREC.mr = mr; const parts = [];
+        mr.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
+        mr.onstop = () => { if (parts.length) SREC.blobs.push(new Blob(parts, {type: mr.mimeType || type})); if (SREC.on) next(); else if (SREC.done) SREC.done(); };
+        mr.start(); SREC.cut = setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 25000); };
+      next(); S.phase = 'rec'; S.t0 = Date.now(); spTick(); render(); return;
+    } catch(e) { S.err = '没拿到麦克风权限'; }
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { S.phase = 'ready'; S.err = (S.err ? S.err + '。' : '') + '这台设备不能语音识别。在「家长 → 设置」填智谱密钥后再试。'; render(); return; }
+  const sr = new SR(); sr.lang = 'en-US'; sr.continuous = true; sr.interimResults = false;
+  SREC = {sr, on: true, t0: Date.now()}; sr.onresult = e => { for (let k = e.resultIndex; k < e.results.length; k++) if (e.results[k].isFinal) S.said += ' ' + e.results[k][0].transcript; };
+  sr.onerror = e => { if (/not-allowed|service-not-allowed|network|audio-capture|language-not-supported/.test(e.error)) { S.err = '浏览器不给用语音识别。在「家长 → 设置」填智谱密钥后再试。'; S.phase = 'ready'; SREC = null; render(); } };
+  sr.onend = () => { if (SREC && SREC.on) { try { sr.start(); } catch(e) {} } };
+  sr.start(); S.phase = 'rec'; S.t0 = Date.now(); spTick(); render();
+}
+function spTick(){ clearInterval(window.__spT); window.__spT = setInterval(() => { const S = state.sp; if (!S || S.phase !== 'rec') return clearInterval(window.__spT); const left = 50 - Math.floor((Date.now() - S.t0) / 1000); const el = $('#sp-left'); if (el) el.textContent = Math.max(0, left); if (left <= 0) spStop(); }, 500); }
+async function spStop(){
+  const S = state.sp; if (!SREC) return; SREC.on = false; S.sec = Math.round((Date.now() - S.t0) / 1000); S.phase = 'busy'; render();
+  try {
+    if (SREC.sr) { SREC.sr.stop(); await new Promise(r => setTimeout(r, 800)); }
+    else { clearTimeout(SREC.cut); await new Promise(res => { SREC.done = res; if (SREC.mr && SREC.mr.state === 'recording') SREC.mr.stop(); else res(); }); SREC.stream.getTracks().forEach(t => t.stop());
+      let txt = ''; for (const b of SREC.blobs) txt += ' ' + await aiASR(b); S.said = txt; }
+  } catch(e) { S.err = e.noMoney ? '智谱语音识别余额不足（0.06 元/分钟）。先用设备自带识别，或者去智谱充值。' : '识别失败：' + e.message; if (e.noMoney) { AI.asrOff = Date.now(); saveAI(); } }
+  SREC = null;
+  if (!enWords(S.said).length) { S.phase = 'ready'; if (!S.err) S.err = '没识别到声音，靠近一点再读一遍。'; render(); return; }
+  const x = LIB.speak.items.find(i => i.id === S.id); S.res = alignWords(x.text, S.said); S.phase = 'result';
+  DB.speakRecs.push({id: uid('sp'), d: today(), pid: x.id, acc: Math.round(S.res.score * 100), sec: S.sec, u: now()}); save(); render();
+}
+function vSpeak(){
+  const P = LIB.speak, L = state.learn;
+  let h = `<div class="row">${backBtn(L.sp ? 'speak' : 'home', L.sp ? '篇目' : '学习')}<h2 style="margin:0">英语 · 模仿朗读</h2></div>`;
+  if (!P) return h + `<div class="card empty">短文还没加载到，联网后再打开。</div>`;
+  const best = id => Math.max(-1, ...DB.speakRecs.filter(r => r.pid === id).map(r => r.acc));
+  if (!L.sp) {
+    h += `<p class="sub">深圳中考英语听说考试（25 分，人机对话）的第一题：先听一段录音，准备后看着原文朗读，50 秒内读完。每天读一篇，重点是读准、读顺、不漏词。</p>`;
+    for (const x of P.items) { const b = best(x.id); h += `<button class="card" style="display:block;width:100%;text-align:left" data-act="spopen" data-v="${x.id}"><div class="row"><b>${esc(x.title)}</b><span class="spacer"></span><span class="small ${b >= 95 ? '' : 'faint'}" style="${b >= 95 ? 'color:var(--good)' : ''}">${b >= 0 ? '最好 ' + b + '%' : x.words + ' 词'}</span></div></button>`; }
+    return h + `<p class="small faint">${esc(P.note)}</p>`;
+  }
+  const x = P.items.find(i => i.id === L.sp), S = state.sp && state.sp.id === x.id ? state.sp : (state.sp = {id: x.id, phase: 'ready'});
+  h += `<div class="card"><div class="row"><h3 style="margin:0">${esc(x.title)}</h3><span class="spacer"></span><span class="small faint">${x.words} 词</span></div>
+    <div style="font-family:Georgia,serif;font-size:19px;line-height:1.8;margin:10px 0">${S.phase === 'result' ? markedEn(x.text, S.res.ok) : esc(x.text)}</div>
+    <div class="row"><button class="btn sm" data-act="spplay">${SPK} 听示范</button></div></div>`;
+  if (S.phase === 'rec') h += `<div class="card" style="text-align:center"><div class="mic rec" style="margin:6px auto;width:90px;height:90px;border-radius:50%;background:var(--danger);display:flex;align-items:center;justify-content:center">${MIC.replace('<svg','<svg style="width:40px;height:40px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…还剩 <b id="sp-left">50</b> 秒</div><button class="btn primary" style="margin-top:10px" data-act="spstop">读完了</button></div>`;
+  else if (S.phase === 'busy') h += `<div class="card empty">正在对照原文…</div>`;
+  else if (S.phase === 'result') { const p = Math.round(S.res.score * 100);
+    h += `<div class="card" style="text-align:center"><div style="font-family:var(--mono);font-size:40px;font-weight:700;color:${p >= 95 ? 'var(--good)' : 'var(--amber)'}">${p}%</div><div class="muted">读对 ${S.res.got}/${S.res.total} 个词 · 用了 ${S.sec} 秒${S.sec > 50 ? '（考试只给 50 秒）' : ''}</div><p class="small faint" style="margin:8px 0 0">标黄的是没识别到的词：可能漏读了，也可能发音不清。先听示范里这几个词怎么读，再读一遍。</p>
+      <details style="text-align:left;margin-top:8px"><summary class="small faint">识别到的内容</summary><p class="small muted">${esc(S.said)}</p></details><div class="row" style="justify-content:center;margin-top:10px"><button class="btn primary" data-act="spstart">再读一遍</button></div></div>`; }
+  else h += `<div class="card" style="text-align:center"><p class="muted" style="margin:0 0 10px">先听一遍示范，再看着原文读。</p><button class="btn primary" style="min-height:56px;font-size:18px;padding:0 26px" data-act="spstart">${MIC.replace('<svg','<svg style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-4px"')} 开始朗读</button><p class="small faint" style="margin-top:8px">${aiReady() && !asrPaused() ? '用智谱语音识别（0.06 元/分钟，读一篇约 3 分钱）' : '用设备自带的英语识别'}</p></div>`;
+  if (S.err) h += `<div class="signal">${esc(S.err)}</div>`;
+  const hist = DB.speakRecs.filter(r => r.pid === x.id).slice(-6).reverse();
+  if (hist.length) h += `<div class="small" style="margin-top:4px">` + hist.map(r => `<span class="pill" style="margin:2px 4px 2px 0">${mdShort(r.d)} ${r.acc}% · ${r.sec} 秒</span>`).join('') + `</div>`;
+  return h;
+}
 function vLearn(){
   loadLib();
   const L = state.learn || (state.learn = {view:'home', book:null, unit:null});
   if (L.view === 'pe') return vPE();
+  if (L.view === 'speak') return vSpeak();
   if (L.view === 'words') return vWords();
   if (L.view === 'card') return vWordCard();
   if (L.view === 'recite') return vRecite();
@@ -2445,6 +2518,8 @@ function vLearn(){
     (RI.length ? `<p style="margin:8px 0">本学期 ${cur.length} 篇：会背 ${cur.filter(x=>['can','dict'].includes(rState(x.id))).length} · 默写全对 ${cur.filter(x=>rState(x.id)==='dict').length}</p>
       <div class="bar" style="height:10px;margin-bottom:10px">${cur.length ? `<i style="width:${pct(cur.filter(x=>rState(x.id)==='dict').length,cur.length)}%;background:var(--good)"></i><i style="width:${pct(cur.filter(x=>rState(x.id)==='can').length,cur.length)}%;background:var(--accent)"></i><i style="width:${pct(cur.filter(x=>rState(x.id)==='learning').length,cur.length)}%;background:var(--amber)"></i>` : ''}</div>
       <div class="row"><button class="btn primary" data-act="lv" data-v="recite">背诵篇目 / 打印</button></div>` : `<p class="small muted">${LIB.tried && !LIB.recite ? '背诵数据还没放进来。' : '加载中…'}</p>`) + `</div>`;
+  { const rs = DB.speakRecs, last = rs[rs.length - 1];
+    h += `<div class="card"><div class="row"><h3 style="margin:0">英语听说 · 模仿朗读</h3><span class="spacer"></span><span class="small faint">${last ? '最近 ' + last.acc + '%' : '中考听说 25 分'}</span></div><p class="small muted" style="margin:6px 0 10px">听示范、看着原文读，读完标出漏读的词。每天一篇，2 分钟。</p><button class="btn" data-act="lv" data-v="speak">打开</button></div>`; }
   { const est = LIB.pe ? peEstimate() : {field: null}, n = DB.peRecs.length;
     h += `<div class="card"><div class="row"><h3 style="margin:0">体育 · 中考 50 分</h3><span class="spacer"></span><span class="small faint">${est.field != null ? '现场估 ' + est.field + ' / 36' : n ? '记了 ' + n + ' 次' : '三项各测一次就能估分'}</span></div><p class="small muted" style="margin:6px 0 10px">1000 米、跳绳、篮球……测完记一下，看离满分还差多少。</p><button class="btn" data-act="lv" data-v="pe">打开</button></div>`; }
   h += `<div class="card"><div class="row"><h3 style="margin:0">数学练习</h3><span class="spacer"></span><span class="small faint">北师大七上</span></div><p class="small muted" style="margin:6px 0 10px">每天一站补漏，10 分钟左右。</p><a class="btn primary" href="../math/">去做数学练习</a></div>`;
@@ -2900,7 +2975,7 @@ const ACT = {
   golearn: el => { state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.view = el.dataset.v; state.learn.flip = false; try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
   toggleq: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.q = !queued(it); it.u = now(); save(); render(); },
   pv: el => { state.pv = el.dataset.v; state.examEdit = null; render(); window.scrollTo(0,0); },
-  lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; render(); window.scrollTo(0,0); },
+  lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { state.learn.sp = null; state.sp = null; } render(); window.scrollTo(0,0); },
   wbook: el => { state.learn.book = el.dataset.v; state.learn.unit = null; render(); },
   wunit: el => { state.learn.unit = el.dataset.v || null; render(); },
   say: el => speak(el.dataset.v, 'en-US'),
@@ -2938,6 +3013,10 @@ const ACT = {
   varclose: () => { state.variant = null; render(); },
   vardone: el => { const id = state.variant.iid; state.variant = null; redoItem(id, el.dataset.ok === '1'); },
   memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
+  spopen: el => { state.learn.sp = el.dataset.v; state.sp = null; render(); window.scrollTo(0,0); },
+  spplay: () => { const x = LIB.speak.items.find(i => i.id === state.learn.sp); const a = window.__enAudio || (window.__enAudio = new Audio()); if (!a.paused) { a.pause(); return; } a.src = x.audio; a.play().catch(() => speak(x.text, 'en-US')); },
+  spstart: () => { state.sp = {id: state.learn.sp, phase: 'ready'}; spStart(); },
+  spstop: () => spStop(),
   pepick: el => { const c = Object.assign({}, DB.settings.pe || {}); c[el.dataset.v] = el.dataset.s; setSetting('pe', c); save(); render(); },
   peadd: el => { const k = el.dataset.v, it = peItem(peChoice()[k]), v = peParse(it, ($('#pe-in-' + k) || {}).value);
     if (v == null) return toast(it.unit === 'time' ? '按「分:秒」填，比如 4:20' : '填一个数字');

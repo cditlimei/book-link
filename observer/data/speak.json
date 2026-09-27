@@ -1,0 +1,62 @@
+{
+"title": "模仿朗读练习（原创短文，55–70 词）",
+"note": "题型参照深圳中考英语听说考试「模仿朗读」：先听录音，准备后朗读。短文为本应用原创。",
+"items": [
+{
+"id": "r01",
+"title": "My School Day",
+"text": "I get up at half past six every morning. After breakfast, I ride my bike to school with my best friend Tom. Our first class is usually English, and I really enjoy it because our teacher tells interesting stories. At noon we have lunch in the dining hall. After school, I often play basketball before I go home.",
+"words": 58,
+"audio": "audio/en/r01.mp3"
+},
+{
+"id": "r02",
+"title": "A Weekend Trip",
+"text": "Last Saturday, my family went to Dameisha Beach. The weather was sunny and warm, so there were lots of people there. My little sister built a sandcastle while my father and I swam in the sea. In the afternoon we had a picnic under a big tree. It was a tiring but happy day, and I hope we can go again soon.",
+"words": 62,
+"audio": "audio/en/r02.mp3"
+},
+{
+"id": "r03",
+"title": "Keeping Healthy",
+"text": "It is important for students to stay healthy. First, we should eat more fruit and vegetables and drink enough water every day. Second, we need to exercise for at least one hour, such as running or skipping rope. Also, going to bed early helps us feel full of energy the next day. Good habits make a big difference.",
+"words": 58,
+"audio": "audio/en/r03.mp3"
+},
+{
+"id": "r04",
+"title": "My Favourite Hobby",
+"text": "My favourite hobby is reading. When I was eight, my mother gave me a book about space, and since then I have loved science books. Now I read for thirty minutes before bed every night. Reading helps me learn new words and understand the world better. Sometimes I share interesting stories with my classmates, and they enjoy them too.",
+"words": 59,
+"audio": "audio/en/r04.mp3"
+},
+{
+"id": "r05",
+"title": "Saving Water",
+"text": "Water is very important to all of us, but many people waste it without thinking. We can save water in simple ways. For example, turn off the tap while you brush your teeth, and take shorter showers. We can also use the water from washing vegetables to water plants. If everyone does a little, we can protect this precious resource.",
+"words": 60,
+"audio": "audio/en/r05.mp3"
+},
+{
+"id": "r06",
+"title": "A Helpful Friend",
+"text": "Last month I was ill and missed a week of school. I was worried because I could not keep up with my lessons. Luckily, my friend Lily came to my home every afternoon. She brought me her notes and helped me with my maths homework. Thanks to her, I caught up quickly. A true friend is always there when you need help.",
+"words": 62,
+"audio": "audio/en/r06.mp3"
+},
+{
+"id": "r07",
+"title": "The School Sports Day",
+"text": "Our school held its sports day last Friday. All the students were excited. I took part in the one thousand metre race. At first I ran too fast and felt tired, but my classmates kept cheering for me. In the end, I finished in fourth place. Although I did not win a prize, I learned that never giving up is the most important thing.",
+"words": 64,
+"audio": "audio/en/r07.mp3"
+},
+{
+"id": "r08",
+"title": "Learning to Cook",
+"text": "This summer I decided to learn how to cook. My grandmother taught me to make tomato and egg noodles. At first, I cut the tomatoes too big and added too much salt. However, I kept trying and practised every weekend. Now my family says my noodles are delicious. Cooking is not easy, but it is a useful skill for everyone.",
+"words": 60,
+"audio": "audio/en/r08.mp3"
+}
+]
+}

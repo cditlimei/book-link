@@ -6,3 +6,6 @@
 
 ## pe.json
 深圳市教育局《2026年深圳市初中学业水平考试体育与健康科目考试项目规则和评分标准》评分表（男生部分），政府公开文件，程序解析自官方 PDF：https://szeb.sz.gov.cn/home/xxgk/flzy/wjtz/content/post_12214618.html
+
+## speak.json 与 audio/en/
+模仿朗读短文为本应用原创；示范音频由 edge-tts（en-US-JennyNeural）生成。
