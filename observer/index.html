@@ -482,7 +482,7 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
@@ -490,6 +490,7 @@ function migrate(x){
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
   for (const k of ['days','weeks','months','del','extReview','words','recite']) x[k] = x[k] || {};
   for (const k of ['items','exams','emotions','photos','aiS']) x[k] = x[k] || [];
+  x.aiMem = x.aiMem || {};
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
   const subs = x.settings.subjects || [];
   for (const s of subs) { const d = DEF_SUBJ.find(a=>a[0]===s.id);
@@ -980,8 +981,8 @@ function mergeDB(L, R){
   M.del = Object.assign({}, Ld);
   for (const id in Rd) if ((Rd[id]||0) > (M.del[id]||0)) { M.del[id] = Rd[id]; rN = true; }
   for (const id in Ld) if (!Rd[id]) lN = true;
-  for (const k of ['days','weeks','months','extReview','words','recite']) {
-    const a = L[k]||{}, b = R[k]||{};
+  for (const k of ['days','weeks','months','extReview','words','recite','aiMem']) {
+    const a = L[k]||{}, b = R[k]||{}; M[k] = M[k] || {};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
       if (x && y) { const m = k === 'days' ? mergeDay(x, y) : mergeRec(x, y); M[k][key] = m.v; lN = lN || m.l; rN = rN || m.r; continue; }
@@ -1572,8 +1573,11 @@ function learnerProfile(sid){
   let n = 0, ok = 0; for (const it of allItems()) if (it.sid === sid) for (const h of (it.hist || [])) if (h.d >= from14) { n++; if (h.ok) ok++; }
   if (n) L.push(`近两周这科错题重做 ${n} 次，做对 ${ok} 次。`);
   const pl = planFor(monOf(t)); if (pl && !pl.manual && pl.m && pl.m.kind !== 'total') L.push('这周在试的学习调整：' + pl.act);
-  const past = (DB.aiS || []).filter(z => z.sid === sid).slice(-6).map(z => `${z.d}：${z.summary}`);
-  if (past.length) L.push('以前几次辅导的记录（接着这些往下帮他）：\n' + past.join('\n'));
+  let vn = 0, vok = 0; for (const it of allItems()) if (it.sid === sid) for (const h of (it.vh || [])) if (h.d >= from14) { vn++; if (h.ok) vok++; }
+  if (vn) L.push(`近两周这科做同类题 ${vn} 道，做对 ${vok} 道。`);
+  const mem = (DB.aiMem || {})[sid]; if (mem && mem.text) L.push('这个学生这科的学习档案（长期记忆，接着这些往下帮他）：\n' + mem.text);
+  const past = (DB.aiS || []).filter(z => z.sid === sid).slice(mem && mem.text ? -3 : -6).map(z => `${z.d}：${z.summary}`);
+  if (past.length) L.push('最近几次辅导的记录：\n' + past.join('\n'));
   return L.join('\n');
 }
 function tutorMinutesToday(){ return (DB.days[today()] || {}).aiMin || 0; }
@@ -1612,8 +1616,31 @@ async function tutorEnd(){
     const rec_ = {id: uid('ai'), d: today(), sid: T.sid, summary: String(j.summary || '').slice(0, 80), type: ['calc','concept','read'].includes(j.type) ? j.type : '', sub: j.sub || '', tag: String(j.tag || '').slice(0, 12), u: now()};
     DB.aiS = (DB.aiS || []).concat([rec_]); save();
     T.result = Object.assign({mistake: !!j.mistake}, rec_);
+    if (T.sid) updateMem(T.sid, T.msgs.filter(m => !m.err).slice(-10).map(m => (m.role === 'user' ? '学生：' : '老师：') + String(m.content || (m.img ? '（发了一张题目照片）' : '')).slice(0, 200)).join('\n'), rec_.summary);
   } catch(e) { T.result = {summary: '（这次没能生成摘要）', mistake: false}; }
   T.busy = false; render();
+}
+/* 学习档案：每科一份长期记忆，每次辅导后由 AI 合并更新，控制在 300 字内；家长能看、能改、能清空 */
+async function updateMem(sid, dialog, summary){
+  const old = ((DB.aiMem || {})[sid] || {}).text || '', sb = subjById(sid);
+  try {
+    const t = (await aiChat([{role: 'system', content: `你在维护一个七年级学生${sb.name}科的学习档案，给以后辅导他的老师看。把「旧档案」和「这次辅导」合并成新档案。
+固定四段，每段 1 到 3 条，每条一句话，总共不超过 300 字：
+【已经会了】（这次或以前确认掌握的，旧的里面被证明又不会的要移走）
+【反复卡住】（出现两次以上的卡点优先，写具体到哪一步）
+【对他有效的讲法】（什么样的提示、例子让他想通了）
+【下次重点】（下次辅导先检查什么）
+只写学习相关的事实，不写姓名、学校、排名，不用负面评价词。只输出档案正文。`},
+      {role: 'user', content: `旧档案：\n${old || '（还没有）'}\n\n这次辅导（${today()}）摘要：${summary}\n对话节选：\n${dialog}`}], {temperature: 0.3})).trim();
+    if (t.length > 20) { DB.aiMem = DB.aiMem || {}; const o = DB.aiMem[sid] || {}; DB.aiMem[sid] = {text: t.slice(0, 600), n: (o.n || 0) + 1, d: today(), u: now()}; save(); }
+  } catch(e) {}
+}
+function memCard(){
+  const ks = Object.keys(DB.aiMem || {}).filter(k => (DB.aiMem[k] || {}).text);
+  if (!ks.length) return `<p class="small faint" style="margin:10px 0 0">AI 学习档案：孩子用 AI 老师辅导过以后，每科会自动整理一份「已经会了 / 反复卡住 / 有效的讲法 / 下次重点」，以后辅导都接着它往下帮。</p>`;
+  return `<details style="margin-top:10px"><summary class="small" style="color:var(--accent)">AI 学习档案（${ks.length} 科，AI 老师记住的他）</summary>` + ks.map(k => { const m = DB.aiMem[k];
+    return `<div style="margin-top:10px"><div class="row"><b>${esc(subjById(k).name)}</b><span class="small faint">辅导 ${m.n || 1} 次后整理 · ${md(m.d || today())}</span><span class="spacer"></span><a href="#" class="small faint" data-act="memclear" data-v="${k}">清空</a></div>
+      <textarea data-in="aimem" data-s="${k}" style="min-height:120px;font-size:14px;margin-top:4px">${esc(m.text)}</textarea></div>`; }).join('') + `<p class="small faint" style="margin:6px 0 0">不对的地方直接改，AI 下次辅导就按改过的来。</p></details>`;
 }
 function vTutor(){
   const T = state.tutor, subs = subjects(today());
@@ -2680,7 +2707,7 @@ function aiCard(){
   if (aiReady() && !state.aiEdit) return `<div class="card"><h3>AI 学习教练 <span class="pill good">已开启</span></h3>
     <p class="small muted" style="margin:0 0 8px">${(AI.model || 'glm-4.6v-flash') === 'glm-4.6v-flash' ? 'GLM-4.6V-Flash（免费）' : esc(AI.model)}${asrPaused() ? ' · 语音识别余额不足，暂时用设备自带识别' : ''}</p>
     <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [10, 15, 20, 30, 45, 60].map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分钟</button>`).join('') + `</div>
-    <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="aitest">检查 AI 功能</a><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div>${aiTestHTML()}</div>`;
+    <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="aitest">检查 AI 功能</a><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div>${aiTestHTML()}${memCard()}</div>`;
   return `<div class="card"><h3>AI 学习教练 · 语音识别 ${aiReady() ? '<span class="pill good">已开启</span>' : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">用智谱大模型：背诵检验时把录音转成文字，以及之后的 AI 辅导。密钥只存在这台设备上，不进备份文件。发给模型的只有学习内容，不含名字、学校、排名和你的情绪记录。</p>
     <label class="f">智谱 API 密钥</label><input type="password" id="ai-key" value="${esc(AI.key||'')}" placeholder="在 open.bigmodel.cn 的「API Keys」里新建" autocomplete="off">
@@ -2869,6 +2896,7 @@ const ACT = {
   varcheck: () => { state.variant.err = ''; varCheck(); },
   varclose: () => { state.variant = null; render(); },
   vardone: el => { const id = state.variant.iid; state.variant = null; redoItem(id, el.dataset.ok === '1'); },
+  memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
   aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; aiSelfTest(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
   rgclose: () => { if (state.precog && state.precog.list.some(x => x.keep) && !confirm('还没加入重做，确定关掉？（照片留着，之后点照片能再识别）')) return; state.precog = null; render(); },
@@ -3019,6 +3047,7 @@ document.addEventListener('click', e => { const el = e.target.closest('[data-act
 document.addEventListener('input', e => {
   const el = e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
+  if (k === 'aimem') { const m = DB.aiMem[el.dataset.s]; if (m) { m.text = v; m.u = now(); save(); } return; }
   if (k === 'rgstem') { if (state.precog) state.precog.list[+el.dataset.v].stem = v; return; }
   if (k === 'day') setDayField(state.date, f, v);
   else if (k === 'dayt') setDayField(today(), f, v);
