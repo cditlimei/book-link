@@ -296,6 +296,11 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 .big button.on{border-color:var(--accent);background:var(--accent-bg);color:var(--accent)}
 .big button.wide{grid-column:1/-1;min-height:56px;font-size:18px}
 .big button.soft{color:var(--ink2);font-weight:500}
+.wiz-lab{font-weight:600;margin:18px 0 8px;font-size:15px}
+.wiz-lab .faint{font-weight:400;font-size:13px}
+.seg.wide{display:flex;width:100%}
+.seg.wide button{flex:1;min-height:44px;font-size:14px;padding:4px}
+.cnt.sm{padding:6px 12px;margin-bottom:6px}
 .cnt{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
 .cnt .nm{flex:1;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
 .cnt button{width:54px;height:54px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface3);font-size:28px;line-height:1;color:var(--ink)}
@@ -1523,7 +1528,11 @@ const WIZ_MIN = [10,15,20,30,40,45,60,75,90];
 function wizStart(){
   const subs = orderedSubjects(state.date), dd = dayObj(state.date) || {subj:{}};
   let i = subs.findIndex(s => !filledRec(dd.subj[s.id])); if (i < 0) i = 0;
-  state.wiz = {list: subs.map(s => s.id), i, step:'min'}; render();
+  const fresh = !subs.some(s => filledRec(dd.subj[s.id]));
+  // 默认勾上：最近两周同一个星期几有作业的科目；没有历史就全勾
+  const had = sid => [7, 14].some(k => { const r = ((DB.days[addD(state.date, -k)] || {}).subj || {})[sid]; return r && !r.none && r.min > 0; });
+  const anyHist = subs.some(s => had(s.id));
+  state.wiz = {list: subs.map(s => s.id), i, step: fresh ? 'pick' : 'min', pick: fresh ? subs.filter(s => !anyHist || had(s.id)).map(s => s.id) : null}; render();
 }
 function wizGo(step){ const w = state.wiz; if (step === 'next') { w.i++; w.step = 'min'; } else w.step = step; render(); const b = $('.wiz-body'); if (b) b.scrollTop = 0; }
 function vWiz(){
@@ -1538,6 +1547,11 @@ function vWiz(){
     h += `</div><div class="wiz-foot">${left ? `<button class="btn good" data-act="wizredo">去重做 ${left} 道错题</button>` : ''}<button class="btn ${left ? '' : 'primary'}" data-act="wizclose">完成</button></div></div>`;
     return h;
   }
+  if (w.step === 'pick') {
+    h += `<div class="wiz-q" style="margin-top:8px">今天有哪几科作业？</div><p class="small faint" style="margin:-10px 0 14px">点一下选上或去掉。没选的记为「今天没作业」。</p><div class="big two">` +
+      w.list.map(x => { const sx = subjById(x), on = w.pick.includes(x); return `<button class="${on ? 'on' : ''}" data-act="wizpick" data-v="${x}"><span class="dot" style="background:${sx.color};display:inline-block;margin-right:6px;vertical-align:3px"></span>${esc(sx.name)}${on ? ' ✓' : ''}</button>`; }).join('') + `</div>`;
+    return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="wizpicked" ${w.pick.length ? '' : ''}>${w.pick.length ? `就这 ${w.pick.length} 科 ›` : '今天都没作业'}</button></div></div>`;
+  }
   const sid = w.list[w.i], s = subjById(sid), r = (dd.subj[sid]) || {}, its = itemsOn(d, sid);
   h += `<div class="wiz-subj"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</div>`;
   let foot = w.i > 0 || w.step !== 'min' ? `<button class="btn ghost" data-act="wizback">‹ 上一步</button>` : '';
@@ -1545,11 +1559,19 @@ function vWiz(){
     h += `<div class="wiz-q">${esc(s.name)}今天做了多久？</div><div class="big">`;
     if (r.min && !WIZ_MIN.includes(r.min)) h += `<button class="wide on" data-act="wizmin" data-v="keep">${r.min} 分钟<small>计时器 / 已填</small></button>`;
     h += WIZ_MIN.map(m => `<button class="${r.min === m && !r.none ? 'on' : ''}" data-act="wizmin" data-v="${m}">${m}<small>分钟</small></button>`).join('');
-    h += `<button class="wide soft ${r.none ? 'on' : ''}" data-act="wizmin" data-v="none">今天没有${esc(s.name)}作业</button></div>
-      <div class="card" style="margin-top:16px;padding:12px 14px"><div class="small muted" style="margin-bottom:8px">都不对？自己填</div>
+    h += `</div>
+      <details class="more" style="margin:8px 0 0" ${r.min && !WIZ_MIN.includes(r.min) && !r.none ? '' : ''}><summary>都不对？自己填分钟或几点到几点</summary><div class="card" style="padding:12px 14px">
         <div class="row"><input type="number" inputmode="numeric" min="0" max="600" id="w-min" class="minin" value="${r.min && !WIZ_MIN.includes(r.min) ? r.min : ''}" placeholder="37"><span class="muted">分钟</span></div>
         <div class="row" style="margin-top:10px"><span class="small muted">或者</span><input type="time" id="w-start" class="timein" value="${r.start||''}" aria-label="开始时间"><span class="muted">到</span><input type="time" id="w-end" class="timein" value="${r.end||''}" aria-label="结束时间"></div>
-        <button class="btn primary sm" style="margin-top:10px" data-act="wizmanual">用我填的</button></div>`;
+        <button class="btn primary sm" style="margin-top:10px" data-act="wizmanual">用我填的</button></div></details>`;
+    const iv = r.intr || 'none';
+    h += `<div class="wiz-lab">中途停下来过吗？<span class="faint">（倒水、玩手机、换科都算）</span></div><div class="seg wide">` +
+      [['none','没停过'],['early','开头停了'],['mid','中间停了'],['late','快完时停了']].map(([k,n]) => `<button data-act="wizintr" data-v="${k}" class="${iv === k ? 'on' : ''}">${n}</button>`).join('') + `</div>`;
+    h += `<div class="wiz-lab">有没做对的题吗？<span class="faint">（都对就不用点）</span></div>`;
+    for (const t of ET) { const n = its.filter(it => it.type === t.k).length;
+      h += `<div class="cnt sm"><span class="nm"><i class="sw" style="background:${ET_COLOR[t.k]};width:12px;height:12px"></i>${typeNameS(sid, t.k)}</span><button data-act="wizerr" data-t="${t.k}" data-v="-1" aria-label="减少">−</button><span class="v">${n}</span><button data-act="wizerr" data-t="${t.k}" data-v="1" aria-label="增加">+</button></div>`; }
+    h += `<button class="btn ghost" style="width:100%;margin-top:6px" data-act="wizmin" data-v="none">今天没有${esc(s.name)}作业</button>`;
+    foot += `<button class="btn primary" data-act="wiznext">${w.i + 1 < w.list.length ? '下一科 ›' : '完成'}</button>`;
     const rest = w.list.slice(w.i).filter(x => !filledRec(dd.subj[x])).length;
     if (rest > 1 && w.list.slice(0, w.i).some(x => filledRec(dd.subj[x]))) foot += `<button class="btn ghost" style="white-space:nowrap" data-act="wizrest">其余 ${rest} 科没作业</button>`;
   } else if (w.step === 'intr') {
@@ -2610,7 +2632,7 @@ const ACT = {
     if (span != null) { if (span <= 0 || span > 600) return toast('时间段不对，看看开始和结束'); r.start = a; r.end = b; r.min = span; }
     else if (n > 0 && n <= 600) { r.min = Math.round(n); }
     else return toast('填分钟数，或者填开始和结束时间');
-    r.none = false; save(); toast(`记 ${r.min} 分钟`); wizGo('intr'); },
+    r.none = false; if (!r.intr) r.intr = 'none'; save(); toast(`记 ${r.min} 分钟`); render(); },
   photoopen: () => { state.photo = {kind:'error', sid: state.openSubj || null}; render(); },
   photoclose: () => { state.photo = null; render(); },
   pkind: el => { state.photo.kind = el.dataset.v; render(); },
@@ -2631,21 +2653,30 @@ const ACT = {
   wizredo: () => { state.wiz = null; setTab('errors'); },
   wizmin: el => { const w = state.wiz, sid = w.list[w.i], v = el.dataset.v, r = rec(state.date, sid, true);
     if (v === 'none') { r.none = true; r.min = 0; r.intr = 'none'; save(); return wizGo('next'); }
-    r.none = false; if (v !== 'keep') r.min = +v; save(); wizGo('intr'); },
+    r.none = false; if (v !== 'keep') r.min = +v; if (!r.intr) r.intr = 'none'; save(); render(); },
+  wizpick: el => { const w = state.wiz, v = el.dataset.v; w.pick = w.pick.includes(v) ? w.pick.filter(x => x !== v) : w.pick.concat([v]); render(); },
+  wizpicked: () => { const w = state.wiz;
+    for (const sid of w.list) if (!w.pick.includes(sid)) { const r = rec(state.date, sid, true); r.none = true; r.min = 0; r.intr = 'none'; }
+    w.list = w.list.filter(x => w.pick.includes(x)); w.i = 0; w.step = 'min'; w.pick = null; save(); render(); },
   wizadj: el => { const r = rec(state.date, state.wiz.list[state.wiz.i], true); r.none = false; r.min = Math.max(0, (r.min||0) + +el.dataset.v); save(); render(); },
-  wizintr: el => { const r = rec(state.date, state.wiz.list[state.wiz.i], true); r.intr = el.dataset.v; save(); wizGo('err'); },
+  wizintr: el => { const r = rec(state.date, state.wiz.list[state.wiz.i], true); r.intr = el.dataset.v; save(); if (state.wiz.step === 'intr') wizGo('err'); else render(); },
   wizerr: el => { const sid = state.wiz.list[state.wiz.i], t = el.dataset.t;
     if (+el.dataset.v > 0) { touchDay(state.date); DB.items.push({id:uid('i'), d:state.date, sid, type:t, conf:null, tag:'', box:0, due:addD(state.date, BOXES[0]), hist:[], done:false, u:now()}); }
     else { const c = itemsOn(state.date, sid).filter(it => it.type === t && !(it.hist||[]).length).pop(); if (c) delRec('items', c.id); }
     save(); render(); },
   wiznext: () => { const w = state.wiz, sid = w.list[w.i];
     const its = itemsOn(state.date, sid);
+    if (w.step === 'min') { const r = (dayObj(state.date) || {subj:{}}).subj[sid] || {};
+      if (!r.none && !(r.min > 0)) return toast('先选做了多久');
+      if (its.length && taxOf(sid)) return wizGo('sub'); if (its.some(it => !it.conf)) return wizGo('conf');
+      return (r.intr && r.intr !== 'none') || its.length ? wizGo('stuck') : wizGo('next'); }
     if (w.step === 'err') return wizGo(its.length && taxOf(sid) ? 'sub' : its.some(it => !it.conf) ? 'conf' : 'stuck');
     if (w.step === 'sub') return wizGo(its.some(it => !it.conf) ? 'conf' : 'stuck');
     wizGo('next'); },
   wizconf: el => { const v = el.dataset.v; if (v !== 'skip') for (const it of itemsOn(state.date, state.wiz.list[state.wiz.i])) if (!it.conf) { it.conf = v; it.u = now(); } save(); wizGo('stuck'); },
   wizback: () => { const w = state.wiz, order = ['min','intr','err','sub','conf','stuck'], its = itemsOn(state.date, w.list[w.i]);
     if (w.step === 'min') { if (w.i > 0) { w.i--; w.step = 'min'; } }
+    else if (w.step === 'sub' || (w.step === 'conf' && !(its.length && taxOf(w.list[w.i]))) || (w.step === 'stuck' && !its.length)) w.step = 'min';
     else { let k = order.indexOf(w.step) - 1; if (order[k] === 'conf' && !its.length) k--; if (order[k] === 'sub' && !(its.length && taxOf(w.list[w.i]))) k--; w.step = order[k]; }
     render(); },
   wizrest: () => { const w = state.wiz, dd = dayObj(state.date) || {subj:{}};
