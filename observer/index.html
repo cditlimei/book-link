@@ -1085,9 +1085,9 @@ function render(){
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
-  document.body.style.overflow = (state.wiz || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
+  document.body.style.overflow = (state.wiz || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
   hydratePhotos();
 }
 
@@ -1356,6 +1356,49 @@ ${cats}
     if (!state.precog.list.length) state.precog.err = '没在照片里找到题目。换个角度、拍近一点再试。';
   } catch(e) { state.precog.err = '识别失败：' + e.message; }
   state.precog.busy = false; render();
+}
+/* 同类题：换数字换情境、考同一个易错点，防止重做原题变成背答案。判对错只给提示，不给答案 */
+const findItem = id => DB.items.find(x => x.id === id) || EXT.find(x => x.id === id);
+async function varGen(){
+  const V = state.variant, it = findItem(V.iid); if (!it) return;
+  const sb = subjById(it.sid); V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; render();
+  try {
+    V.q = (await aiChat([{role: 'system', content: `你是有经验的初中${sb.name}老师。根据学生做错的题，出一道「同类题」：考同一个知识点、同一个容易错的地方，但换数字或换情境，难度相当，七年级学生 5 分钟内能做完。只输出题目本身，不要答案、不要提示、不要解析。数学公式用普通文字写，比如 x^2、3/4。`},
+      {role: 'user', content: `原题：${it.stem || '（没有原文）'}\n知识点：${it.tag || '—'}\n错因：${typeName(it)}${subName(it) ? ' · ' + subName(it) : ''}`}], {temperature: 0.7})).trim().slice(0, 600);
+    if (!V.q) throw new Error('AI 没出题');
+  } catch(e) { V.err = '出题失败：' + e.message; }
+  V.busy = false; render();
+}
+async function varCheck(){
+  const V = state.variant, it = findItem(V.iid), sb = subjById(it.sid); V.ans = ($('#var-ans') || {}).value || V.ans;
+  if (!V.ans.trim()) return toast('先写你的答案');
+  V.busy = true; render();
+  try {
+    const out = await aiChat([{role: 'system', content: `你是初中${sb.name}老师，判断学生这道题做得对不对。只输出 JSON：{"ok":true 或 false,"hint":"做错时给一句提示，指出该检查哪一步，绝对不能说出正确答案或完整过程；做对时写一句具体的肯定"}。`},
+      {role: 'user', content: `题目：${V.q}\n学生的答案和过程：${V.ans}`}], {temperature: 0.1});
+    const j = parseJSONObj(out); if (!j) throw new Error('判断结果看不懂');
+    V.res = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)}; V.tries++;
+    it.vh = (it.vh || []).concat([{d: today(), ok: V.res.ok}]).slice(-10); it.u = now(); if (!it.ext) save();
+  } catch(e) { V.err = '判断失败：' + e.message; }
+  V.busy = false; render();
+}
+function vVariant(){
+  const V = state.variant, it = findItem(V.iid); if (!it) { state.variant = null; return ''; }
+  const sb = subjById(it.sid);
+  let h = `<div class="wiz" role="dialog" aria-label="同类题"><div class="wiz-top"><div style="flex:1;font-weight:600">同类题 · ${esc(sb.name)}${it.tag ? ' · ' + esc(it.tag) : ''}</div><button class="wiz-x" data-act="varclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (V.err) h += `<div class="signal">${esc(V.err)}</div>`;
+  if (V.busy && !V.q) return h + `<div style="text-align:center;margin-top:60px"><div class="wiz-q">AI 正在出题…</div></div></div></div>`;
+  if (!V.q) return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="vargen">再出一道</button></div></div>`;
+  h += `<p class="small faint" style="margin:4px 0 8px">和原题考的是同一个地方，换了数字。先在纸上做，再把答案（最好带关键步骤）写下来。</p>
+    <div class="card" style="font-size:18px;line-height:1.7;white-space:pre-wrap">${esc(V.q)}</div>
+    <label class="f">我的答案</label><textarea id="var-ans" class="wiz-in" style="min-height:90px" placeholder="比如：x = 3（先去括号，再移项）" ${V.res && V.res.ok ? 'disabled' : ''}>${esc(V.ans || '')}</textarea>`;
+  if (V.busy) h += `<p class="muted">AI 正在看…</p>`;
+  if (V.res) h += `<div class="signal ${V.res.ok ? 'good' : ''}" style="margin-top:12px"><span class="k">${V.res.ok ? '做对了' : '还不对'}</span>${esc(V.res.hint)}</div>`;
+  let foot;
+  if (V.res && V.res.ok) foot = `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">算这道重做做对了</button>`;
+  else if (V.res) foot = `<button class="btn ghost" data-act="vardone" data-ok="0">还是不会</button><button class="btn primary" data-act="varcheck">改好了，再看看</button>`;
+  else foot = `<button class="btn ghost" data-act="vargen">换一道</button><button class="btn primary" data-act="varcheck">对答案</button>`;
+  return h + `</div><div class="wiz-foot">${foot}</div></div>`;
 }
 function vPhotoRecog(){
   const R = state.precog, sid = R.sid, tx = taxOf(sid), sb = subjById(sid);
@@ -1733,7 +1776,7 @@ function vRedo(){
     h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span>${it.conf==='sure'?'<span class="pill amber">有把握却错了 · 优先</span>':''}<span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
       <div class="q">${it.tag ? esc(it.tag) : '（没标知识点）'}</div>
       <div class="small muted">${md(it.d)}的${esc(s.name)}作业${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
-      <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div><div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</a><a href="#" class="small faint" data-act="skipitem" data-v="${it.id}">找不到原题</a></div></div>`;
+      <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div><div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</a>${(it.stem || it.tag) && aiReady() ? `<a href="#" class="small" style="color:var(--accent)" data-act="varopen" data-v="${esc(it.id)}">练一道同类题</a>` : ''}<a href="#" class="small faint" data-act="skipitem" data-v="${it.id}">找不到原题</a></div></div>`;
   }
   if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">今天就这些。</p>`;
   if (dn) { const ex = (dayObj(today()) || {}).explain || 0;
@@ -1753,7 +1796,7 @@ function extCard(it, s){
       <div class="signal good" style="margin-top:6px"><span class="k">正确答案</span>${esc(it.answer)}</div>
       ${it.kidAnswer ? `<div class="small muted">上次写的：${esc(it.kidAnswer)}</div>` : ''}
       ${it.note ? `<div class="signal info"><span class="k">错在哪（给家长了解，不用讲题）</span>${esc(it.note)}</div>` : ''}</details>
-    <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button><span class="spacer"></span><button class="btn sm ghost" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</button></div></div>`;
+    <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div><div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</a>${(it.stem || it.tag) && aiReady() ? `<a href="#" class="small" style="color:var(--accent)" data-act="varopen" data-v="${esc(it.id)}">练一道同类题</a>` : ''}</div></div>`;
 }
 /* ================= 错题导出：打印/存 PDF、Excel 表格 ================= */
 function exportRows(){
@@ -2800,6 +2843,11 @@ const ACT = {
   photoclose: () => { state.photo = null; render(); },
   pkind: el => { state.photo.kind = el.dataset.v; render(); },
   psubj: el => { state.photo.sid = el.dataset.v; render(); },
+  varopen: el => { state.variant = {iid: el.dataset.v}; varGen(); },
+  vargen: () => { state.variant.err = ''; varGen(); },
+  varcheck: () => { state.variant.err = ''; varCheck(); },
+  varclose: () => { state.variant = null; render(); },
+  vardone: el => { const id = state.variant.iid; state.variant = null; redoItem(id, el.dataset.ok === '1'); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
   rgclose: () => { if (state.precog && state.precog.list.some(x => x.keep) && !confirm('还没加入重做，确定关掉？（照片留着，之后点照片能再识别）')) return; state.precog = null; render(); },
   rgretry: () => recogPhoto(state.precog.pid),
