@@ -2898,9 +2898,27 @@ function vParent(){
   if (pv === 'grades') return h + vGrades();
   return h + vMe(pv);
 }
+/* 还没用过的功能：按数据判断，一次最多提 2 条，关掉的不再提 */
+function unusedHints(){
+  if (DEMO) return [];
+  const off = DB.settings.hintOff || {}, used = Object.keys(DB.days).filter(dayHasData).length, H = [];
+  const add = (k, cond, t, d, act, v) => { if (cond && !off[k]) H.push({k, t, d, act, v}); };
+  add('sync', used >= 2 && !syncReady(), '云同步', '数据现在只在这台设备上。开了同步，iPad、手机、电脑都能看，换设备也不丢。', 'pv', 'setup');
+  add('aitest', aiReady() && !DB.settings.aiTested, '检查 AI 功能', '点一下，逐项确认拍照识别、同类题、AI 老师在这台 iPad 上都能用。', 'pv', 'setup');
+  add('photo', aiReady() && used >= 3 && !DB.items.some(i => i.src === '拍照识别'), '拍照识别错题', '老师批改后拍一张错题照片，AI 认题、分好类，确认后自动进重做，不用手打。在「今天」页点「拍照」。', 'tab', 'today');
+  add('exam', aiReady() && !DB.exams.length, '拍成绩单自动填分', '考完试在「成绩 → 记一次考试」里拍成绩单或试卷，AI 自动填各科分数和丢分类型。', 'pv', 'grades');
+  add('speak', used >= 3 && !DB.speakRecs.length, '英语听说', '中考英语里有 25 分是人机对话听说。一三五「今天」页会自动排一项，2 到 3 分钟。', 'golearn', 'speak');
+  add('pe', used >= 5 && !DB.peRecs.length, '体育估分', '1000 米、跳绳、球类测完记一下，自动按深圳 2026 评分表算分，看离满分差多少。', 'golearn', 'pe');
+  add('tutor', aiReady() && used >= 5 && !(DB.aiS || []).length, 'AI 老师', '孩子卡住时点「问 AI 老师」，只给提示不给答案，还会记住他常卡在哪。', 'tab', 'today');
+  return H.slice(0, 2);
+}
+function hintsCard(){
+  const H = unusedHints(); if (!H.length) return '';
+  return `<div class="card" style="border-color:var(--accent)"><h3>这些功能你可能还没用过</h3>` + H.map(x => `<div style="padding:8px 0;border-top:1px solid var(--line)"><b>${esc(x.t)}</b><p class="small muted" style="margin:2px 0 6px">${esc(x.d)}</p><div class="row" style="gap:14px"><button class="btn sm" data-act="${x.act}" data-v="${x.v}">去看看</button><a href="#" class="small faint" data-act="hintoff" data-v="${x.k}">不用了</a></div></div>`).join('') + `</div>`;
+}
 /* 家长才需要看的提醒：备份/同步、令牌到期、情绪偏高时今晚只听不讲、今天的家长观察 */
 function parentNotes(){
-  let h = '';
+  let h = hintsCard();
   const n = Object.keys(DB.days).length;
   if (!DEMO && n >= 3 && !syncReady()) {
     const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
@@ -3186,7 +3204,8 @@ const ACT = {
   peadd: el => { const k = el.dataset.v, it = peItem(peChoice()[k]), v = peParse(it, ($('#pe-in-' + k) || {}).value);
     if (v == null) return toast(it.unit === 'time' ? '按「分:秒」填，比如 4:20' : '填一个数字'); if (isNaN(v)) return toast('这个成绩看起来不对，再核对一下' + (it.unit === 'time' ? '（按「分:秒」填，比如 4:20）' : ''));
     DB.peRecs.push({id: uid('pe'), d: today(), item: it.id, v, u: now()}); save(); render(); toast(`${peFmt(it, v)} = ${peScore(it, v)} 分`); },
-  aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; aiSelfTest(); },
+  aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; if (!DB.settings.aiTested) { setSetting('aiTested', true); save(); } aiSelfTest(); },
+  hintoff: el => { const o = Object.assign({}, DB.settings.hintOff || {}); o[el.dataset.v] = true; setSetting('hintOff', o); save(); render(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
   rgclose: () => { if (state.precog && state.precog.list.some(x => x.keep) && !confirm('还没加入重做，确定关掉？（照片留着，之后点照片能再识别）')) return; state.precog = null; render(); },
   rgretry: () => recogPhoto(state.precog.pid),
