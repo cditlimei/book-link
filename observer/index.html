@@ -1052,7 +1052,8 @@ async function syncNow(manual, depth){
 const isTyping = () => { const a = document.activeElement; return a && /INPUT|TEXTAREA/.test(a.tagName); };
 let pendingRender = false;
 let focusVal = null;
-document.addEventListener('focusin', e => { const el = e.target; focusVal = el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') ? el.value : null; });
+const DRAFT_IN = /^(voice|rgstem|qptext)$/;
+document.addEventListener('focusin', e => { const el = e.target; focusVal = el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') && !DRAFT_IN.test(el.dataset.in) ? el.value : null; });
 document.addEventListener('focusout', e => { const el = e.target; if (focusVal != null && el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') && el.value !== focusVal) { onDataIn({target: el}); flush(); toast('已保存 ✓'); } focusVal = null; });
 document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(() => { if (!isTyping()) render(); }, 50); } });
 function renderSyncState(){
@@ -1099,9 +1100,11 @@ function render(){
   if (state.tab === 'exams') { state.tab = 'me'; state.pv = 'grades'; }
   if (state.tab === 'review') { state.tab = 'me'; state.pv = 'review'; }
   const v = {today:vToday, errors:vErrors, learn:vLearn, me:vParent}[state.tab] || vToday;
+  const peSnap = [1, 2, 3].map(k => { const e = document.getElementById('pe-in-' + k); return e ? e.value : ''; });
   const exKey = el => el.id || ['ex', el.dataset.ex, el.dataset.s, el.dataset.t || ''].join(':');
   const exSnap = state.examEdit && $('.examform') ? {id: state.examEdit, v: [...document.querySelectorAll('.examform input, .examform textarea')].map(el => [exKey(el), el.value])} : null;
   $('#main').innerHTML = v();
+  peSnap.forEach((v, k) => { const e = document.getElementById('pe-in-' + (k + 1)); if (e && v && !e.value) e.value = v; });
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
@@ -1175,7 +1178,7 @@ function vToday(){
     const allDone = filled >= subs.length && left === 0 && wordsOk && !rDue;
     if (late && !allDone && !isRest(d)) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
     const dowP = P(d).getDay(); const showProg = allDone || dowP === 0 || dowP === 6;
-    if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[filled ? '自己把 ' + filled + ' 科作业记清楚了' : '', dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
+    if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[(() => { const n = subs.filter(x => { const r = dd.subj[x.id]; return r && !r.none && r.min > 0; }).length; return n ? '自己把 ' + n + ' 科作业记清楚了' : filled ? '今天都没作业' : ''; })(), dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
     if (allDone) h += progressCard();
     if (isRest(d) && !dayHasData(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
     let slOpen0 = state.slistOpen; if (slOpen0 == null) { try { slOpen0 = localStorage.getItem('observer:slOpen') === '1'; } catch(e) { slOpen0 = false; } }
@@ -1216,8 +1219,8 @@ function vToday(){
   if (isToday) h += `<div class="card"><h3>说一句话记今天</h3><p class="small muted" style="margin:0 0 8px">不想一科一科点，就把今天的作业情况一口气说出来，app 会拆成各科记录。</p><button class="btn sm" data-act="voiceopen">${MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 说一句话记今天</button></div>`;
   more = h; h = h0; nMore = (more.match(/<h3/g) || []).length;
   if (state.slistOpen == null) { try { state.slistOpen = localStorage.getItem('observer:slOpen') === '1'; } catch(e) { state.slistOpen = false; } }
-  const slOpen = !isToday || state.slistOpen || state.openSubj || (DB.timer && DB.timer.d === d);
-  if (isToday) h += `<details class="more" id="slist-d" ${slOpen ? 'open' : ''}><summary data-act="sltog">各科明细 · 计时（边写边计时用）</summary>`;
+  const slOpen = !isToday || state.slistOpen;
+  if (isToday) h += `<details class="more" id="slist-d" ${slOpen ? 'open' : ''}><summary data-act="sltog">各科明细 · 计时${DB.timer && DB.timer.d === d ? `<span class="pill amber" style="margin-left:8px">${esc(subjById(DB.timer.sid).name)}计时中${slOpen ? '' : '，点开停止'}</span>` : '（边写边计时用）'}</summary>`;
   h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
     <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
   for (const s of subs) h += subjRow(d, s, dd.subj[s.id]);
@@ -1281,7 +1284,7 @@ function vQuick(){
   return `<div class="wiz" role="dialog" aria-label="记一个问题"><div class="wiz-top"><div style="flex:1;font-weight:600">记一个问题 · ${md(state.date)}</div><button class="wiz-x" data-act="qpclose" aria-label="关闭">×</button></div><div class="wiz-body">
     <div class="wiz-q" style="font-size:21px;margin-top:4px">哪一科？</div><div class="row">` + subs.map(x => `<button class="chip ${Q.sid === x.id ? 'on' : ''}" style="min-height:44px;font-size:16px" data-act="qpsubj" data-v="${x.id}"><span class="dot" style="background:${x.color};margin-right:5px"></span>${esc(x.name)}</button>`).join('') + `</div>
     <div class="wiz-q" style="font-size:21px;margin-top:20px">遇到什么问题？</div>
-    <div class="withmic"><textarea id="qp-text" class="wiz-in" style="min-height:110px" placeholder="说一句就行，比如：&#10;去括号后面的项忘了变号&#10;第 3 题不知道用哪个公式&#10;作文不知道怎么开头">${esc(Q.text || '')}</textarea>${micBtn('qp-text')}</div>
+    <div class="withmic"><textarea id="qp-text" data-in="qptext" class="wiz-in" style="min-height:110px" placeholder="说一句就行，比如：&#10;去括号后面的项忘了变号&#10;第 3 题不知道用哪个公式&#10;作文不知道怎么开头">${esc(Q.text || '')}</textarea>${micBtn('qp-text')}</div>
     <button class="btn primary" style="width:100%;min-height:52px;font-size:18px;margin-top:12px" data-act="qpsave">保存</button>
     <p class="small faint" style="margin-top:8px">不用选是计算还是概念问题，${aiReady() ? 'AI' : 'app'} 会自动归类。会进「重做」，隔几天再考一次。</p></div></div>`;
 }
@@ -1865,7 +1868,7 @@ function vRedo(){
     h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
       ${it.stem ? `<div class="q" style="font-size:17px;line-height:1.6;white-space:pre-wrap">${esc(it.stem)}</div>${it.tag ? `<div class="small faint">知识点：${esc(it.tag)}</div>` : ''}` : `<div class="q">${it.tag ? esc(it.tag) : '（没标知识点，翻到当天的作业找这道题）'}</div>`}
       ${it.photoId && DB.photos.some(p => p.id === it.photoId) ? `<img data-pid="${it.photoId}" data-act="photoview" data-v="${it.photoId}" alt="原题照片" style="display:block;max-width:100%;max-height:180px;margin:8px 0;border-radius:10px;object-fit:contain;background:var(--surface2);cursor:zoom-in">` : ''}
-      <div class="small muted">${md(it.d)}的${esc(s.name)}${it.src === '随手记' ? '（自己记的问题）' : it.src === '拍照识别' ? '（拍照识别）' : '作业'}${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
+      <div class="small muted">${md(it.d)}的${esc(s.name)}${it.src === '随手记' ? '（自己记的问题）' : it.src === '拍照识别' ? '（拍照识别）' : '作业'}${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck && it.src !== '随手记' && it.src !== '拍照识别' ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
       <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div><div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</a>${(it.stem || it.tag) && aiReady() ? `<a href="#" class="small" style="color:var(--accent)" data-act="varopen" data-v="${esc(it.id)}">练一道同类题</a>` : ''}<a href="#" class="small faint" data-act="skipitem" data-v="${it.id}">找不到原题</a></div></div>`;
   }
   if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">今天就这些。</p>`;
@@ -1896,7 +1899,7 @@ function exportRows(){
     .sort((a,b) => DB.settings.subjects.findIndex(s=>s.id===a.sid) - DB.settings.subjects.findIndex(s=>s.id===b.sid) || ET.findIndex(t=>t.k===a.type) - ET.findIndex(t=>t.k===b.type) || (a.d < b.d ? -1 : 1));
 }
 const itemStatus = it => it.skipped ? '移出' : it.done ? '已掌握' : '在练';
-const itemStuck = it => { const r = DB.days[it.d] && DB.days[it.d].subj[it.sid]; return r && r.stuck || ''; };
+const itemStuck = it => { if (it.src === '随手记' || it.src === '拍照识别') return ''; const r = DB.days[it.d] && DB.days[it.d].subj[it.sid]; return r && r.stuck || ''; };
 function vExport(){
   const f = state.exp || (state.exp = {period:'all', subj:'all', status:'active', answers:true});
   const rows = exportRows();
@@ -1921,10 +1924,16 @@ function download(name, text, type){
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type + ';charset=utf-8'}));
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
+let printing = false;
 async function exportPrint(){
+  if (printing) return; printing = true; try { await exportPrint0(); } finally { printing = false; }
+}
+async function exportPrint0(){
   const f = state.exp, rows = exportRows(); let n = 0;
   // 有原题照片的先取出来（本机没有就从私有仓库下载解密），印在题目下面
-  const pics = {}; for (const it of rows) if (it.photoId && !pics[it.photoId]) { const p = DB.photos.find(x => x.id === it.photoId); if (p) { try { pics[it.photoId] = await photoSrc(p); } catch(e) {} } }
+  const pics = {}, ids = [...new Set(rows.map(it => it.photoId).filter(Boolean))];
+  if (ids.length) toast(`正在准备 ${ids.length} 张原题照片…`);
+  await Promise.all(ids.map(async id => { const p = DB.photos.find(x => x.id === id); if (p) { try { pics[id] = await photoSrc(p); } catch(e) {} } }));
   const [from, to, lab] = periodRange(f.period);
   let h = `<h1>${esc(DB.settings.child)}的错题本</h1><p class="pm">${lab}（${md(from)}–${md(to)}）· ${f.subj==='all'?'全部科目':esc(subjById(f.subj).name)} · 共 ${rows.length} 道 · 导出于 ${md(today())}</p>`;
   const answers = [];
@@ -1937,7 +1946,7 @@ async function exportPrint(){
       for (const it of ts) { n++;
         h += `<div class="pi"><div class="pq"><b>${n}.</b> ${it.stem ? esc(it.stem) : esc(it.tag || '（没标知识点）')}</div>
           <div class="pmeta">${md(it.d)} · ${subName(it) ? esc(subName(it)) + ' · ' : ''}${it.stem && it.tag ? esc(it.tag) + ' · ' : ''}${it.conf ? CONFN[it.conf] + ' · ' : ''}${it.ext || it.src ? esc(it.src) : '每日记录'}${!it.ext && itemStuck(it) ? ' · 当时说：「' + esc(itemStuck(it)) + '」' : ''}</div>
-          ${pics[it.photoId] ? `<img class="ppic" src="${pics[it.photoId]}" alt="原题">` : ''}
+          ${pics[it.photoId] ? `<img class="ppic" src="${pics[it.photoId]}" alt="原题">` : it.photoId ? '<div class="pmeta">（原题照片没取到：在拍照的那台设备上打印，或先开云同步）</div>' : ''}
           ${it.stem || pics[it.photoId] ? '<div class="pblank"></div>' : '<div class="pblank sm">翻到原题重做：</div>'}</div>`;
         if (it.answer) answers.push(`<p><b>${n}.</b> ${esc(it.answer)}${it.note ? `<br><span class="pmeta">讲题提示：${esc(it.note)}</span>` : ''}</p>`);
       }
@@ -2500,7 +2509,7 @@ function vPE(){
   for (const k of [1, 2, 3]) {
     const it = peItem(ch[k]), opts = P.items.filter(x => x.cls === k), recs = DB.peRecs.filter(r => r.item === it.id).sort((a, b) => a.d < b.d ? 1 : -1), last = recs[0];
     h += `<div class="card"><div class="row"><h3 style="margin:0">${['', '一', '二', '三'][k]}类 · ${esc(it.name)}</h3><span class="spacer"></span>${last ? `<b style="font-family:var(--mono);font-size:22px">${peScore(it, last.v)}</b><span class="small faint">分</span>` : ''}</div>
-      <details style="margin:4px 0 8px"><summary class="small faint">换项目（${opts.length} 选 1）</summary><div class="row" style="margin-top:6px">` + opts.map(o => `<button class="chip ${o.id === it.id ? 'on' : ''}" data-act="pepick" data-v="${k}" data-s="${o.id}">${esc(o.name)}</button>`).join('') + `</div></details>
+      <details style="margin:4px 0 8px" ${(state.peOpen || {})[k] ? 'open' : ''}><summary class="small faint" data-act="petog" data-v="${k}">换项目（${opts.length} 选 1）</summary><div class="row" style="margin-top:6px">` + opts.map(o => `<button class="chip ${o.id === it.id ? 'on' : ''}" data-act="pepick" data-v="${k}" data-s="${o.id}">${esc(o.name)}</button>`).join('') + `</div></details>
       ${last ? `<p style="margin:0 0 4px">最近：<b>${peFmt(it, last.v)}</b>（${md(last.d)}）· ${peNext(it, last.v)}</p>` : `<p class="small muted" style="margin:0 0 4px">还没测过。满分标准：${peFmt(it, it.rows[0][1])}；60 分：${peFmt(it, it.rows[8][1])}。</p>`}
       <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input type="text" id="pe-in-${k}" inputmode="${it.unit === 'time' ? 'text' : 'decimal'}" placeholder="${it.unit === 'time' ? '今天测的，比如 4:20' : '今天测的' + it.unit}" style="flex:1;min-width:0"></div>
       ${recs.length > 1 ? `<div class="small" style="margin-top:8px">` + recs.slice(0, 6).map(r => `<span class="pill" style="margin:2px 4px 2px 0">${mdShort(r.d)} ${peFmt(it, r.v)} · ${peScore(it, r.v)}分</span>`).join('') + `</div>` : ''}</div>`;
@@ -3005,7 +3014,7 @@ function askCard(){
   const d = today(), dd = dayObj(d) || {subj:{}}, subs = orderedSubjects(d), qi = (P(d).getTime()/864e5|0) % QUESTIONS.length;
   const errSub = subs.filter(s => taxOf(s.id)).map(s => [s, itemsOn(d, s.id).length]).filter(x => x[1]).sort((a,b)=>b[1]-a[1])[0];
   const q = dd.q || (errSub ? errSub[0].name + '：' + taxOf(errSub[0].id).ask[qi % taxOf(errSub[0].id).ask.length] : QUESTIONS[qi]);
-  return `<details class="card" id="askq" ${dd.answer ? '' : ''}><summary><h3 style="display:inline">今晚只问孩子一句</h3> <span class="small faint">（可选）</span></summary>
+  return `<details class="card" id="askq" ${state.askOpen ? 'open' : ''}><summary data-act="askog"><h3 style="display:inline">今晚只问孩子一句</h3> <span class="small faint">（可选）</span></summary>
     <div class="row" style="align-items:flex-start;flex-wrap:nowrap;margin-top:8px"><div style="flex:1;font-family:var(--serif);font-size:17px">「${esc(q)}」</div><button class="btn sm ghost" data-act="nextq">换一句</button></div>
     <label class="f">孩子怎么回答的（原话就好）</label>
     <div class="withmic"><textarea id="t-ans" data-in="dayt" data-f="answer" placeholder="比如：第二题第三步，不确定用相遇还是追及">${esc(dd.answer||'')}</textarea>${micBtn('t-ans')}</div><div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="savenow">保存</button></div>
@@ -3219,11 +3228,11 @@ const ACT = {
   wkshow: () => { state.showWeek = !state.showWeek; render(); },
   moretog: (el, e) => { e && e.preventDefault(); state.moreOpen = !state.moreOpen; render(); },
   scroll: el => { const t = document.getElementById(el.dataset.v); if (t) window.scrollTo({top: t.getBoundingClientRect().top + scrollY - 70, behavior:'smooth'}); },
-  savenow: () => { const a = document.activeElement; if (a && a.blur) a.blur(); save(); flush(); toast('已保存 ✓'); },
+  savenow: () => { focusVal = null; const a = document.activeElement; if (a && a.blur) a.blur(); save(); flush(); toast('已保存 ✓'); },
   itemopen: el => { state.openItem = state.openItem === el.dataset.v ? null : el.dataset.v; render(); },
   sltog: (el, e) => { e && e.preventDefault(); state.slistOpen = !($('#slist-d') || {}).open; try { localStorage.setItem('observer:slOpen', state.slistOpen ? '1' : '0'); } catch(e2) {} render(); },
-  slopen: () => { state.slistOpen = true; render(); setTimeout(() => ACT.scroll({dataset: {v: 'slist'}}), 30); },
-  sdone: el => { state.openSubj = null; save(); flush(); render(); toast('已保存 ✓'); },
+  slopen: () => { state.slistOpen = true; try { localStorage.setItem('observer:slOpen', '1'); } catch(e) {} render(); setTimeout(() => ACT.scroll({dataset: {v: 'slist'}}), 30); },
+  sdone: el => { focusVal = null; state.openSubj = null; save(); flush(); render(); toast('已保存 ✓'); },
   sopen: el => { state.openSubj = state.openSubj === el.dataset.s ? null : el.dataset.s; render(); },
   mood: el => { const dd = dayObj(state.date) || {}; setDayField(state.date, 'mood', dd.mood === el.dataset.v ? '' : el.dataset.v); save(); render(); },
   nextq: () => { const dd = dayObj(today()) || {}; const cur = dd.q || QUESTIONS[(P(today()).getTime()/864e5|0) % QUESTIONS.length]; setDayField(today(), 'q', QUESTIONS[(QUESTIONS.indexOf(cur)+1) % QUESTIONS.length]); save(); render(); },
@@ -3319,11 +3328,14 @@ const ACT = {
   spstart: () => { state.sp = {id: state.learn.sp, phase: 'ready'}; spStart(); },
   spstop: () => spStop(),
   peaddall: () => { const ch = peChoice(); let n = 0, bad = '', msg = [];
+    let badIt = null;
     for (const k of [1, 2, 3]) { const inp = $('#pe-in-' + k); if (!inp || !inp.value.trim()) continue; const it = peItem(ch[k]), v = peParse(it, inp.value);
-      if (v == null || isNaN(v)) { bad = it.name; continue; } DB.peRecs.push({id: uid('pe'), d: today(), item: it.id, v, u: now()}); n++; msg.push(`${it.name} ${peScore(it, v)} 分`); }
-    if (bad && !n) return toast(`${bad}的成绩看起来不对，${peItem(ch[1]).unit === 'time' ? '时间按「分:秒」填，比如 4:20' : '再核对一下'}`);
+      if (v == null || isNaN(v)) { bad = it.name; badIt = it; continue; } DB.peRecs.push({id: uid('pe'), d: today(), item: it.id, v, u: now()}); n++; msg.push(`${it.name} ${peScore(it, v)} 分`); inp.value = ''; }
+    if (bad && !n) return toast(`${bad}的成绩看起来不对，${badIt.unit === 'time' ? '时间按「分:秒」填，比如 4:20' : '再核对一下'}`);
     if (!n) return toast('先在上面填今天测的成绩'); save(); render(); toast('已保存 ✓ ' + msg.join('，') + (bad ? `（${bad}没存，数字不对）` : '')); },
-  pepick: el => { const c = Object.assign({}, DB.settings.peItems || {}); c[el.dataset.v] = el.dataset.s; setSetting('peItems', c); save(); render(); },
+  pepick: el => { const c = Object.assign({}, DB.settings.peItems || {}); c[el.dataset.v] = el.dataset.s; setSetting('peItems', c); const e = $('#pe-in-' + el.dataset.v); if (e) e.value = ''; save(); render(); },
+  petog: (el, e) => { e && e.preventDefault(); state.peOpen = Object.assign({}, state.peOpen || {}, {[el.dataset.v]: !(state.peOpen || {})[el.dataset.v]}); render(); },
+  askog: (el, e) => { e && e.preventDefault(); state.askOpen = !state.askOpen; render(); },
   peadd: el => { const k = el.dataset.v, it = peItem(peChoice()[k]), v = peParse(it, ($('#pe-in-' + k) || {}).value);
     if (v == null) return toast(it.unit === 'time' ? '按「分:秒」填，比如 4:20' : '填一个数字'); if (isNaN(v)) return toast('这个成绩看起来不对，再核对一下' + (it.unit === 'time' ? '（按「分:秒」填，比如 4:20）' : ''));
     DB.peRecs.push({id: uid('pe'), d: today(), item: it.id, v, u: now()}); save(); render(); toast(`${peFmt(it, v)} = ${peScore(it, v)} 分`); },
@@ -3334,7 +3346,7 @@ const ACT = {
     if (!Q.sid) return toast('先选是哪一科'); if (!t) return toast('写一句遇到的问题，或者点话筒说');
     const d = state.date, g = kwGuess(Q.sid, t), conf = /有把握|以为(是)?对|以为做对/.test(t) ? 'sure' : /不确定|犹豫|拿不准/.test(t) ? 'unsure' : /不会|不知道怎么/.test(t) ? 'no' : null;
     const it = {id: uid('i'), d, sid: Q.sid, type: g.type, sub: g.sub || undefined, tag: '', stem: t.slice(0, 300), conf, src: '随手记', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()};
-    DB.items.push(it); const r = rec(d, Q.sid, true); if (!r.stuck) r.stuck = t.slice(0, 80); r.none = false; touchDay(d); save();
+    DB.items.push(it); const r = rec(d, Q.sid, true); if (!r.stuck && !r.none) r.stuck = t.slice(0, 80); touchDay(d); save();
     state._lastQp = Q.sid; state.qp = null; render(); toast('记下了 ✓' + (aiReady() ? ' AI 正在归类' : '')); qpClassify(it.id); },
   aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; if (!DB.settings.aiTested) { setSetting('aiTested', true); save(); } aiSelfTest(); },
   hintoff: el => { const o = Object.assign({}, DB.settings.hintOff || {}); o[el.dataset.v] = true; setSetting('hintOff', o); save(); render(); },
@@ -3492,6 +3504,7 @@ document.addEventListener('click', e => { const el = e.target.closest('[data-act
 function onDataIn(e){
   const el = e.target.closest && e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
+  if (k === 'qptext') { if (state.qp) state.qp.text = v; return; }
   if (k === 'aimem') { const m = DB.aiMem[el.dataset.s]; if (m) { m.text = v; m.u = now(); save(); } return; }
   if (k === 'rgstem') { if (state.precog) state.precog.list[+el.dataset.v].stem = v; return; }
   if (k === 'day') setDayField(state.date, f, v);
