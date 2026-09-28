@@ -1862,8 +1862,9 @@ function vRedo(){
     if (it.ext) { h += extCard(it, s); continue; }
     const nth = (it.hist||[]).length + 1;
     h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
-      <div class="q">${it.tag ? esc(it.tag) : '（没标知识点）'}</div>
-      <div class="small muted">${md(it.d)}的${esc(s.name)}作业${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
+      ${it.stem ? `<div class="q" style="font-size:17px;line-height:1.6;white-space:pre-wrap">${esc(it.stem)}</div>${it.tag ? `<div class="small faint">知识点：${esc(it.tag)}</div>` : ''}` : `<div class="q">${it.tag ? esc(it.tag) : '（没标知识点，翻到当天的作业找这道题）'}</div>`}
+      ${it.photoId && DB.photos.some(p => p.id === it.photoId) ? `<img data-pid="${it.photoId}" data-act="photoview" data-v="${it.photoId}" alt="原题照片" style="display:block;max-width:100%;max-height:180px;margin:8px 0;border-radius:10px;object-fit:contain;background:var(--surface2);cursor:zoom-in">` : ''}
+      <div class="small muted">${md(it.d)}的${esc(s.name)}${it.src === '随手记' ? '（自己记的问题）' : it.src === '拍照识别' ? '（拍照识别）' : '作业'}${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
       <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div><div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</a>${(it.stem || it.tag) && aiReady() ? `<a href="#" class="small" style="color:var(--accent)" data-act="varopen" data-v="${esc(it.id)}">练一道同类题</a>` : ''}<a href="#" class="small faint" data-act="skipitem" data-v="${it.id}">找不到原题</a></div></div>`;
   }
   if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">今天就这些。</p>`;
