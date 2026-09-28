@@ -600,7 +600,12 @@ function queued(it){
 const queueWhy = it => it.q === true ? (it.src === '拍照识别' ? '拍照识别' : '手动加入') : it.ext ? '拍照错题本' : it.conf === 'sure' ? '有把握却错了，7 天后回检一次' : (it.conf === 'no' || it.conf === 'unsure') && it.type === 'concept' ? '概念没搞懂' : it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2 ? '同一个问题出现了 ' + REP[it.sid + '|' + it.sub] + ' 次' : '';
 const itemsOn = (d, sid) => (IDX[d] || []).filter(it => !sid || it.sid === sid);
 const isRest = d => !!(DB.days[d] && DB.days[d].rest);
-function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0; while (ok(d) && n < 2000) { if (dayHasData(d)) n++; d = addD(d, -1); } return n; }
+// 漏一天自动请假：同一周没用过请假时，单独漏掉的一天不算断（可以漏一天，不能连漏两天）
+const autoFreeze = d => !dayHasData(d) && !isRest(d) && dayHasData(addD(d, -1)) && !range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x));
+function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0, frozen = {};
+  if (!ok(d) && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); }
+  while (n < 2000) { if (ok(d)) { if (dayHasData(d)) n++; d = addD(d, -1); continue; } if (!frozen[monOf(d)] && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); continue; } break; }
+  return n; }
 function bestStreak(){ const ok = d => dayHasData(d) || isRest(d); const ds = Object.keys(DB.days).filter(ok).sort(); let best = 0, cur = 0, prev = null;
   for (const d of ds) { cur = prev && addD(prev, 1) === d ? cur + (dayHasData(d) ? 1 : 0) : (dayHasData(d) ? 1 : 0); prev = d; if (cur > best) best = cur; } return best; }
 const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x));
@@ -997,7 +1002,7 @@ function mergeDay(x, y){
   const out = clone(x); out.fu = Object.assign({}, x.fu||{}); out.subj = Object.assign({}, x.subj||{});
   let l = false, r = false;
   const ft = (o, f) => o[f] === undefined ? -1 : o.fu ? (o.fu[f] || 0) : (o.u || 0);
-  for (const f of ['mood','q','answer','note','rest']) {
+  for (const f of ['mood','q','answer','note','rest','praise']) {
     if (x[f] === y[f]) continue;
     const a = ft(x, f), b = ft(y, f);
     if (b > a) { out[f] = y[f]; out.fu[f] = b; r = true; } else l = true;
@@ -1117,6 +1122,14 @@ function renderChrome(){
   $('#tabs').innerHTML = '<div class="tabin">' + TABS.map(([k,n]) => `<button data-act="tab" data-v="${k}" class="${state.tab===k?'on':''}">${ICONS[k]}<span>${n}</span>${k==='errors' && left ? `<i class="badge">${left}</i>` : ''}</button>`).join('') + '</div>';
   renderSyncState();
 }
+/* 主屏幕图标角标：今晚还剩几项；做完了就显示明天到期的重做数。需要家长授权一次通知（iOS 16.4+ 主屏幕 Web App） */
+function updateBadge(){
+  try { if (!navigator.setAppBadge || !window.Notification || Notification.permission !== 'granted' || DEMO) return;
+    const d = today(), subs = orderedSubjects(d), dd = dayObj(d) || {subj:{}}, filled = subs.filter(s => filledRec(dd.subj[s.id])).length;
+    let n = (filled < subs.length ? 1 : 0) + (redoLeftToday() > 0 ? 1 : 0) + (LIB.done && wordsLeftTonight() > 0 ? 1 : 0) + (reciteDue().length ? 1 : 0);
+    if (!n) n = dueList(addD(d, 1)).length ? 1 : 0;
+    n ? navigator.setAppBadge(n) : navigator.clearAppBadge && navigator.clearAppBadge(); } catch(e) {}
+}
 function render(){
   reindex();
   try { ensureAutoPlans(); } catch(e) {}
@@ -1136,7 +1149,7 @@ function render(){
   $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
   document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
-  hydratePhotos();
+  hydratePhotos(); updateBadge();
 }
 
 /* ================= 今天 ================= */
@@ -1202,11 +1215,15 @@ function vToday(){
     const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today())), rDue = reciteDue().length;
     const wordsOk = LIB.done && (!LIB.words || wLeft === 0);
     const allDone = filled >= subs.length && left === 0 && wordsOk && !rDue;
+    if (!dayHasData(d) && !isRest(d) && autoFreeze(addD(d, -1)) && streak() > 1) h += `<div class="tip">昨天没记，本周的请假自动补上了。<b>今天记一下，连续 ${streak()} 天就接上</b>。</div>`;
     if (heavyNight() && !late && !allDone) h += `<div class="tip">今天作业写了 ${homeworkMin(d)} 分钟，已经超过 90 分钟。今晚<b>重做只排 1 道、单词只背 8 个</b>，早点休息。</div>`;
     if (late && !allDone && !isRest(d)) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
     const dowP = P(d).getDay(); const showProg = allDone || dowP === 0 || dowP === 6;
     if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[(() => { const n = subs.filter(x => { const r = dd.subj[x.id]; return r && !r.none && r.min > 0; }).length; return n ? '自己把 ' + n + ' 科作业记清楚了' : filled ? '今天都没作业' : ''; })(), dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
     if (allDone) h += progressCard();
+    if (allDone) { const old = allItems().filter(it => it.done && !it.skipped && it.d >= addD(d, -33) && it.d <= addD(d, -27) && (it.tag || it.stem));
+      if (old.length) { const it = old[(P(d).getDate()) % old.length];
+        h += `<div class="card" style="background:var(--good-bg);border-color:transparent"><div class="small faint">一个月前的今天</div><div style="margin-top:4px">${md(it.d)}你在<b>${esc(it.tag || (it.stem || '').slice(0, 18))}</b>上出过错，现在已经会了 ✓</div></div>`; } }
     if (isRest(d) && !dayHasData(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
     let slOpen0 = state.slistOpen; if (slOpen0 == null) { try { slOpen0 = localStorage.getItem('observer:slOpen') === '1'; } catch(e) { slOpen0 = false; } }
     const T = [
@@ -1217,6 +1234,8 @@ function vToday(){
     const ex = extraTask(d); if (ex) T.push(ex);
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
+    { const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise), seen = (() => { try { return localStorage.getItem('observer:praiseSeen'); } catch(e) { return null; } })();
+      if (pd && seen !== pd + DB.days[pd].praise) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
     const alt = T.filter(x => !x.done && x !== nx).slice(0, 2);
     if (nx && !late && alt.length) h += `<p class="small" style="text-align:center;margin:-6px 0 10px;color:var(--ink2)">或者先：${alt.map(x => `<a href="#" style="color:var(--accent)" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}>${x.t}</a>`).join(' · ')}</p>`;
     if (nx && nx.act === 'wizstart' && !filled && !slOpen0 && !(DB.timer && DB.timer.d === d)) h += `<p style="text-align:center;margin:-6px 0 12px"><a href="#" class="small" style="color:var(--accent)" data-act="slopen">还没开始写？边写边计时 ›</a></p>`;
@@ -1857,6 +1876,8 @@ function vWiz(){
     return h;
   }
   if (w.step === 'pick') {
+    const lw = addD(d, -7), lr = ((DB.days[lw] || {}).subj) || {}, same = w.list.filter(x => lr[x] && !lr[x].none && lr[x].min > 0);
+    if (same.length) h += `<button class="card" style="display:block;width:100%;text-align:left;border-color:var(--accent);margin:4px 0 14px" data-act="wizsame"><b>跟上${WD[P(lw).getDay()] === '日' ? '周日' : '周' + WD[P(lw).getDay()]}一样</b><div class="small muted" style="margin-top:4px">${same.map(x => esc(subjById(x).name) + ' ' + lr[x].min).join(' · ')} 分钟，点一下全部记好，不一样的再改</div></button>`;
     h += `<div class="wiz-q" style="margin-top:8px">今天有哪几科作业？</div><p class="small faint" style="margin:-10px 0 14px">点一下选上或去掉。没选的记为「今天没作业」。</p><div class="big two">` +
       w.list.map(x => { const sx = subjById(x), on = w.pick.includes(x); return `<button class="${on ? 'on' : ''}" data-act="wizpick" data-v="${x}"><span class="dot" style="background:${sx.color};display:inline-block;margin-right:6px;vertical-align:3px"></span>${esc(sx.name)}${on ? ' ✓' : ''}</button>`; }).join('') + `</div>`;
     return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="wizpicked" ${w.pick.length ? '' : ''}>${w.pick.length ? `就这 ${w.pick.length} 科 ›` : '今天都没作业'}</button></div></div>`;
@@ -3141,8 +3162,11 @@ function todayGlance(){
   if (probs.length || stuck.length) h += `<div class="small" style="margin-top:8px;color:var(--ink2)">他记下的问题：</div>` +
     probs.map(it => `<div style="margin:3px 0">· <b>${esc(subjById(it.sid).name)}</b> ${esc((it.stem || it.tag).slice(0, 60))}</div>`).join('') +
     stuck.filter(([s, r]) => !probs.some(it => it.sid === s.id && (it.stem || '').startsWith(r.stuck.slice(0, 8)))).map(([s, r]) => `<div style="margin:3px 0">· <b>${esc(s.name)}</b> ${esc(r.stuck.slice(0, 60))}</div>`).join('');
+  const pr = dd.praise;
+  h += `<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><span class="small faint">${pr ? '已经点过赞：「' + esc(pr) + '」' : '给他点个赞：'}</span>` + (pr ? '' : PRAISE.map((x, k) => `<button class="chip" data-act="praise" data-v="${k}">${esc(x)}</button>`).join('')) + `</div>`;
   return h + `</div>`;
 }
+const PRAISE = ['看到你今天自己记了问题，很好', '今天作业很专心', '重做坚持下来了', '辛苦了，早点睡'];
 /* 只在出问题时出现：连续没记、错题积压、某科反复中途停、作业时间持续过长 */
 function attentionItems(){
   if (DEMO) return [];
@@ -3243,7 +3267,10 @@ function guideCard(){
     <p style="margin:0 0 6px"><b>每周日，5 分钟</b>：看「本周复盘」最上面那一条，和「这周在试的调整」。系统每周只调一件事，下周自动看有没有效果。想留底就点「打印这周周报」。</p>
     <p style="margin:0 0 6px"><b>什么时候需要你</b>：家长页出现橙色的「需要注意」时（连续没记、错题积压、某科老中途停、作业太多、太依赖 AI），按上面写的做一件事就好。考完试点「记一次考试」，拍成绩单自动填。</p>
     <p style="margin:0 0 6px"><b>哪些不用你管</b>：重做排哪几道、单词背多少、古诗什么时候复习、作业多的晚上减量，这些 app 按他的记录自动安排。不用检查他做得对不对，也不用每天看复盘。</p>
-    <p class="small faint" style="margin:0">研究发现，初中生家长盯作业、盯分数效果往往适得其反；定好规则、偶尔聊聊学习的用处，效果更好。</p></details>`;
+    <p class="small faint" style="margin:0 0 10px">研究发现，初中生家长盯作业、盯分数效果往往适得其反；定好规则、偶尔聊聊学习的用处，效果更好。</p>
+    <p style="margin:0 0 6px"><b>提醒孩子（可选）</b></p>
+    <p class="small" style="margin:0 0 6px">① 主屏幕图标显示数字：今晚还剩几项、明天有几项。${window.Notification && Notification.permission === 'granted' ? '<b>已开启</b>' : '<button class="btn sm" data-act="badgeon">开启</button>（会弹出一次通知授权，只用来显示数字）'}</p>
+    <p class="small" style="margin:0">② 每晚定时打开 app：在孩子的 iPad 上打开「快捷指令」→ 底部「自动化」→「新建个人自动化」→「特定时间」选 20:00、每天 →「立即运行」→ 下一步选「打开 URL」，填 <b>${esc(location.origin + location.pathname)}</b>。iPad 长时间没人拿起时可能不触发，只当辅助。</p></details>`;
 }
 function aiCard(){
   if (aiReady() && !state.aiEdit) return `<div class="card"><h3>AI 学习教练 <span class="pill good">已开启</span></h3>
@@ -3486,6 +3513,9 @@ const ACT = {
     const it = {id: uid('i'), d, sid: Q.sid, type: g.type, sub: g.sub || undefined, tag: '', stem: t.slice(0, 300), conf, src: '随手记', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()};
     DB.items.push(it); const r = rec(d, Q.sid, true); if (!r.stuck && !r.none) r.stuck = t.slice(0, 80); touchDay(d); save();
     state._lastQp = Q.sid; state.qp = null; render(); toast('记下了 ✓' + (aiReady() ? ' AI 正在归类' : '')); qpClassify(it.id); },
+  praise: el => { setDayField(today(), 'praise', PRAISE[+el.dataset.v]); save(); render(); toast('孩子下次打开 app 会看到'); },
+  praiseseen: el => { try { localStorage.setItem('observer:praiseSeen', el.dataset.v); } catch(e) {} render(); },
+  badgeon: () => { if (!window.Notification) return toast('这台设备不支持'); Notification.requestPermission().then(p => { toast(p === 'granted' ? '好了，主屏幕图标会显示数字' : '没有授权，可以在 iPad 设置里打开通知'); updateBadge(); render(); }); },
   aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; if (!DB.settings.aiTested) { setSetting('aiTested', true); save(); } aiSelfTest(); },
   hintoff: el => { const o = Object.assign({}, DB.settings.hintOff || {}); o[el.dataset.v] = true; setSetting('hintOff', o); save(); render(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
@@ -3518,6 +3548,10 @@ const ACT = {
       if (its.length && !confirm(`这科记了 ${its.length} 道错题，标成「没作业」会把它们删掉，确定吗？`)) return;
       its.forEach(it => delRec('items', it.id)); r.none = true; r.min = 0; r.intr = 'none'; save(); return wizGo('next'); }
     r.none = false; if (v !== 'keep') r.min = +v; if (!r.intr) r.intr = 'none'; save(); state._wk = ''; render(); },
+  wizsame: () => { const w = state.wiz, d = state.date, lr = ((DB.days[addD(d, -7)] || {}).subj) || {};
+    for (const sid of w.list) { const r = rec(d, sid, true), o = lr[sid];
+      if (o && !o.none && o.min > 0) { r.none = false; r.min = o.min; r.intr = 'none'; } else { r.none = true; r.min = 0; r.intr = 'none'; } }
+    w.list = w.list.filter(x => lr[x] && !lr[x].none && lr[x].min > 0); w.i = w.list.length; w.step = 'min'; w.pick = null; save(); render(); toast('按上周同一天记好了，不一样的点科目改'); },
   wizpick: el => { const w = state.wiz, v = el.dataset.v; w.pick = w.pick.includes(v) ? w.pick.filter(x => x !== v) : w.pick.concat([v]); render(); },
   wizpicked: () => { const w = state.wiz;
     for (const sid of w.list) { const r = rec(state.date, sid, true); if (!w.pick.includes(sid)) { r.none = true; r.min = 0; r.intr = 'none'; } else if (r.none) r.none = false; }
