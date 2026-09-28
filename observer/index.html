@@ -138,6 +138,16 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .tile .ts{font-size:15px;color:var(--accent);font-weight:600}
 .tile .tu{font-size:12.5px;color:var(--ink3);margin-top:auto}
 .btn.primary-soft{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);font-weight:600}
+.heat{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-width:420px}
+.heat .hh{font-size:11px;color:var(--ink3);text-align:center}
+.hc{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:6px;font-size:12px;color:var(--ink3);background:var(--surface2)}
+.hc.l1{background:var(--good-bg);color:var(--ink2)}
+.hc.l2{background:var(--good);opacity:.55;color:var(--surface)}
+.hc.l3{background:var(--good);color:var(--surface)}
+.hc.lr{background:var(--amber-bg);color:var(--amber)}
+.hc.lf{background:transparent;color:var(--ink3);opacity:.5}
+.hc.now{outline:2px solid var(--accent);outline-offset:1px}
+.hc.key{display:inline-block;width:12px;height:12px;aspect-ratio:auto;vertical-align:-2px;margin:0 2px 0 6px}
 .sumk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
 .sk .v{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1}
 .sk .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:2px}
@@ -154,7 +164,7 @@ label.f{display:block;font-size:13px;color:var(--ink2);margin:10px 0 4px}
 .todo-r .chev{color:var(--ink3);font-size:20px}
 .tools{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:-4px 0 14px}
 .tools .btn{color:var(--ink2);flex:1;background:var(--surface);border:1px solid var(--line)}
-.streak{font-size:14px;color:var(--amber);background:var(--amber-bg);border-radius:20px;padding:4px 10px;white-space:nowrap}
+.streak{border:0;flex-shrink:0;margin-left:8px;vertical-align:1px;font-size:13px;color:var(--amber);background:var(--amber-bg);border-radius:20px;padding:4px 10px;white-space:nowrap}
 .streak b{font-family:var(--mono);font-size:16px}
 details.more{margin:6px 0 14px}
 details.more>summary{cursor:pointer;color:var(--accent);font-size:15px;padding:10px 4px;list-style:none}
@@ -606,9 +616,29 @@ function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today(
   if (!ok(d) && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); }
   while (n < 2000) { if (ok(d)) { if (dayHasData(d)) n++; d = addD(d, -1); continue; } if (!frozen[monOf(d)] && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); continue; } break; }
   return n; }
-function bestStreak(){ const ok = d => dayHasData(d) || isRest(d); const ds = Object.keys(DB.days).filter(ok).sort(); let best = 0, cur = 0, prev = null;
-  for (const d of ds) { cur = prev && addD(prev, 1) === d ? cur + (dayHasData(d) ? 1 : 0) : (dayHasData(d) ? 1 : 0); prev = d; if (cur > best) best = cur; } return best; }
-const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x));
+/* 月历热力图：每天按实际做了多少着色（空白=没记，浅=记了一些，中=作业都记了，深=作业+重做或单词），请假单独标 */
+function dayLevel(d){
+  if (isRest(d) && !dayHasData(d)) return 'r';
+  if (!dayHasData(d)) return 0;
+  const dd = DB.days[d] || {subj:{}}, subs = orderedSubjects(d), hw = subs.length && subs.every(s => filledRec(dd.subj[s.id]));
+  const more = allItems().some(it => (it.hist || []).some(h => h.d === d)) || Object.values(DB.words).some(w => (w.hist || []).some(h => h.d === d));
+  return hw ? (more ? 3 : 2) : 1;
+}
+function monthHeat(m){
+  const first = m + '-01', last = monthEnd(m), pad = (P(first).getDay() + 6) % 7, t = today();
+  let cells = '<span class="hh">一</span><span class="hh">二</span><span class="hh">三</span><span class="hh">四</span><span class="hh">五</span><span class="hh">六</span><span class="hh">日</span>' + '<span></span>'.repeat(pad);
+  let n = 0, full = 0;
+  for (const d of range(first, last)) { const lv = d > t ? 'f' : dayLevel(d); if (lv && lv !== 'f' && lv !== 'r') n++; if (lv === 3) full++;
+    cells += `<span class="hc l${lv}${d === t ? ' now' : ''}" title="${md(d)}">${P(d).getDate()}</span>`; }
+  return `<div class="heat">${cells}</div><div class="small faint" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap"><span>这个月记了 <b>${n}</b> 天，其中 <b>${full}</b> 天全做完</span><span><i class="hc l1 key"></i>记了一些 <i class="hc l2 key"></i>作业记全 <i class="hc l3 key"></i>全做完 <i class="hc lr key"></i>请假</span></div>`;
+}
+function streakPill(){ const n = streak(); if (n > 1) return `<button class="streak" data-act="monthtog" aria-label="看这个月">连续 <b>${n}</b> 天 ▾</button>`; const b = bestStreak(); return b >= 3 ? `<button class="streak" data-act="monthtog" style="background:var(--surface2);color:var(--ink2)">最长 ${b} 天 · 今天接着来</button>` : ''; }
+function bestStreak(){ const ok = d => dayHasData(d) || isRest(d); const ds = Object.keys(DB.days).filter(ok).sort(); let best = 0, cur = 0, prev = null, frozen = {};
+  for (const d of ds) { const gap = prev ? addD(prev, 1) === d ? 0 : addD(prev, 2) === d && !frozen[monOf(addD(prev, 1))] ? 1 : 2 : 2;
+    if (gap === 1) frozen[monOf(addD(prev, 1))] = 1;
+    cur = gap < 2 ? cur + (dayHasData(d) ? 1 : 0) : (dayHasData(d) ? 1 : 0); prev = d; if (cur > best) best = cur; } return Math.max(best, streak()); }
+const autoUsedIn = (d) => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && x < today() && !dayHasData(x) && !isRest(x) && dayHasData(addD(x, -1)) && (dayHasData(addD(x, 1)) || addD(x, 1) === today()));
+const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x)) || autoUsedIn(d);
 function dayHasData(d){
   if (itemsOn(d).length) return true;
   const dd = DB.days[d]; if (!dd) return false;
@@ -1128,7 +1158,7 @@ function updateBadge(){
     const d = today(), subs = orderedSubjects(d), dd = dayObj(d) || {subj:{}}, filled = subs.filter(s => filledRec(dd.subj[s.id])).length;
     let n = (filled < subs.length ? 1 : 0) + (redoLeftToday() > 0 ? 1 : 0) + (LIB.done && wordsLeftTonight() > 0 ? 1 : 0) + (reciteDue().length ? 1 : 0);
     if (!n) n = dueList(addD(d, 1)).length ? 1 : 0;
-    n ? navigator.setAppBadge(n) : navigator.clearAppBadge && navigator.clearAppBadge(); } catch(e) {}
+    const pr = n ? navigator.setAppBadge(n) : navigator.clearAppBadge && navigator.clearAppBadge(); if (pr && pr.catch) pr.catch(() => {}); } catch(e) {}
 }
 function render(){
   reindex();
@@ -1197,10 +1227,11 @@ function vToday(){
   const mon = monOf(d);
   let h = isToday ? banners() : '';
   h += `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="day" data-v="-1">‹</button>
-    <div style="flex:1;min-width:0"><div class="d">${md(d)}</div><div class="w">${wd(d)}${isToday?' · 今天':' · <a href="#" data-act="day" data-v="0" style="color:var(--accent)">回到今天</a>'}</div></div>
-    ${isToday ? (() => { const n = streak(); if (n > 1) return `<span class="streak">连续 <b>${n}</b> 天</span>`; const b = bestStreak(); return b >= 3 ? `<span class="streak" style="background:var(--surface2);color:var(--ink2)">最长 ${b} 天 · 今天接着来</span>` : ''; })() : ''}${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${state.showWeek ? '▴' : '▾'}</button>` : ''}<button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
+    <div style="flex:1;min-width:0"><div class="d">${md(d)}</div><div class="w">${wd(d)}${isToday?' · 今天':' · <a href="#" data-act="day" data-v="0" style="color:var(--accent)">回到今天</a>'}${isToday ? streakPill() : ''}</div></div>
+${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${state.showWeek ? '▴' : '▾'}</button>` : ''}<button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
 </div>
     ${!state.showWeek && isToday ? '</div>' : `<div class="wstrip">` + range(mon, addD(mon,6)).map(x => `<button data-act="goday" data-v="${x}" class="${dayHasData(x)?'rec':''} ${x===d?'sel':''} ${x>today()?'fut':''}" ${x>today()?'disabled':''}>${WD[P(x).getDay()]}<i>${P(x).getDate()}</i></button>`).join('') + `</div></div>`}`;
+  if (isToday && state.showMonth) h += `<div class="card"><div class="row"><h3 style="margin:0">${+mKey(d).slice(5)} 月</h3><span class="spacer"></span><button class="btn sm ghost" data-act="monthtog">收起</button></div><div style="margin-top:10px">${monthHeat(mKey(d))}</div></div>`;
   if (!isToday && filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
   const tools = `<div class="tools"><button class="btn sm primary-soft" data-act="qpopen">＋ 记一个问题</button><button class="btn" style="flex:1" data-act="photoopen">${CAM} 拍照</button><button class="btn" style="flex:1" data-act="tuopen">问 AI 老师</button></div>`;
   if (!isToday) h += tools;
@@ -1215,7 +1246,7 @@ function vToday(){
     const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today())), rDue = reciteDue().length;
     const wordsOk = LIB.done && (!LIB.words || wLeft === 0);
     const allDone = filled >= subs.length && left === 0 && wordsOk && !rDue;
-    if (!dayHasData(d) && !isRest(d) && autoFreeze(addD(d, -1)) && streak() > 1) h += `<div class="tip">昨天没记，本周的请假自动补上了。<b>今天记一下，连续 ${streak()} 天就接上</b>。</div>`;
+    if (!dayHasData(d) && !isRest(d) && autoFreeze(addD(d, -1)) && streak() > 1) h += `<div class="tip">昨天没记，自动用了一次请假。<b>今天记一下，就是连续 ${streak() + 1} 天</b>。</div>`;
     if (heavyNight() && !late && !allDone) h += `<div class="tip">今天作业写了 ${homeworkMin(d)} 分钟，已经超过 90 分钟。今晚<b>重做只排 1 道、单词只背 8 个</b>，早点休息。</div>`;
     if (late && !allDone && !isRest(d)) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
     const dowP = P(d).getDay(); const showProg = allDone || dowP === 0 || dowP === 6;
@@ -1234,8 +1265,9 @@ function vToday(){
     const ex = extraTask(d); if (ex) T.push(ex);
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
-    { const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise), seen = (() => { try { return localStorage.getItem('observer:praiseSeen'); } catch(e) { return null; } })();
-      if (pd && seen !== pd + DB.days[pd].praise) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
+    { const seen = (() => { try { return localStorage.getItem('observer:praiseSeen') || ''; } catch(e) { return ''; } })();
+      const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise && !seen.split('|').includes(x + DB.days[x].praise));
+      if (pd) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
     const alt = T.filter(x => !x.done && x !== nx).slice(0, 2);
     if (nx && !late && alt.length) h += `<p class="small" style="text-align:center;margin:-6px 0 10px;color:var(--ink2)">或者先：${alt.map(x => `<a href="#" style="color:var(--accent)" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}>${x.t}</a>`).join(' · ')}</p>`;
     if (nx && nx.act === 'wizstart' && !filled && !slOpen0 && !(DB.timer && DB.timer.d === d)) h += `<p style="text-align:center;margin:-6px 0 12px"><a href="#" class="small" style="color:var(--accent)" data-act="slopen">还没开始写？边写边计时 ›</a></p>`;
@@ -1869,15 +1901,15 @@ function vWiz(){
   let h = `<div class="wiz" role="dialog" aria-label="一步一步填"><div class="wiz-top"><div class="wiz-dots">${dots}</div><span class="small faint num">${Math.min(w.i+1, w.list.length)}/${w.list.length}</span><button class="wiz-x" data-act="wizclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
   if (w.i >= w.list.length) {
     h += `<div class="wiz-q" style="margin-top:24px">${w.list.length ? '填完了 ✓' : '今天都没作业 ✓'}</div>`;
-    for (const sid of w.list) { const s = subjById(sid), r = dd.subj[sid], n = itemsOn(d, sid).length;
-      h += `<div class="wiz-sum"><span class="dot" style="background:${s.color}"></span><b style="width:3em">${esc(s.name)}</b><span class="muted">${!r ? '没填' : r.none ? '没作业' : [r.min+' 分钟', n ? '记了 ' + n + ' 道题' : ''].filter(Boolean).join(' · ')}</span></div>`; }
+    w.list.forEach((sid, k) => { const s = subjById(sid), r = dd.subj[sid], n = itemsOn(d, sid).length;
+      h += `<div class="wiz-sum" data-act="wizgo" data-v="${k}" style="cursor:pointer"><span class="dot" style="background:${s.color}"></span><b style="width:3em">${esc(s.name)}</b><span class="muted">${!r ? '没填' : r.none ? '没作业' : [r.min+' 分钟', n ? '记了 ' + n + ' 道题' : ''].filter(Boolean).join(' · ')}</span></div>`; });
     const left = redoLeftToday();
     h += `</div><div class="wiz-foot">${left ? `<button class="btn good" data-act="wizredo">去重做 ${left} 道错题</button>` : ''}<button class="btn ${left ? '' : 'primary'}" data-act="wizclose">完成</button></div></div>`;
     return h;
   }
   if (w.step === 'pick') {
-    const lw = addD(d, -7), lr = ((DB.days[lw] || {}).subj) || {}, same = w.list.filter(x => lr[x] && !lr[x].none && lr[x].min > 0);
-    if (same.length) h += `<button class="card" style="display:block;width:100%;text-align:left;border-color:var(--accent);margin:4px 0 14px" data-act="wizsame"><b>跟上${WD[P(lw).getDay()] === '日' ? '周日' : '周' + WD[P(lw).getDay()]}一样</b><div class="small muted" style="margin-top:4px">${same.map(x => esc(subjById(x).name) + ' ' + lr[x].min).join(' · ')} 分钟，点一下全部记好，不一样的再改</div></button>`;
+    const lw = addD(d, -7), lr = ((DB.days[lw] || {}).subj) || {}, same = w.list.filter(x => lr[x] && !lr[x].none && lr[x].min > 0), fresh0 = !w.list.some(x => filledRec(dd.subj[x]));
+    if (same.length && fresh0) h += `<button class="card" style="display:block;width:100%;text-align:left;border-color:var(--accent);margin:4px 0 14px" data-act="wizsame"><b>跟上${WD[P(lw).getDay()] === '日' ? '周日' : '周' + WD[P(lw).getDay()]}一样</b><div class="small muted" style="margin-top:4px">${same.map(x => esc(subjById(x).name) + ' ' + lr[x].min).join(' · ')} 分钟，点一下全部记好，不一样的再改</div></button>`;
     h += `<div class="wiz-q" style="margin-top:8px">今天有哪几科作业？</div><p class="small faint" style="margin:-10px 0 14px">点一下选上或去掉。没选的记为「今天没作业」。</p><div class="big two">` +
       w.list.map(x => { const sx = subjById(x), on = w.pick.includes(x); return `<button class="${on ? 'on' : ''}" data-act="wizpick" data-v="${x}"><span class="dot" style="background:${sx.color};display:inline-block;margin-right:6px;vertical-align:3px"></span>${esc(sx.name)}${on ? ' ✓' : ''}</button>`; }).join('') + `</div>`;
     return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="wizpicked" ${w.pick.length ? '' : ''}>${w.pick.length ? `就这 ${w.pick.length} 科 ›` : '今天都没作业'}</button></div></div>`;
@@ -2305,6 +2337,7 @@ function vMonth(){
     const num = (v, u, sub) => `<div class="sk"><div class="v">${v}<small>${u}</small></div><div class="l">${sub}</div></div>`;
     h += `<div class="card"><div class="sumk">${num(st.recDays + '/' + n, '天', '有记录')}${num(avg || '–', avg ? '分' : '', '每天作业' + (avg && pavg ? `（上月 ${pavg}）` : ''))}${num(st.errN, '道', '错题' + (prev.errN ? `（上月 ${prev.errN}）` : ''))}</div>
       <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="printmonth">打印这月月报 / 存 PDF</a></div></div>`; }
+  h += `<div class="card"><h3>这个月每天</h3>${monthHeat(m)}</div>`;
   const monHead = h.length;
   { const pa = (DB.months[pm] || {}).auto, ca = (DB.months[m] || {}).auto;
     h += `<div class="card" style="border-color:var(--accent)"><h3>这个月的目标 <span class="small faint">（上个月数据自动定）</span></h3>`;
@@ -3163,7 +3196,7 @@ function todayGlance(){
     probs.map(it => `<div style="margin:3px 0">· <b>${esc(subjById(it.sid).name)}</b> ${esc((it.stem || it.tag).slice(0, 60))}</div>`).join('') +
     stuck.filter(([s, r]) => !probs.some(it => it.sid === s.id && (it.stem || '').startsWith(r.stuck.slice(0, 8)))).map(([s, r]) => `<div style="margin:3px 0">· <b>${esc(s.name)}</b> ${esc(r.stuck.slice(0, 60))}</div>`).join('');
   const pr = dd.praise;
-  h += `<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><span class="small faint">${pr ? '已经点过赞：「' + esc(pr) + '」' : '给他点个赞：'}</span>` + (pr ? '' : PRAISE.map((x, k) => `<button class="chip" data-act="praise" data-v="${k}">${esc(x)}</button>`).join('')) + `</div>`;
+  h += `<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><span class="small faint">${pr ? '已经点过赞：「' + esc(pr) + '」' : '给他点个赞：'}</span>` + (pr ? '<a href="#" class="small faint" data-act="praiseundo">撤回</a>' : PRAISE.map((x, k) => `<button class="chip" data-act="praise" data-v="${k}">${esc(x)}</button>`).join('')) + `</div>`;
   return h + `</div>`;
 }
 const PRAISE = ['看到你今天自己记了问题，很好', '今天作业很专心', '重做坚持下来了', '辛苦了，早点睡'];
@@ -3269,7 +3302,7 @@ function guideCard(){
     <p style="margin:0 0 6px"><b>哪些不用你管</b>：重做排哪几道、单词背多少、古诗什么时候复习、作业多的晚上减量，这些 app 按他的记录自动安排。不用检查他做得对不对，也不用每天看复盘。</p>
     <p class="small faint" style="margin:0 0 10px">研究发现，初中生家长盯作业、盯分数效果往往适得其反；定好规则、偶尔聊聊学习的用处，效果更好。</p>
     <p style="margin:0 0 6px"><b>提醒孩子（可选）</b></p>
-    <p class="small" style="margin:0 0 6px">① 主屏幕图标显示数字：今晚还剩几项、明天有几项。${window.Notification && Notification.permission === 'granted' ? '<b>已开启</b>' : '<button class="btn sm" data-act="badgeon">开启</button>（会弹出一次通知授权，只用来显示数字）'}</p>
+    <p class="small" style="margin:0 0 6px">① 主屏幕图标显示数字：今晚还剩几项没做（做完后，明天有要做的就显示 1）。<b>要在孩子的 iPad 上、从主屏幕图标打开 app 后点</b>：${window.Notification && Notification.permission === 'granted' ? '<b>已开启</b>' : '<button class="btn sm" data-act="badgeon">开启</button>（会弹出一次通知授权，只用来显示数字）'}</p>
     <p class="small" style="margin:0">② 每晚定时打开 app：在孩子的 iPad 上打开「快捷指令」→ 底部「自动化」→「新建个人自动化」→「特定时间」选 20:00、每天 →「立即运行」→ 下一步选「打开 URL」，填 <b>${esc(location.origin + location.pathname)}</b>。iPad 长时间没人拿起时可能不触发，只当辅助。</p></details>`;
 }
 function aiCard(){
@@ -3383,6 +3416,7 @@ const ACT = {
   momore: (el, e) => { e && e.preventDefault(); state.moMore = !state.moMore; render(); },
   rest: el => { const on = el.dataset.v === '1'; if (on && restUsed(today())) return toast('这周已经休息过一天了'); setDayField(today(), 'rest', on ? true : ''); save(); render(); },
   printweek: () => printWeek(state.week),
+  monthtog: () => { state.showMonth = !state.showMonth; render(); },
   wkshow: () => { state.showWeek = !state.showWeek; render(); },
   moretog: (el, e) => { e && e.preventDefault(); state.moreOpen = !state.moreOpen; render(); },
   scroll: el => { const t = document.getElementById(el.dataset.v); if (t) window.scrollTo({top: t.getBoundingClientRect().top + scrollY - 70, behavior:'smooth'}); },
@@ -3514,8 +3548,9 @@ const ACT = {
     DB.items.push(it); const r = rec(d, Q.sid, true); if (!r.stuck && !r.none) r.stuck = t.slice(0, 80); touchDay(d); save();
     state._lastQp = Q.sid; state.qp = null; render(); toast('记下了 ✓' + (aiReady() ? ' AI 正在归类' : '')); qpClassify(it.id); },
   praise: el => { setDayField(today(), 'praise', PRAISE[+el.dataset.v]); save(); render(); toast('孩子下次打开 app 会看到'); },
-  praiseseen: el => { try { localStorage.setItem('observer:praiseSeen', el.dataset.v); } catch(e) {} render(); },
-  badgeon: () => { if (!window.Notification) return toast('这台设备不支持'); Notification.requestPermission().then(p => { toast(p === 'granted' ? '好了，主屏幕图标会显示数字' : '没有授权，可以在 iPad 设置里打开通知'); updateBadge(); render(); }); },
+  praiseseen: el => { try { const old = (localStorage.getItem('observer:praiseSeen') || '').split('|').slice(-6); localStorage.setItem('observer:praiseSeen', old.concat([el.dataset.v]).join('|')); } catch(e) {} render(); },
+  praiseundo: () => { setDayField(today(), 'praise', ''); save(); render(); },
+  badgeon: () => { if (!window.Notification) return toast(standalone() ? '这台设备的系统版本不支持（需要 iPadOS 16.4 以上）' : '先把 app 添加到主屏幕，再从主屏幕图标打开，然后点这里'); Notification.requestPermission().then(p => { toast(p === 'granted' ? '好了，主屏幕图标会显示数字' : '没有授权，可以在 iPad 设置里打开通知'); updateBadge(); render(); }); },
   aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; if (!DB.settings.aiTested) { setSetting('aiTested', true); save(); } aiSelfTest(); },
   hintoff: el => { const o = Object.assign({}, DB.settings.hintOff || {}); o[el.dataset.v] = true; setSetting('hintOff', o); save(); render(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
@@ -3548,10 +3583,13 @@ const ACT = {
       if (its.length && !confirm(`这科记了 ${its.length} 道错题，标成「没作业」会把它们删掉，确定吗？`)) return;
       its.forEach(it => delRec('items', it.id)); r.none = true; r.min = 0; r.intr = 'none'; save(); return wizGo('next'); }
     r.none = false; if (v !== 'keep') r.min = +v; if (!r.intr) r.intr = 'none'; save(); state._wk = ''; render(); },
-  wizsame: () => { const w = state.wiz, d = state.date, lr = ((DB.days[addD(d, -7)] || {}).subj) || {};
-    for (const sid of w.list) { const r = rec(d, sid, true), o = lr[sid];
-      if (o && !o.none && o.min > 0) { r.none = false; r.min = o.min; r.intr = 'none'; } else { r.none = true; r.min = 0; r.intr = 'none'; } }
-    w.list = w.list.filter(x => lr[x] && !lr[x].none && lr[x].min > 0); w.i = w.list.length; w.step = 'min'; w.pick = null; save(); render(); toast('按上周同一天记好了，不一样的点科目改'); },
+  wizsame: () => { const w = state.wiz, d = state.date, lr = ((DB.days[addD(d, -7)] || {}).subj) || {}, manual = [];
+    for (const sid of w.list) { const o = lr[sid], busy = (DB.timer && DB.timer.d === d && DB.timer.sid === sid) || itemsOn(d, sid).length;
+      if (busy) { manual.push(sid); continue; }   // 正在计时或已经记了错题的科目，留给孩子自己填
+      const r = rec(d, sid, true); if (o && !o.none && o.min > 0) { r.none = false; r.min = o.min; r.intr = 'none'; } else { r.none = true; r.min = 0; r.intr = 'none'; } }
+    w.list = w.list.filter(x => manual.includes(x) || (lr[x] && !lr[x].none && lr[x].min > 0)); w.i = w.list.findIndex(x => manual.includes(x)); if (w.i < 0) w.i = w.list.length;
+    w.step = 'min'; w.pick = null; save(); render(); toast(manual.length ? '其余按上周记好了，这几科自己填一下' : '按上周同一天记好了，哪科不一样点它改'); },
+  wizgo: el => { const w = state.wiz; w.i = +el.dataset.v; w.step = 'min'; render(); },
   wizpick: el => { const w = state.wiz, v = el.dataset.v; w.pick = w.pick.includes(v) ? w.pick.filter(x => x !== v) : w.pick.concat([v]); render(); },
   wizpicked: () => { const w = state.wiz;
     for (const sid of w.list) { const r = rec(state.date, sid, true); if (!w.pick.includes(sid)) { r.none = true; r.min = 0; r.intr = 'none'; } else if (r.none) r.none = false; }
