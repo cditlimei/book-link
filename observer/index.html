@@ -3092,6 +3092,9 @@ function kidProgress(){
   const ia = intr([mon, t]), ib = intr([pm, pt]); if (ia != null && ib != null && ib - ia >= 0.15) out.push(`写作业中途停下来的少了（${Math.round(ib * 100)}% → <b>${Math.round(ia * 100)}%</b>）`);
   const pe = DB.peRecs.filter(r => inA(r.d)); if (pe.length && LIB.pe) { const r = pe[pe.length - 1], it = peItem(r.item), prev = DB.peRecs.filter(x => x.item === r.item && x.d < mon).sort((a, b) => a.d < b.d ? 1 : -1)[0];
     if (it && prev && peScore(it, r.v) > peScore(it, prev.v)) out.push(`${esc(it.name)}从 ${peScore(it, prev.v)} 分到 <b>${peScore(it, r.v)} 分</b>`); }
+  // 自己说清卡在哪：元认知本身就是进步
+  { let k = 0; for (const d of range(mon, t)) for (const r of Object.values((DB.days[d] || {}).subj || {})) if (r.stuck) k++;
+    k += DB.items.filter(it => it.src === '随手记' && inA(it.d)).length; if (k >= 2 && out.length < 3) out.push(`自己找出了 <b>${k}</b> 个卡在哪一步——说得清卡在哪，就离会了不远`); }
   const days = range(mon, t).filter(dayHasData).length;
   if (!out.length && days) out.push(`这周坚持记了 <b>${days}</b> 天`);
   return out.slice(0, 3);
@@ -3138,6 +3141,10 @@ function attentionItems(){
   const last = range(addD(t, -7), y1).filter(dayHasData).slice(-5);
   if (last.length >= 4) { for (const sb of subjects(t)) { const n = last.filter(d => { const r = ((DB.days[d] || {}).subj || {})[sb.id]; return r && r.intr && r.intr !== 'none'; }).length; if (n >= 4) A.push([`${sb.name}最近 ${last.length} 天里 ${n} 天中途停下`, `可以问一句：「${sb.name}做到哪一步开始想停？」只听，不批评。`]); }
     const mins = last.map(d => Object.values((DB.days[d] || {}).subj || {}).reduce((a, r) => a + (!r.none && r.min > 0 ? r.min : 0), 0)); if (mins.filter(m => m > 150).length >= 3) A.push(['作业时间连续偏长', `最近 ${mins.filter(m => m > 150).length} 天作业都超过 2.5 小时，教育部要求初中书面作业不超过 90 分钟。可以和老师沟通一下。`]); }
+  // AI 依赖：这周用 AI 老师多，但自己做同类题 / 混合练习的正确率不到一半（Bastani 2024：不设限的 AI 辅导撤掉后成绩更差）
+  { const mon = monOf(t), aiMin = range(mon, t).reduce((a, d) => a + ((DB.days[d] || {}).aiMin || 0), 0); let n = 0, okN = 0;
+    for (const it of allItems()) for (const h of (it.vh || [])) if (h.d >= mon && h.d <= t) { n++; if (h.ok) okN++; }
+    if (aiMin >= 40 && n >= 4 && okN / n < 0.5) A.push([`这周用 AI 老师 ${Math.round(aiMin)} 分钟，自己做同类题只对了 ${okN}/${n}`, `可能有点依赖 AI 了。可以在「设置」把每晚 AI 时长先调到 10 分钟，卡住时先翻课本例题再问。`]); }
   return A.slice(0, 3);
 }
 function attentionCard(){ const A = attentionItems(); if (!A.length) return '';
