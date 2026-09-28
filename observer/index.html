@@ -3005,8 +3005,26 @@ function askCard(){
     <p class="small faint" style="margin:8px 0 0">问「卡在哪一步」，不问「为什么又错」。只听，不批改。</p></details>`;
 }
 /* 家长才需要看的提醒：备份/同步、令牌到期、情绪偏高时今晚只听不讲、今天的家长观察 */
+/* 家长 10 秒速览：孩子今晚做完了没有、花了多久、记了什么问题 */
+function todayGlance(){
+  const d = today(), dd = dayObj(d) || {subj:{}}, subs = orderedSubjects(d), filled = subs.filter(s => filledRec(dd.subj[s.id])).length;
+  if (!filled && !itemsOn(d).length && !doneToday() && !isRest(d)) return `<div class="card"><h3>今天</h3><p class="muted" style="margin:0">孩子今天还没开始记。</p></div>`;
+  if (isRest(d) && !dayHasData(d)) return `<div class="card"><h3>今天</h3><p class="muted" style="margin:0">孩子今天请了休息。</p></div>`;
+  const recs = subs.map(s => [s, dd.subj[s.id]]).filter(([, r]) => r && !r.none && r.min > 0), mins = recs.reduce((a, [, r]) => a + r.min, 0), stops = recs.filter(([, r]) => r.intr && r.intr !== 'none');
+  const wq = LIB.words ? wordQueue().length : 0, wDone = Object.values(DB.words).filter(w => (w.hist || []).some(x => x.d === d)).length, left = redoLeftToday(), dn = doneToday();
+  const rDone = Object.values(DB.recite).some(r => (r.hist || []).some(x => x.d === d));
+  const probs = itemsOn(d).filter(it => it.stem || it.tag).slice(0, 4), stuck = recs.filter(([, r]) => r.stuck).slice(0, 3), ai = (dd.aiMin || 0);
+  const ck = (ok, t) => `<span style="margin-right:12px;white-space:nowrap"><b style="color:${ok ? 'var(--good)' : 'var(--ink3)'}">${ok ? '✓' : '○'}</b> ${t}</span>`;
+  let h = `<div class="card"><div class="row"><h3 style="margin:0">今天</h3><span class="spacer"></span><span class="small faint">${md(d)} ${wd(d)}</span></div>
+    <div style="margin:8px 0;line-height:2">${ck(filled >= subs.length, `作业 ${filled}/${subs.length} 科`)}${ck(left === 0, dn ? `重做 ${dn} 道` : left === 0 ? '重做（今天没有）' : '重做')}${ck(LIB.done && wq === 0, wDone ? `单词 ${wDone} 个` : '单词')}${ck(rDone, '古诗')}</div>
+    <p style="margin:0">${mins ? `作业共 <b>${mins}</b> 分钟` : '还没记用时'}${recs.length ? `（${recs.map(([s, r]) => esc(s.name) + ' ' + r.min).join('、')}）` : ''}${stops.length ? `，${stops.map(([s]) => esc(s.name)).join('、')}中途停过` : mins ? '，都没中途停' : ''}。${ai ? ` 用 AI 老师 ${Math.round(ai)} 分钟。` : ''}</p>`;
+  if (probs.length || stuck.length) h += `<div class="small" style="margin-top:8px;color:var(--ink2)">他记下的问题：</div>` +
+    probs.map(it => `<div style="margin:3px 0">· <b>${esc(subjById(it.sid).name)}</b> ${esc((it.stem || it.tag).slice(0, 60))}</div>`).join('') +
+    stuck.filter(([s, r]) => !probs.some(it => it.sid === s.id && (it.stem || '').startsWith(r.stuck.slice(0, 8)))).map(([s, r]) => `<div style="margin:3px 0">· <b>${esc(s.name)}</b> ${esc(r.stuck.slice(0, 60))}</div>`).join('');
+  return h + `</div>`;
+}
 function parentNotes(){
-  let h = hintsCard();
+  let h = todayGlance() + hintsCard();
   const n = Object.keys(DB.days).length;
   if (!DEMO && n >= 3 && !syncReady()) {
     const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
