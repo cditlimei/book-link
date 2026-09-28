@@ -3197,7 +3197,7 @@ function methodCard(){
 }
 
 /* ================= 事件 ================= */
-function setTab(t){ if (t !== state.tab) stopAllEn(); state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0); }
+function setTab(t){ if (t !== state.tab) stopAllEn(); if (t === 'today') checkDay(); state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0); }
 const ACT = {
   tab: el => setTab(el.dataset.v),
   day: (el, e) => { e.preventDefault(); const v = +el.dataset.v; state.date = v === 0 ? today() : addD(state.date, v); if (state.date > today()) state.date = today(); state.openSubj = null; render(); },
@@ -3522,9 +3522,13 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.wiz)
     if (kb) { const a = document.activeElement; if (a && a.closest && a.closest('.wiz') && a.scrollIntoView) setTimeout(() => a.scrollIntoView({block: 'nearest'}), 30); } };
   vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); })();
 let lastToday = today();
-document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; const t = today(); if (t === lastToday) return;
+/* 跨过零点：切回前台、每分钟、点「今天」时都检查；正在记作业/记问题等弹窗里时先不切，免得记到一半落到新的一天 */
+function checkDay(){ const t = today(); if (t === lastToday) return false;
+  if (state.wiz || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.photo || state.voice || isTyping()) return false;
   if (state.date === lastToday) state.date = t; if (state.week === monOf(lastToday)) state.week = monOf(t); if (state.month === mKey(lastToday)) state.month = mKey(t);
-  lastToday = t; render(); });
+  lastToday = t; render(); return true; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDay(); });
+setInterval(checkDay, 60000);
 let rt; window.addEventListener('resize', () => { if (state.tab !== 'trends') return; clearTimeout(rt); rt = setTimeout(render, 200); });
 
 /* ================= 示例数据（只在 ?demo 下生成，独立存储） ================= */
