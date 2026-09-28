@@ -498,14 +498,14 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, peRecs:[], speakRecs:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, peRecs:[], speakRecs:[], mixRecs:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
   for (const k of ['days','weeks','months','del','extReview','words','recite']) x[k] = x[k] || {};
-  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs']) x[k] = x[k] || [];
+  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs']) x[k] = x[k] || [];
   x.aiMem = x.aiMem || {};
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
   const subs = x.settings.subjects || [];
@@ -594,6 +594,8 @@ const queueWhy = it => it.q === true ? (it.src === '拍照识别' ? '拍照识�
 const itemsOn = (d, sid) => (IDX[d] || []).filter(it => !sid || it.sid === sid);
 const isRest = d => !!(DB.days[d] && DB.days[d].rest);
 function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0; while (ok(d) && n < 2000) { if (dayHasData(d)) n++; d = addD(d, -1); } return n; }
+function bestStreak(){ const ok = d => dayHasData(d) || isRest(d); const ds = Object.keys(DB.days).filter(ok).sort(); let best = 0, cur = 0, prev = null;
+  for (const d of ds) { cur = prev && addD(prev, 1) === d ? cur + (dayHasData(d) ? 1 : 0) : (dayHasData(d) ? 1 : 0); prev = d; if (cur > best) best = cur; } return best; }
 const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x));
 function dayHasData(d){
   if (itemsOn(d).length) return true;
@@ -1006,7 +1008,7 @@ function mergeDB(L, R){
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
   }
-  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs']) {
+  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs']) {
     const a = new Map((L[k]||[]).map(x=>[x.id,x])), b = new Map((R[k]||[]).map(x=>[x.id,x]));
     const out = [];
     for (const id of new Set([...a.keys(), ...b.keys()])) {
@@ -1108,9 +1110,9 @@ function render(){
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.qp ? vQuick() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
-  document.body.style.overflow = (state.wiz || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
+  document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
   hydratePhotos();
 }
 
@@ -1159,7 +1161,7 @@ function vToday(){
   let h = isToday ? banners() : '';
   h += `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="day" data-v="-1">‹</button>
     <div style="flex:1;min-width:0"><div class="d">${md(d)}</div><div class="w">${wd(d)}${isToday?' · 今天':' · <a href="#" data-act="day" data-v="0" style="color:var(--accent)">回到今天</a>'}</div></div>
-    ${isToday && streak() > 1 ? `<span class="streak">连续 <b>${streak()}</b> 天</span>` : ''}${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${state.showWeek ? '▴' : '▾'}</button>` : ''}<button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
+    ${isToday ? (() => { const n = streak(); if (n > 1) return `<span class="streak">连续 <b>${n}</b> 天</span>`; const b = bestStreak(); return b >= 3 ? `<span class="streak" style="background:var(--surface2);color:var(--ink2)">最长 ${b} 天 · 今天接着来</span>` : ''; })() : ''}${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${state.showWeek ? '▴' : '▾'}</button>` : ''}<button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
 </div>
     ${!state.showWeek && isToday ? '</div>' : `<div class="wstrip">` + range(mon, addD(mon,6)).map(x => `<button data-act="goday" data-v="${x}" class="${dayHasData(x)?'rec':''} ${x===d?'sel':''} ${x>today()?'fut':''}" ${x>today()?'disabled':''}>${WD[P(x).getDay()]}<i>${P(x).getDate()}</i></button>`).join('') + `</div></div>`}`;
   if (!isToday && filled < subs.length) h += `<button class="btn primary fillbtn" data-act="wizstart">${filled ? `接着填（还有 ${subs.length - filled} 科）` : '一步一步填今天的作业'}<span style="font-weight:400;opacity:.8;font-size:14px">· 约 1 分钟</span></button>`;
@@ -1190,6 +1192,8 @@ function vToday(){
     const ex = extraTask(d); if (ex) T.push(ex);
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
+    const alt = T.filter(x => !x.done && x !== nx).slice(0, 2);
+    if (nx && !late && alt.length) h += `<p class="small" style="text-align:center;margin:-6px 0 10px;color:var(--ink2)">或者先：${alt.map(x => `<a href="#" style="color:var(--accent)" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}>${x.t}</a>`).join(' · ')}</p>`;
     if (nx && nx.act === 'wizstart' && !filled && !slOpen0 && !(DB.timer && DB.timer.d === d)) h += `<p style="text-align:center;margin:-6px 0 12px"><a href="#" class="small" style="color:var(--accent)" data-act="slopen">还没开始写？边写边计时 ›</a></p>`;
     h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done' : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
@@ -1454,6 +1458,69 @@ function vVariant(){
   else if (V.res) foot = `<button class="btn ghost" data-act="vardone" data-ok="0">还是不会</button><button class="btn primary" data-act="varcheck">改好了，再看看</button>`;
   else foot = `<button class="btn ghost" data-act="vargen">换一道</button><button class="btn primary" data-act="varcheck">对答案</button>`;
   if (V.busy) foot = foot.replace(/<button /g, '<button disabled ');
+  return h + `</div><div class="wiz-foot">${foot}</div></div>`;
+}
+/* 每周数学混合练习：不同题型打乱，先判断用什么方法再做（Rohrer 2020，七年级 RCT：一个月后 61% vs 38%） */
+const mixLabel = it => subName(it) || it.tag || typeName(it);
+function mixPool(){ const from = addD(today(), -42); return allItems().filter(it => it.sid === 'sx' && it.d >= from && (it.stem || it.tag)); }
+function mixPick(){ const pool = mixPool().slice().sort(() => Math.random() - 0.5), seen = new Set(), out = [];
+  for (const it of pool) { const k = mixLabel(it); if (!seen.has(k)) { seen.add(k); out.push(it); } if (out.length >= 5) break; }
+  for (const it of pool) { if (out.length >= 5) break; if (!out.includes(it)) out.push(it); }
+  return out.sort(() => Math.random() - 0.5); }
+const mixDoneThisWeek = () => DB.mixRecs.some(r => r.d >= monOf(today()));
+async function mixStart(){
+  if (!aiReady()) return toast('要先在「家长 → 设置」填智谱密钥');
+  const src = mixPick(); if (src.length < 3) return toast('最近数学错题还不到 3 道，攒够了再练');
+  const M = state.mix = {src: src.map(it => it.id), qs: [], i: 0, phase: 'gen', res: []}; render();
+  try {
+    const list = src.map((it, k) => `${k + 1}. 原题：${it.stem || '（无原文）'}；知识点：${it.tag || '—'}；错因：${typeName(it)}${subName(it) ? ' · ' + subName(it) : ''}`).join('\n');
+    const out = await aiChat([{role: 'system', content: `你是有经验的初中数学老师。为下面每道学生做错的题各出一道「同类新题」：考同一个知识点和易错点，换数字或情境，七年级水平，每道 3 分钟内能做完。题目里不要写出知识点名称或章节，让学生自己判断该用什么方法。只输出 JSON 数组，顺序和原题一致：[{"q":"题目"}]。不要答案。`}, {role: 'user', content: list}], {temperature: 0.7});
+    if (state.mix !== M) return;
+    const arr = parseJSONList(out); if (!arr || arr.length < src.length) throw new Error('AI 出的题不全，再试一次');
+    M.qs = src.map((it, k) => ({iid: it.id, q: String(arr[k].q || '').slice(0, 500), method: mixLabel(it)})).filter(x => x.q);
+    M.opts = [...new Set(M.qs.map(x => x.method))].sort(() => Math.random() - 0.5);
+    M.phase = M.opts.length >= 2 ? 'method' : 'ans';
+  } catch(e) { if (state.mix !== M) return; M.err = '出题失败：' + e.message; M.phase = 'err'; }
+  render();
+}
+async function mixCheck(){
+  const M = state.mix, Q = M.qs[M.i], ans = (($('#mix-ans') || {}).value || '').trim(); if (!ans) return toast('先写你的答案'); if (M.busy) return;
+  M.ans = ans; M.busy = true; render();
+  try { const j = parseJSONObj(await aiChat([{role: 'system', content: '你是初中数学老师，判断学生这道题做得对不对。只输出 JSON：{"ok":true 或 false,"hint":"做错时一句提示，指出该检查哪一步，绝对不能说出正确答案；做对时一句具体的肯定"}。'}, {role: 'user', content: `题目：${Q.q}\n学生的答案和过程：${ans}`}], {temperature: 0.1}));
+    if (state.mix !== M) return; if (!j) throw new Error('判断结果看不懂');
+    M.cur = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)};
+  } catch(e) { if (state.mix !== M) return; M.cur = {ok: null, hint: '判断失败：' + e.message}; }
+  M.busy = false; render();
+}
+function mixNext(){
+  const M = state.mix, Q = M.qs[M.i]; M.res[M.i] = {ok: M.cur && M.cur.ok === true, method: M.pick === Q.method};
+  const it = findItem(Q.iid); if (it && !it.ext) { it.vh = (it.vh || []).concat([{d: today(), ok: M.res[M.i].ok, mix: true}]).slice(-10); it.u = now(); }
+  M.i++; M.pick = null; M.cur = null; M.ans = '';
+  if (M.i >= M.qs.length) { M.phase = 'done'; DB.mixRecs.push({id: uid('mx'), d: today(), n: M.qs.length, ok: M.res.filter(r => r.ok).length, method: M.res.filter(r => r.method).length, u: now()}); }
+  else M.phase = M.opts.length >= 2 ? 'method' : 'ans';
+  save(); render();
+}
+function vMix(){
+  const M = state.mix; let h = `<div class="wiz" role="dialog" aria-label="数学混合练习"><div class="wiz-top"><div style="flex:1;font-weight:600">数学混合练习${M.qs.length ? ` · ${Math.min(M.i + 1, M.qs.length)}/${M.qs.length}` : ''}</div><button class="wiz-x" data-act="mixclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (M.phase === 'gen') return h + `<div style="text-align:center;margin-top:60px"><div class="wiz-q">AI 正在从你的错题里出 5 道新题…</div><p class="muted">不同题型混在一起，不告诉你是哪一章</p></div></div></div>`;
+  if (M.phase === 'err') return h + `<div class="signal">${esc(M.err)}</div></div><div class="wiz-foot"><button class="btn primary" data-act="mixstart">再试一次</button></div></div>`;
+  if (M.phase === 'done') { const ok = M.res.filter(r => r.ok).length, me = M.res.filter(r => r.method).length;
+    return h + `<div style="text-align:center;margin-top:30px"><div style="font-family:var(--mono);font-size:44px;font-weight:700">${ok}/${M.qs.length}</div><div class="muted">做对 ${ok} 道${M.opts.length >= 2 ? ` · 方法判断对 ${me} 道` : ''}</div>
+      <p class="small faint" style="margin-top:14px">混在一起练，比一章一章练难一些，但一个月后记得更牢。${me < M.qs.length && M.opts.length >= 2 ? '方法判断错的那几道，下次先想「这题在问什么」。' : ''}</p></div></div><div class="wiz-foot"><button class="btn primary" data-act="mixclose">好了</button></div></div>`; }
+  const Q = M.qs[M.i];
+  h += `<div class="card" style="font-size:18px;line-height:1.7;white-space:pre-wrap">${esc(Q.q)}</div>`;
+  if (M.phase === 'method') {
+    h += `<div class="wiz-lab">先别急着算：这题主要用什么方法？</div><div class="big two">` + M.opts.map(o => `<button data-act="mixpick" data-v="${esc(o)}">${esc(o)}</button>`).join('') + `</div>`;
+    return h + `</div></div>`;
+  }
+  if (M.pick != null) h += `<div class="small ${M.pick === Q.method ? '' : 'muted'}" style="margin:8px 0">${M.pick === Q.method ? '✓ 方法判断对了' : `你选的是「${esc(M.pick)}」，这题考的是「${esc(Q.method)}」`}</div>`;
+  h += `<label class="f">我的答案（写上关键步骤）</label><textarea id="mix-ans" class="wiz-in" style="min-height:90px" ${M.cur && M.cur.ok ? 'disabled' : ''}>${esc(M.ans || '')}</textarea>`;
+  if (M.busy) h += `<p class="muted">AI 正在看…</p>`;
+  if (M.cur) h += `<div class="signal ${M.cur.ok ? 'good' : ''}" style="margin-top:10px"><span class="k">${M.cur.ok ? '做对了' : M.cur.ok === false ? '还不对' : '没判断成'}</span>${esc(M.cur.hint)}</div>`;
+  let foot = M.cur && M.cur.ok ? `<button class="btn primary" data-act="mixnext">${M.i + 1 < M.qs.length ? '下一道 ›' : '看结果'}</button>`
+    : M.cur ? `<button class="btn ghost" data-act="mixnext">跳过这道</button><button class="btn primary" data-act="mixcheck">改好了，再看看</button>`
+    : `<button class="btn ghost" data-act="mixnext">不会，跳过</button><button class="btn primary" data-act="mixcheck">对答案</button>`;
+  if (M.busy) foot = foot.replace(/<button /g, '<button disabled ');
   return h + `</div><div class="wiz-foot">${foot}</div></div>`;
 }
 function vPhotoRecog(){
@@ -1840,7 +1907,7 @@ function tagList(sid){
 
 /* ================= 重做 / 错题索引 ================= */
 function vErrors(){
-  if (state.errView === 'redo') return `<h2 style="margin:0 0 10px">今天重做</h2>` + vRedo() + `<p class="small faint" style="margin:18px 4px 0">家长用：<a href="#" data-act="ev" data-v="index" style="color:var(--accent)">错题本（按类型看）</a> · <a href="#" data-act="ev" data-v="export" style="color:var(--accent)">导出 / 打印错题</a></p>`;
+  if (state.errView === 'redo') return `<h2 style="margin:0 0 10px">今天重做</h2>` + vRedo() + (aiReady() && mixPool().length >= 3 ? `<div class="card" style="margin-top:14px"><div class="row"><h3 style="margin:0">数学混合练习</h3><span class="spacer"></span><span class="small faint">${mixDoneThisWeek() ? '这周练过了' : '每周一次'}</span></div><p class="small muted" style="margin:6px 0 10px">从最近的数学错题里出 5 道新题，不同题型混在一起。先判断用什么方法，再做。</p><button class="btn" data-act="mixstart">开始 5 道</button></div>` : '') + `<p class="small faint" style="margin:18px 4px 0">家长用：<a href="#" data-act="ev" data-v="index" style="color:var(--accent)">错题本（按类型看）</a> · <a href="#" data-act="ev" data-v="export" style="color:var(--accent)">导出 / 打印错题</a></p>`;
   let h = `<div class="row" style="margin-bottom:10px"><button class="btn sm ghost" data-act="ev" data-v="redo">‹ 重做</button><h2 style="margin:0">${state.errView === 'export' ? '导出错题' : '错题本'}</h2><span class="spacer"></span><div class="seg sm"><button data-act="ev" data-v="index" class="${state.errView==='index'?'on':''}">错题本</button><button data-act="ev" data-v="export" class="${state.errView==='export'?'on':''}">导出</button></div></div>`;
   return h + (state.errView === 'export' ? vExport() : vIndex());
 }
@@ -2125,13 +2192,15 @@ function extraWeek(mon, end){
   const inW = r => r.d >= mon && r.d <= end, pw = r => r.d >= addD(mon, -7) && r.d <= addD(mon, -1);
   const sp = DB.speakRecs.filter(inW), spp = DB.speakRecs.filter(pw), avg = a => a.length ? Math.round(a.reduce((x, r) => x + r.acc, 0) / a.length) : null;
   const pe = DB.peRecs.filter(inW), est = LIB.pe ? peEstimate(end) : {field: null};
-  if (!sp.length && !pe.length && est.field == null) return null;
+  const mx = DB.mixRecs.filter(inW);
+  if (!sp.length && !pe.length && est.field == null && !mx.length) return null;
   const kinds = {read: 0, listen: 0, retell: 0}; sp.forEach(r => kinds[r.kind || 'read']++);
-  return {n: sp.length, avg: avg(sp), pavg: avg(spp), kinds, pe: pe.length, est: est.field};
+  return {n: sp.length, avg: avg(sp), pavg: avg(spp), kinds, pe: pe.length, est: est.field, mx};
 }
 function extraWeekText(x){ if (!x) return ''; const a = [];
   if (x.n) a.push(`英语听说练了 ${x.n} 次（朗读 ${x.kinds.read}、听后回答 ${x.kinds.listen}、复述提问 ${x.kinds.retell}），平均 ${x.avg}%${x.pavg != null ? `，上周 ${x.pavg}%` : ''}`); else a.push('英语听说这周没练');
   if (x.est != null) a.push(`体育现场分估 ${x.est}/36${x.pe ? `（这周测了 ${x.pe} 次）` : ''}`); else if (x.pe) a.push(`体育这周测了 ${x.pe} 次`);
+  if (x.mx && x.mx.length) { const m = x.mx[x.mx.length - 1]; a.push(`数学混合练习 ${m.ok}/${m.n} 道做对，方法判断对 ${m.method} 道`); }
   return a.join('；') + '。'; }
 function printWeek(mon){
   const sun = addD(mon,6), t = today(), end = sun < t ? sun : t, days = range(mon, sun);
@@ -2720,6 +2789,7 @@ function extraTask(d){
     const done = DB.speakRecs.some(r => r.d === d);
     return {t: '英语听说', s: done ? '练过了' : ({r: '模仿朗读', l: '听后回答', t: '复述提问'})[kind] + ' · 可选', done, opt: true, act: 'golearn', v: 'speak', sp: pick.id, go: ''};
   }
+  if (dow === 0 && aiReady() && mixPool().length >= 3) { const done = mixDoneThisWeek(); return {t: '数学混合练习', s: done ? '这周练过了' : '5 道 · 可选', done, opt: true, act: 'mixstart', v: '', go: ''}; }
   if (dow === 6 && LIB.pe) { const done = DB.peRecs.some(r => r.d === d); return {t: '测一次体育', s: done ? '测过了' : '一项就行 · 可选', done, opt: true, act: 'golearn', v: 'pe', go: ''}; }
   return null;
 }
@@ -2776,16 +2846,18 @@ function vWordCard(){
   const L = state.learn, q = wordQueue();
   let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">背单词</h2><span class="spacer"></span><span class="small faint">还剩 ${q.length}</span><button class="btn sm ghost" data-act="lv" data-v="words">单词表 / 打印</button></div>` + `<details style="margin-top:6px"><summary class="small faint">怎么背</summary><p class="small faint" style="margin:6px 0 0">看中文想英文，想完再翻面听发音。每天新学 ${newPerDay()} 个（按最近的正确率自动调：记得牢就多学，记不住就少学），记住的隔 1、3、7、21 天再考，第 4 次还记得就算掌握。</p></details>`;
   if (!q.length) return h + `<div class="card empty" style="margin-top:12px">今天的单词背完了。明天再来，隔天复习才记得牢。<div style="margin-top:12px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button></div></div>`;
-  const w = q[0], s = wState(w), flip = L.flip;
+  const w = q[0], s = wState(w), flip = L.flip, mustSpell = !!s && (s.box || 0) >= 2, spellOk = (L.typed || '').trim().toLowerCase() === w.w.toLowerCase();
   h += `<div class="card" style="margin-top:12px;text-align:center;padding:28px 16px">
     <div class="small faint">${s ? '复习 · 第 ' + ((s.hist||[]).length + 1) + ' 次' : '新词'}${w.unit ? ' · ' + esc(w.unit) : ''}</div>
     <div style="font-size:26px;font-weight:700;margin:14px 0 4px">${esc(shortCn(w.cn))}</div>
-    ${!flip ? `<input type="text" id="w-spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="拼一下（可选）" value="${esc(L.typed||'')}" style="max-width:260px;margin:12px auto 0;display:block;text-align:center;font-family:Georgia,serif;font-size:20px">` : ''}
+    ${!flip ? `<input type="text" id="w-spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${mustSpell ? '这一轮要拼出来' : '拼一下（可选）'}" value="${esc(L.typed||'')}" style="max-width:260px;margin:12px auto 0;display:block;text-align:center;font-family:Georgia,serif;font-size:20px">` : ''}
     ${flip ? `<div style="font-size:34px;font-weight:700;margin:22px 0 4px;font-family:Georgia,serif">${esc(w.w)}</div><div class="muted">${esc(w.p || '')}</div>
       ${L.typed ? (L.typed.trim().toLowerCase() === w.w.toLowerCase() ? '<div class="pill good" style="display:inline-block;margin-top:8px">拼对了</div>' : `<div class="small" style="margin-top:8px;color:var(--amber)">你拼的是：${esc(L.typed)}</div>`) : ''}
       <div class="small faint" style="margin-top:6px">${esc(w.cn || '')}</div>
-      <button class="btn sm" style="margin-top:10px" data-act="say" data-v="${esc(w.w)}">${SPK} 再听一遍</button>` : `<p class="small faint" style="margin-top:22px">先在心里想（或写在纸上）英文怎么说</p>`}</div>`;
-  h += flip ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">想对了</button><button class="btn" style="flex:1;min-height:52px" data-act="wmark" data-v="0">没想起来</button></div>`
+      <button class="btn sm" style="margin-top:10px" data-act="say" data-v="${esc(w.w)}">${SPK} 再听一遍</button>` : `<p class="small faint" style="margin-top:22px">${mustSpell ? '记住两轮了，这次要把它拼出来' : '先在心里想（或写在纸上）英文怎么说'}</p>`}</div>`;
+  h += flip && mustSpell ? (spellOk ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">拼对了 ✓ 下一个</button></div>`
+      : `<div class="row"><button class="btn" style="flex:2;min-height:52px" data-act="wmark" data-v="0">拼错了，过两天再考</button><button class="btn ghost" style="flex:1;min-height:52px" data-act="wmark" data-v="1">只是手滑</button></div>`)
+    : flip ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">想对了</button><button class="btn" style="flex:1;min-height:52px" data-act="wmark" data-v="0">没想起来</button></div>`
             : `<div class="row"><button class="btn primary" style="flex:2;min-height:52px" data-act="wflip">翻面看答案</button>${!s ? '<button class="btn" style="flex:1;min-height:52px" data-act="wknown">早就会了</button>' : ''}</div>`;
   return h;
 }
@@ -3039,8 +3111,22 @@ function todayGlance(){
     stuck.filter(([s, r]) => !probs.some(it => it.sid === s.id && (it.stem || '').startsWith(r.stuck.slice(0, 8)))).map(([s, r]) => `<div style="margin:3px 0">· <b>${esc(s.name)}</b> ${esc(r.stuck.slice(0, 60))}</div>`).join('');
   return h + `</div>`;
 }
+/* 只在出问题时出现：连续没记、错题积压、某科反复中途停、作业时间持续过长 */
+function attentionItems(){
+  if (DEMO) return [];
+  const t = today(), A = [], used = Object.keys(DB.days).filter(dayHasData).length; if (used < 3) return A;
+  const y1 = addD(t, -1), y2 = addD(t, -2);
+  if (!dayHasData(y1) && !dayHasData(y2) && !isRest(y1) && !isRest(y2)) A.push(['连续两天没记', '昨天和前天都没有记录。别追问，今晚陪他一起把今天记上就好。']);
+  const backlog = dueList().length; if (backlog >= 15) A.push([`错题积压 ${backlog} 道`, `每天只排 ${redoQuota()} 道，积压会越来越多。可以周末挑一天多做几道，或者把「找不到原题」的移出去。`]);
+  const last = range(addD(t, -7), y1).filter(dayHasData).slice(-5);
+  if (last.length >= 4) { for (const sb of subjects(t)) { const n = last.filter(d => { const r = ((DB.days[d] || {}).subj || {})[sb.id]; return r && r.intr && r.intr !== 'none'; }).length; if (n >= 4) A.push([`${sb.name}最近 ${last.length} 天里 ${n} 天中途停下`, `可以问一句：「${sb.name}做到哪一步开始想停？」只听，不批评。`]); }
+    const mins = last.map(d => Object.values((DB.days[d] || {}).subj || {}).reduce((a, r) => a + (!r.none && r.min > 0 ? r.min : 0), 0)); if (mins.filter(m => m > 150).length >= 3) A.push(['作业时间连续偏长', `最近 ${mins.filter(m => m > 150).length} 天作业都超过 2.5 小时，教育部要求初中书面作业不超过 90 分钟。可以和老师沟通一下。`]); }
+  return A.slice(0, 3);
+}
+function attentionCard(){ const A = attentionItems(); if (!A.length) return '';
+  return `<div class="card" style="border-color:var(--amber)"><h3 style="color:var(--amber)">需要注意</h3>` + A.map(([t, d]) => `<div style="padding:6px 0;border-top:1px solid var(--line)"><b>${esc(t)}</b><div class="small muted" style="margin-top:2px">${esc(d)}</div></div>`).join('') + `</div>`; }
 function parentNotes(){
-  let h = todayGlance() + hintsCard();
+  let h = todayGlance() + attentionCard() + hintsCard();
   const n = Object.keys(DB.days).length;
   if (!DEMO && n >= 3 && !syncReady()) {
     const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
@@ -3280,7 +3366,7 @@ const ACT = {
   wbook: el => { state.learn.book = el.dataset.v; state.learn.unit = null; render(); },
   wunit: el => { state.learn.unit = el.dataset.v || null; render(); },
   say: el => speak(el.dataset.v, 'en-US'),
-  wflip: () => { const sp = $('#w-spell'); state.learn.typed = sp ? sp.value : ''; state.learn.flip = true; render(); const q = wordQueue(); if (q[0]) speak(q[0].w, 'en-US'); },
+  wflip: () => { const sp = $('#w-spell'); state.learn.typed = sp ? sp.value : ''; const q0 = wordQueue()[0], s0 = q0 && wState(q0); if (s0 && (s0.box || 0) >= 2 && !state.learn.typed.trim()) { toast('这个词已经记住两轮了，这一轮要拼出来'); if (sp) sp.focus(); return; } state.learn.flip = true; render(); const q = wordQueue(); if (q[0]) speak(q[0].w, 'en-US'); },
   wmark: el => { const q = wordQueue(); if (q[0]) markWord(q[0], el.dataset.v === '1'); state.learn.flip = false; state.learn.typed = ''; render(); },
   wknown: () => { const q = wordQueue(); const w = q[0]; if (!w) return; const t = today(); DB.words[wordKey(w)] = {box: WBOX.length, done: true, due: null, first: t, hist: [{d: t, ok: true, known: true}], u: now()}; save(); state.learn.typed = ''; render(); },
   wprint: el => printWords(el.dataset.v),
@@ -3308,6 +3394,11 @@ const ACT = {
   photoclose: () => { state.photo = null; render(); },
   pkind: el => { state.photo.kind = el.dataset.v; render(); },
   psubj: el => { state.photo.sid = el.dataset.v; render(); },
+  mixstart: () => mixStart(),
+  mixpick: el => { const M = state.mix; M.pick = el.dataset.v; M.phase = 'ans'; render(); },
+  mixcheck: () => mixCheck(),
+  mixnext: () => mixNext(),
+  mixclose: () => { const M = state.mix; if (M && M.phase !== 'done' && M.phase !== 'err' && M.phase !== 'gen' && M.i > 0 && !confirm('还没做完，确定退出？')) return; state.mix = null; render(); },
   varopen: el => { state.variant = {iid: el.dataset.v}; varGen(); },
   vargen: () => { if (state.variant.busy) return; state.variant.err = ''; varGen(); },
   varcheck: () => { state.variant.err = ''; varCheck(); },
@@ -3544,7 +3635,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.wiz)
 let lastToday = today();
 /* 跨过零点：切回前台、每分钟、点「今天」时都检查；正在记作业/记问题等弹窗里时先不切，免得记到一半落到新的一天 */
 function checkDay(){ const t = today(); if (t === lastToday) return false;
-  if (state.wiz || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.photo || state.voice || isTyping()) return false;
+  if (state.wiz || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.photo || state.voice || isTyping()) return false;
   if (state.date === lastToday) state.date = t; if (state.week === monOf(lastToday)) state.week = monOf(t); if (state.month === mKey(lastToday)) state.month = mKey(t);
   lastToday = t; render(); return true; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDay(); });
