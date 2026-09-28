@@ -2156,6 +2156,7 @@ function vWeek(){
 /* 自动卡片：这周在试的调整 + 进度；上周调整的效果；本周结束后自动定下周 */
 function autoWeekCard(mon, end){
   const plan = planFor(mon), pk = addD(mon, -7), pa = (DB.weeks[pk] || {}).auto;
+  if (!plan && !((DB.weeks[mon] || {}).auto && !(DB.weeks[mon] || {}).auto.skip)) return `<p class="small faint" style="margin:0 4px 12px">${pa && pa.skip ? '这周不调，保持原来的节奏。' : '这周先只管记，记满 3 天后，下周会自动挑一件事来调。'}</p>`;
   let h = `<div class="card" style="border-color:var(--accent)"><h3>这周在试的调整 <span class="small faint">（自动）</span></h3>`;
   if (!plan) h += `<p class="small muted" style="margin:0">${pa && pa.skip ? '这周不调，保持原来的节奏。' : '上周的记录还不够（少于 3 天），这周先只管记。一周结束后系统会自动挑一件事来调。'}</p>`;
   else {
@@ -3033,7 +3034,7 @@ function vParent(){
   const pv = state.pv || 'review';
   let h = `<div class="row" style="margin-bottom:4px"><h2 style="margin:0">家长区</h2></div>
     <div class="seg" style="margin-bottom:12px;display:flex">` + [['review','复盘'],['grades','成绩'],['mine','我的记录'],['setup','设置']].map(([k,n]) => `<button style="flex:1" data-act="pv" data-v="${k}" class="${pv===k?'on':''}">${n}</button>`).join('') + `</div>`;
-  if (pv === 'review') return h + parentNotes() + vReview() + askCard() + noteCard();
+  if (pv === 'review') return h + parentNotes() + vReview() + askCard() + noteCard() + hintsCard();
   if (pv === 'grades') return h + vGrades();
   return h + vMe(pv);
 }
@@ -3042,18 +3043,19 @@ function unusedHints(){
   if (DEMO) return [];
   const off = DB.settings.hintOff || {}, used = Object.keys(DB.days).filter(dayHasData).length, H = [];
   const add = (k, cond, t, d, act, v) => { if (cond && !off[k]) H.push({k, t, d, act, v}); };
-  add('sync', used >= 2 && !syncReady(), '云同步', '数据现在只在这台设备上。开了同步，iPad、手机、电脑都能看，换设备也不丢。', 'pv', 'setup');
+  const backupNag = !DEMO && Object.keys(DB.days).length >= 3 && !syncReady();
+  add('sync', used >= 2 && !syncReady() && !backupNag, '云同步', '数据现在只在这台设备上。开了同步，iPad、手机、电脑都能看，换设备也不丢。', 'pv', 'setup');
   add('aitest', aiReady() && !DB.settings.aiTested, '检查 AI 功能', '点一下，逐项确认拍照识别、同类题、AI 老师在这台 iPad 上都能用。', 'pv', 'setup');
   add('photo', aiReady() && used >= 3 && !DB.items.some(i => i.src === '拍照识别'), '拍照识别错题', '老师批改后拍一张错题照片，AI 认题、分好类，确认后自动进重做，不用手打。在「今天」页点「拍照」。', 'tab', 'today');
   add('exam', aiReady() && !DB.exams.length, '拍成绩单自动填分', '考完试在「成绩 → 记一次考试」里拍成绩单或试卷，AI 自动填各科分数和丢分类型。', 'pv', 'grades');
   add('speak', used >= 3 && !DB.speakRecs.length, '英语听说', '中考英语里有 25 分是人机对话听说。一三五「今天」页会自动排一项，2 到 3 分钟。', 'golearn', 'speak');
   add('pe', used >= 5 && !DB.peRecs.length, '体育估分', '1000 米、跳绳、球类测完记一下，自动按深圳 2026 评分表算分，看离满分差多少。', 'golearn', 'pe');
   add('tutor', aiReady() && used >= 5 && !(DB.aiS || []).length, 'AI 老师', '孩子卡住时点「问 AI 老师」，只给提示不给答案，还会记住他常卡在哪。', 'tab', 'today');
-  return H.slice(0, 2);
+  return H.slice(0, 1);
 }
 function hintsCard(){
   const H = unusedHints(); if (!H.length) return '';
-  return `<div class="card" style="border-color:var(--accent)"><h3>这些功能你可能还没用过</h3>` + H.map(x => `<div style="padding:8px 0;border-top:1px solid var(--line)"><b>${esc(x.t)}</b><p class="small muted" style="margin:2px 0 6px">${esc(x.d)}</p><div class="row" style="gap:14px"><button class="btn sm" data-act="${x.act}" data-v="${x.v}">去看看</button><a href="#" class="small faint" data-act="hintoff" data-v="${x.k}">不用了</a></div></div>`).join('') + `</div>`;
+  return `<div class="card" style="border-color:var(--accent)"><h3>你可能还没用过</h3>` + H.map(x => `<div style="padding:8px 0;border-top:1px solid var(--line)"><b>${esc(x.t)}</b><p class="small muted" style="margin:2px 0 6px">${esc(x.d)}</p><div class="row" style="gap:14px"><button class="btn sm" data-act="${x.act}" data-v="${x.v}">去看看</button><a href="#" class="small faint" data-act="hintoff" data-v="${x.k}">不用了</a></div></div>`).join('') + `</div>`;
 }
 function noteCard(){ const dd = dayObj(today()) || {};
   let h = '';
@@ -3116,7 +3118,7 @@ function attentionItems(){
   if (DEMO) return [];
   const t = today(), A = [], used = Object.keys(DB.days).filter(dayHasData).length; if (used < 3) return A;
   const y1 = addD(t, -1), y2 = addD(t, -2);
-  if (!dayHasData(y1) && !dayHasData(y2) && !isRest(y1) && !isRest(y2)) A.push(['连续两天没记', '昨天和前天都没有记录。别追问，今晚陪他一起把今天记上就好。']);
+  if (!dayHasData(t) && !dayHasData(y1) && !dayHasData(y2) && !isRest(y1) && !isRest(y2)) A.push(['连续两天没记', '昨天和前天都没有记录。别追问，今晚陪他一起把今天记上就好。']);
   const backlog = dueList().length; if (backlog >= 15) A.push([`错题积压 ${backlog} 道`, `每天只排 ${redoQuota()} 道，积压会越来越多。可以周末挑一天多做几道，或者把「找不到原题」的移出去。`]);
   const last = range(addD(t, -7), y1).filter(dayHasData).slice(-5);
   if (last.length >= 4) { for (const sb of subjects(t)) { const n = last.filter(d => { const r = ((DB.days[d] || {}).subj || {})[sb.id]; return r && r.intr && r.intr !== 'none'; }).length; if (n >= 4) A.push([`${sb.name}最近 ${last.length} 天里 ${n} 天中途停下`, `可以问一句：「${sb.name}做到哪一步开始想停？」只听，不批评。`]); }
@@ -3126,7 +3128,7 @@ function attentionItems(){
 function attentionCard(){ const A = attentionItems(); if (!A.length) return '';
   return `<div class="card" style="border-color:var(--amber)"><h3 style="color:var(--amber)">需要注意</h3>` + A.map(([t, d]) => `<div style="padding:6px 0;border-top:1px solid var(--line)"><b>${esc(t)}</b><div class="small muted" style="margin-top:2px">${esc(d)}</div></div>`).join('') + `</div>`; }
 function parentNotes(){
-  let h = todayGlance() + attentionCard() + hintsCard();
+  let h = todayGlance() + attentionCard();
   const n = Object.keys(DB.days).length;
   if (!DEMO && n >= 3 && !syncReady()) {
     const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
