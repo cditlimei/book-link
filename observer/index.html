@@ -364,7 +364,8 @@ const DAILY_REDO = 3;                     // 每天默认推 3 道，放得进 1
 const homeworkMin = d => Object.values(((DB.days[d || today()] || {}).subj) || {}).reduce((a, r) => a + (!r.none && r.min > 0 ? r.min : 0), 0);
 const heavyNight = () => homeworkMin(today()) > 90;
 const wordsTonight = () => heavyNight() ? 8 : WORDS_PER_NIGHT;
-const wordsDoneToday = () => Object.values(DB.words).filter(s => (s.hist||[]).some(x => x.d === today())).length;
+const wordsLeftTonight = () => LIB.words ? Math.max(0, Math.min(wordQueue().length, wordsTonight() - wordsDoneToday())) : 0;
+const wordsDoneToday = () => Object.values(DB.words).filter(s => (s.hist||[]).some(x => x.d === today() && !x.known)).length;
 function redoQuota(){
   if (heavyNight()) return 1;
   const from = addD(today(), -14); let n = 0, ok = 0;
@@ -793,7 +794,7 @@ function metricLabel(m){
 }
 const metricFmt = (m, v) => v == null ? '—' : (m.kind === 'avg' || m.kind === 'total') ? Math.round(v) + ' 分钟' : (Math.round(v * 10) / 10) + (m.kind === 'tired' ? ' 天/周' : ' 次/周');
 function verdict(base, after){
-  if (base == null || after == null) return {k:'na', t:'数据还不够（这周记录少于 3 天）'};
+  if (base == null || after == null) return {k:'na', t:'数据还不够（这周记录少于 5 天）'};
   const imp = (base - after) / Math.max(base, 0.5);
   if (imp >= 0.3) return {k:'good', t:'有效'};
   if (after > base * 1.2 + 0.3) return {k:'bad', t:'没看到效果'};
@@ -836,31 +837,39 @@ function planFor(mon){
 }
 
 /* ================= 错题重做队列 ================= */
+const sureDue = it => it.conf === 'sure' && !(it.hist || []).length && !it.ext ? addD(it.d, 7) : it.due;   // 有把握却错了：多数改一次就好，7 天后回检一次
 function dueList(t){
   t = t || today();
-  const sureDue = it => it.conf === 'sure' && !(it.hist || []).length ? addD(it.d, 7) : it.due;   // 有把握却错了：多数改一次就好，7 天后回检一次
   const due = allItems().filter(it => !it.done && sureDue(it) <= t && queued(it));
   // 期末前 3 周：每天从已掌握的题里抽 1 道回检（隔得最久的先来）
   if (examSeason(t)) { const done = allItems().filter(it => it.done && !it.skipped && queued(it)), last = it => ((it.hist || []).slice(-1)[0] || {}).d || it.d;
-    if (!done.some(it => last(it) === t)) { const c = done.filter(it => last(it) <= addD(t, -14)).sort((a, b) => last(a) < last(b) ? -1 : 1)[0]; if (c) due.push(c); } }
+    if ((DB.settings.examRv || '') !== t && !done.some(it => last(it) === t)) { const c = done.filter(it => last(it) <= addD(t, -14)).sort((a, b) => last(a) < last(b) ? -1 : 1)[0]; if (c) due.push(c); } }
   const pri = it => (it.done ? 5 : (it.conf === 'no' || it.conf === 'unsure') && it.type === 'concept' ? 0 : it.conf === 'unsure' ? 1 : it.conf === 'no' ? 2 : it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2 ? 3 : 4);
   due.sort((a,b) => pri(a)-pri(b) || (a.due < b.due ? -1 : 1));
   // 交错：同一科目 / 知识点尽量不连着出
   const out = []; const pool = due.slice();
   while (pool.length) {
     const last = out[out.length-1];
-    let i = pool.findIndex(x => !last || (x.sid !== last.sid && x.tag !== last.tag));
+    const p0 = pri(pool[0]); let i = pool.findIndex(x => pri(x) === p0 && (!last || (x.sid !== last.sid && !(x.tag && last.tag && x.tag === last.tag))));
     if (i < 0) i = 0; out.push(pool.splice(i,1)[0]);
   }
   return out;
 }
 function doneToday(){ const t = today(); return allItems().filter(it => (it.hist||[]).some(h => h.d === t)).length; }
+/* 最后一关没过（同类题做错，或 AI 出不了题）：不清零，停在最后一格，2 天后再验 */
+function finalMiss(id, selfOk){
+  const ext = id.startsWith('m:'), it = ext ? extItems().find(x => x.id === id) : DB.items.find(x => x.id === id); if (!it) return;
+  const t = today(); it.hist = (it.hist || []).concat([{d: t, ok: !!selfOk, pend: true}]); it.box = BOXES.length - 1; it.due = addD(t, 2); it.u = now();
+  if (ext) DB.extReview[id] = {box: it.box, due: it.due, hist: it.hist, done: it.done, u: it.u};
+  save(); render(); toast(selfOk ? '先记下了，2 天后再过最后一关' : '差一点，2 天后再来一次最后一关');
+}
 function redoItem(id, ok, verified){
   const ext = id.startsWith('m:');
   const it = ext ? extItems().find(x => x.id === id) : DB.items.find(x => x.id === id); if (!it) return;
   const t = today(), sureOnce = it.conf === 'sure' && !(it.hist || []).length, last = ok && !it.done && !sureOnce && (it.box || 0) + 1 >= BOXES.length;
   // 最后一关不靠自评：有 AI 时要做对一道同类题才算掌握
   if (last && !verified && aiReady() && (it.stem || it.tag)) { toast('最后一关：做对一道同类题才算掌握'); state.variant = {iid: id, final: true}; varGen(); return; }
+  if (it.done && examSeason(t)) setSetting('examRv', t);
   it.hist = (it.hist || []).slice(); it.hist.push({d:t, ok}); it.u = now();
   if (ok && (it.done || sureOnce)) { it.done = true; it.box = BOXES.length; toast(sureOnce ? '回检做对了，这道结束' : '还记得，很好'); }
   else if (ok) { it.box = (it.box||0) + 1; if (it.box >= BOXES.length) { it.done = true; toast('这道算掌握了'); } else { it.due = addD(t, BOXES[it.box]); toast(BOXES[it.box]+' 天后再做一次'); } }
@@ -1187,7 +1196,7 @@ function vToday(){
     const hr = new Date().getHours() + new Date().getMinutes()/60, late = hr >= 21.75;
     const wq = LIB.words ? wordQueue().length : 0;
     const wDone = Object.values(DB.words).filter(s => (s.hist||[]).some(x => x.d === today())).length;
-    const wLeft = Math.max(0, Math.min(wq, wordsTonight() - wDone));
+    const wLeft = wordsLeftTonight();
     const learning = LIB.recite ? LIB.recite.items.filter(x => rState(x.id) === 'learning').length : 0;
     const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today())), rDue = reciteDue().length;
     const wordsOk = LIB.done && (!LIB.words || wLeft === 0);
@@ -1433,7 +1442,7 @@ ${cats}
 const findItem = id => DB.items.find(x => x.id === id) || EXT.find(x => x.id === id);
 async function varGen(){
   const V = state.variant, it = findItem(V.iid); if (!it) return;
-  const sb = subjById(it.sid), gen = V.gen = (V.gen || 0) + 1; V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; render();
+  const sb = subjById(it.sid), gen = V.gen = (V.gen || 0) + 1; V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; V.logged = false; render();
   try {
     V.q = (await aiChat([{role: 'system', content: `你是有经验的初中${sb.name}老师。根据学生做错的题，出一道「同类题」：考同一个知识点、同一个容易错的地方，但换数字或换情境，难度相当，七年级学生 5 分钟内能做完。只输出题目本身，不要答案、不要提示、不要解析。数学公式用普通文字写，比如 x^2、3/4。`},
       {role: 'user', content: `原题：${it.stem || '（没有原文）'}\n知识点：${it.tag || '—'}\n错因：${typeName(it)}${subName(it) ? ' · ' + subName(it) : ''}`}], {temperature: 0.7})).trim().slice(0, 600);
@@ -1452,7 +1461,7 @@ async function varCheck(){
     if (state.variant !== V || V.gen !== gen || V.q !== q) return;
     const j = parseJSONObj(out); if (!j) throw new Error('判断结果看不懂');
     V.res = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)}; V.tries++;
-    it.vh = (it.vh || []).concat([{d: today(), ok: V.res.ok}]).slice(-10); it.u = now(); if (!it.ext) save();
+    if (!V.logged && !it.ext) { it.vh = (it.vh || []).concat([{d: today(), ok: V.res.ok}]).slice(-10); it.u = now(); V.logged = true; save(); }
   } catch(e) { V.err = '判断失败：' + e.message; }
   V.busy = false; render();
 }
@@ -1462,7 +1471,7 @@ function vVariant(){
   let h = `<div class="wiz" role="dialog" aria-label="同类题"><div class="wiz-top"><div style="flex:1;font-weight:600">${V.final ? '最后一关 · ' : '同类题 · '}${esc(sb.name)}${it.tag ? ' · ' + esc(it.tag) : ''}</div><button class="wiz-x" data-act="varclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
   if (V.err) h += `<div class="signal">${esc(V.err)}</div>`;
   if (V.busy && !V.q) return h + `<div style="text-align:center;margin-top:60px"><div class="wiz-q">AI 正在出题…</div></div></div></div>`;
-  if (!V.q) return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="vargen">再出一道</button></div></div>`;
+  if (!V.q) return h + (V.final ? `<p class="small muted" style="margin-top:10px">AI 现在出不了题（可能没网或额度用完）。可以先按你自己做对记下，下次再过这一关。</p>` : '') + `</div><div class="wiz-foot">${V.final ? '<button class="btn ghost" data-act="varself">先按自己做对记下</button>' : ''}<button class="btn primary" data-act="vargen">再出一道</button></div></div>`;
   h += `<p class="small faint" style="margin:4px 0 8px">和原题考的是同一个地方，换了数字。先在纸上做，再把答案（最好带关键步骤）写下来。</p>
     <div class="card" style="font-size:18px;line-height:1.7;white-space:pre-wrap">${esc(V.q)}</div>
     <label class="f">我的答案</label><textarea id="var-ans" class="wiz-in" style="min-height:90px" placeholder="比如：x = 3（先去括号，再移项）" ${V.res && V.res.ok ? 'disabled' : ''}>${esc(V.ans || '')}</textarea>`;
@@ -1492,7 +1501,8 @@ async function mixStart(){
     const out = await aiChat([{role: 'system', content: `你是有经验的初中数学老师。为下面每道学生做错的题各出一道「同类新题」：考同一个知识点和易错点，换数字或情境，七年级水平，每道 3 分钟内能做完。题目里不要写出知识点名称或章节，让学生自己判断该用什么方法。只输出 JSON 数组，顺序和原题一致：[{"q":"题目"}]。不要答案。`}, {role: 'user', content: list}], {temperature: 0.7});
     if (state.mix !== M) return;
     const arr = parseJSONList(out); if (!arr || arr.length < src.length) throw new Error('AI 出的题不全，再试一次');
-    M.qs = src.map((it, k) => ({iid: it.id, q: String(arr[k].q || '').slice(0, 500), method: mixLabel(it)})).filter(x => x.q);
+    M.qs = src.map((it, k) => ({iid: it.id, q: String((arr[k] || {}).q || '').slice(0, 500), method: mixLabel(it)})).filter(x => x.q);
+    if (M.qs.length < 3) throw new Error('AI 出的题不全，再试一次');
     M.opts = [...new Set(M.qs.map(x => x.method))].sort(() => Math.random() - 0.5);
     M.phase = M.opts.length >= 2 ? 'method' : 'ans';
   } catch(e) { if (state.mix !== M) return; M.err = '出题失败：' + e.message; M.phase = 'err'; }
@@ -1508,8 +1518,8 @@ async function mixCheck(){
   M.busy = false; render();
 }
 function mixNext(){
-  const M = state.mix, Q = M.qs[M.i]; M.res[M.i] = {ok: M.cur && M.cur.ok === true, method: M.pick === Q.method};
-  const it = findItem(Q.iid); if (it && !it.ext) { it.vh = (it.vh || []).concat([{d: today(), ok: M.res[M.i].ok, mix: true}]).slice(-10); it.u = now(); }
+  const M = state.mix, Q = M.qs[M.i]; M.res[M.i] = {ok: M.cur && M.cur.ok === true, method: M.pick === Q.method, skip: !M.cur || M.cur.ok === null};
+  const it = findItem(Q.iid); if (it && !it.ext && M.cur && M.cur.ok !== null) { it.vh = (it.vh || []).concat([{d: today(), ok: M.res[M.i].ok, mix: true}]).slice(-10); it.u = now(); }
   M.i++; M.pick = null; M.cur = null; M.ans = '';
   if (M.i >= M.qs.length) { M.phase = 'done'; DB.mixRecs.push({id: uid('mx'), d: today(), n: M.qs.length, ok: M.res.filter(r => r.ok).length, method: M.res.filter(r => r.method).length, u: now()}); }
   else M.phase = M.opts.length >= 2 ? 'method' : 'ans';
@@ -1957,7 +1967,7 @@ function vRedo(){
   if (dn) { const ex = (dayObj(today()) || {}).explain || 0;
     h += `<div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>讲给我听（给家长）</h3><p style="margin:0 0 8px">请他挑刚才做对的一道讲讲：<b>「这题为什么这么做？」</b>你只听，不判对错、不纠正。自己讲一遍，比听别人讲记得牢。</p>
       <div class="row"><button class="btn sm" data-act="explain" data-v="1">听他讲完了</button><button class="btn sm ghost" data-act="explain" data-v="0">没讲清，明天再讲</button>${ex ? `<span class="small faint">今天讲了 ${ex} 次</span>` : ''}</div></div>`; }
-  const up = {}; for (const it of AI) if (!it.done && it.due > today() && it.due <= addD(today(), 7)) up[it.due] = (up[it.due]||0) + 1;
+  const up = {}; for (const it of AI) { const dd = sureDue(it); if (!it.done && queued(it) && dd > today() && dd <= addD(today(), 7)) up[dd] = (up[dd]||0) + 1; }
   if (Object.keys(up).length) h += `<div class="card"><h3>接下来 7 天</h3><div class="row">` + Object.keys(up).sort().map(d => `<span class="pill">${mdShort(d)} ${wd(d)} · ${up[d]} 道</span>`).join('') + `</div></div>`;
   if (wk.redoN) h += `<div class="card"><h3>本周重做</h3><p style="margin:0">做了 ${wk.redoN} 次，做对 ${wk.redoOk} 次（${pct(wk.redoOk, wk.redoN)}%）。</p></div>`;
   return h;
@@ -1999,7 +2009,7 @@ function vExport(){
 function exportCSV(){
   const q = v => { v = v == null ? '' : String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
   const head = ['日期','科目','错误类型','具体问题','知识点','题干','正确答案','孩子当时的答案','做的时候','卡点','来源','重做次数','重做做对','状态','下次重做'];
-  const lines = [head.join(',')].concat(exportRows().map(it => [it.d, subjById(it.sid).name, typeName(it), subName(it), it.tag, it.stem || '', it.answer || '', it.kidAnswer || '', it.conf ? CONF.find(c=>c.k===it.conf).n : '', it.ext ? '' : itemStuck(it), it.ext ? '拍照错题本 · ' + (it.src||'') : '每日记录', (it.hist||[]).length, (it.hist||[]).filter(h=>h.ok).length, itemStatus(it), it.done ? '' : it.due].map(q).join(',')));
+  const lines = [head.join(',')].concat(exportRows().map(it => [it.d, subjById(it.sid).name, typeName(it), subName(it), it.tag, it.stem || '', it.answer || '', it.kidAnswer || '', it.conf ? CONF.find(c=>c.k===it.conf).n : '', it.ext ? '' : itemStuck(it), it.ext ? '拍照错题本 · ' + (it.src||'') : '每日记录', (it.hist||[]).length, (it.hist||[]).filter(h=>h.ok).length, itemStatus(it), it.done ? '' : sureDue(it)].map(q).join(',')));
   download('错题-' + today() + '.csv', '﻿' + lines.join('\r\n'), 'text/csv');
 }
 function download(name, text, type){
@@ -2821,7 +2831,7 @@ function vLearn(){
   if (L.view === 'books') return vBooks();
   if (!LIB.tried || (LIB.words === null && LIB.recite === null && LIB.books === null && !LIB.done)) { LIB.done = true; }
   // 一屏方块：名称 + 一行现状，点进去再看说明和打印
-  const W = uniqWords(), mastered = W.filter(w => (wState(w)||{}).done).length, wq = LIB.words ? Math.min(wordQueue().length, 99) : 0;
+  const W = uniqWords(), mastered = W.filter(w => (wState(w)||{}).done).length, wq = wordsLeftTonight();
   const RI = LIB.recite ? LIB.recite.items : [], tk = termKey(today()), cur = RI.filter(x => x.term === tk), can = cur.filter(x => ['can','dict'].includes(rState(x.id))).length;
   const sr = DB.speakRecs, last = sr[sr.length - 1], est = LIB.pe ? peEstimate() : {field: null};
   const ex = extraTask(today()), rDueN = LIB.recite ? reciteDue().length : 0;
@@ -2859,7 +2869,8 @@ function vWords(){
   return h;
 }
 function vWordCard(){
-  const L = state.learn, q0 = wordQueue(), q = wordsDoneToday() >= wordsTonight() ? [] : q0;
+  const L = state.learn, q0 = wordQueue(), isRetry = w => { const s = wState(w); return s && s.triesD === today() && s.due === today() && !s.done; };
+  const q = wordsDoneToday() >= wordsTonight() ? q0.filter(isRetry) : q0;
   let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">背单词</h2><span class="spacer"></span><span class="small faint">今晚还剩 ${Math.min(q.length, Math.max(0, wordsTonight() - wordsDoneToday()))}</span><button class="btn sm ghost" data-act="lv" data-v="words">单词表 / 打印</button></div>` + `<details style="margin-top:6px"><summary class="small faint">怎么背</summary><p class="small faint" style="margin:6px 0 0">看中文想英文，想完再翻面听发音。每天新学 ${newPerDay()} 个（按最近的正确率自动调：记得牢就多学，记不住就少学），记住的隔 1、3、7、21 天再考，第 4 次还记得就算掌握。</p></details>`;
   if (!q.length) return h + `<div class="card empty" style="margin-top:12px">今天的单词背完了。明天再来，隔天复习才记得牢。<div style="margin-top:12px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button></div></div>`;
   const w = q[0], s = wState(w), flip = L.flip, mustSpell = !!s && (s.box || 0) >= 2, spellOk = (L.typed || '').trim().toLowerCase() === w.w.toLowerCase();
@@ -3082,7 +3093,7 @@ function kidProgress(){
   const inA = d => d >= mon && d <= t, inB = d => d >= pm && d <= pt, out = [];
   let ra = 0, rb = 0; for (const it of allItems()) for (const h of (it.hist || [])) if (h.ok) { if (inA(h.d)) ra++; else if (inB(h.d)) rb++; }
   if (ra && ra > rb) out.push(`重做做对 <b>${ra}</b> 道${rb ? `，比上周多 ${ra - rb} 道` : ''}`);
-  let wa = 0, wb = 0, ma = 0; for (const k in DB.words) { const w = DB.words[k], hs = w.hist || []; for (const h of hs) if (h.ok) { if (inA(h.d)) wa++; else if (inB(h.d)) wb++; } const last = hs[hs.length - 1]; if (w.done && last && inA(last.d)) ma++; }
+  let wa = 0, wb = 0, ma = 0; for (const k in DB.words) { const w = DB.words[k], hs = w.hist || []; for (const h of hs) if (h.ok) { if (inA(h.d)) wa++; else if (inB(h.d)) wb++; } const last = hs[hs.length - 1]; if (w.done && last && inA(last.d) && !last.known) ma++; }
   if (ma) out.push(`新掌握 <b>${ma}</b> 个单词`); else if (wa && wa > wb) out.push(`单词记对 <b>${wa}</b> 次${wb ? `，比上周多 ${wa - wb} 次` : ''}`);
   const rc = LIB.recite ? LIB.recite.items.filter(x => ((DB.recite[x.id] || {}).hist || []).some(h => inA(h.d) && h.score >= 90)) : [];
   if (rc.length) out.push(`背下来 <b>${rc.length}</b> 篇：${rc.slice(0, 2).map(x => '《' + esc(x.title.replace(/[（(].*$/, '')) + '》').join('')}`);
@@ -3124,7 +3135,7 @@ function todayGlance(){
   const probs = itemsOn(d).filter(it => it.stem || it.tag).slice(0, 4), stuck = recs.filter(([, r]) => r.stuck).slice(0, 3), ai = (dd.aiMin || 0);
   const ck = (ok, t) => `<span style="margin-right:12px;white-space:nowrap"><b style="color:${ok ? 'var(--good)' : 'var(--ink3)'}">${ok ? '✓' : '○'}</b> ${t}</span>`;
   let h = `<div class="card"><div class="row"><h3 style="margin:0">今天</h3><span class="spacer"></span><span class="small faint">${md(d)} ${wd(d)}</span></div>
-    <div style="margin:8px 0;line-height:2">${ck(filled >= subs.length, `作业 ${filled}/${subs.length} 科`)}${ck(left === 0, dn ? `重做 ${dn} 道` : left === 0 ? '重做（今天没有）' : '重做')}${ck(LIB.done && wq === 0, wDone ? `单词 ${wDone} 个` : '单词')}${ck(rDone, '古诗')}</div>
+    <div style="margin:8px 0;line-height:2">${ck(filled >= subs.length, `作业 ${filled}/${subs.length} 科`)}${ck(left === 0, dn ? `重做 ${dn} 道` : left === 0 ? '重做（今天没有）' : '重做')}${ck(LIB.done && wordsLeftTonight() === 0, wDone ? `单词 ${wDone} 个` : '单词')}${ck(rDone, '古诗')}</div>
     <p style="margin:0">${mins ? `作业共 <b>${mins}</b> 分钟` : '还没记用时'}${recs.length ? `（${recs.map(([s, r]) => esc(s.name) + ' ' + r.min).join('、')}）` : ''}${stops.length ? `，${stops.map(([s]) => esc(s.name)).join('、')}中途停过` : mins ? '，都没中途停' : ''}。${ai ? ` 用 AI 老师 ${Math.round(ai)} 分钟。` : ''}</p>`;
   if (probs.length || stuck.length) h += `<div class="small" style="margin-top:8px;color:var(--ink2)">他记下的问题：</div>` +
     probs.map(it => `<div style="margin:3px 0">· <b>${esc(subjById(it.sid).name)}</b> ${esc((it.stem || it.tag).slice(0, 60))}</div>`).join('') +
@@ -3427,7 +3438,9 @@ const ACT = {
   vargen: () => { if (state.variant.busy) return; state.variant.err = ''; varGen(); },
   varcheck: () => { state.variant.err = ''; varCheck(); },
   varclose: () => { state.variant = null; render(); },
-  vardone: el => { const id = state.variant.iid; state.variant = null; redoItem(id, el.dataset.ok === '1', true); },
+  vardone: el => { const V = state.variant, id = V.iid, ok = el.dataset.ok === '1'; state.variant = null;
+    if (V.final) { if (ok) redoItem(id, true, true); else finalMiss(id); } else if (ok) redoItem(id, true, true); else render(); },
+  varself: () => { const id = state.variant.iid; state.variant = null; finalMiss(id, true); },
   memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
   spopen: el => { stopAllEn(); state.learn.sp = el.dataset.v; state.sp = null; render(); window.scrollTo(0,0); },
   lsplay: () => { const S = state.ls; S.phase = 'play'; S.n2 = false; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.ls === S && S.phase === 'play' && state.tab === 'learn') { S.phase = 'q'; S.i = 0; lsAsk(); } }); },
@@ -3532,7 +3545,7 @@ const ACT = {
   tpause: () => timerPause(),
   tstop: () => timerStop(),
   ev: el => { state.errView = el.dataset.v; render(); },
-  redo: el => redoItem(el.dataset.v, el.dataset.ok === '1'),
+  redo: el => { const k = el.dataset.v, t0 = Date.now(); if (ACT._lastRedo && ACT._lastRedo.k === k && t0 - ACT._lastRedo.t < 800) return; if (ACT._lastRedo && t0 - ACT._lastRedo.t < 400) return; ACT._lastRedo = {k, t: t0}; redoItem(k, el.dataset.ok === '1'); },
   skipitem: el => { if (!confirm('找不到原题，就把这道移出重做队列？')) return; const it = DB.items.find(x => x.id === el.dataset.v); it.done = true; it.skipped = true; it.u = now(); save(); render(); },
   alldue: (el, e) => { e.preventDefault(); state.showAllDue = true; render(); },
   errp: el => { state.errPeriod = el.dataset.v; render(); },
