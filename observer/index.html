@@ -1161,10 +1161,11 @@ function installBanner(){
 function welcomeCard(){
   let h = '';
   const everUsed = Object.keys(DB.days).some(dayHasData);
-  if (!DEMO && !everUsed && !lsGet('observer:welcomed')) h += `<div class="card" style="border-color:var(--accent)"><h3>第一次用，看这里</h3>
-    <p style="margin:0 0 6px"><b>孩子每天晚上</b>（约 10 分钟）：① 点下面的「一步一步填」记今天的作业 ② 做到期的重做题（一开始没有）③ 背几个单词。</p>
-    <p style="margin:0 0 6px"><b>家长每天</b>：问一句「哪一步最不确定」，只听不讲。<b>每周日</b>：到「家长 → 复盘」看一眼，定一件下周要调的事。</p>
-    <p class="small faint" style="margin:0 0 8px">记的是实际发生了什么，不是考核。头一两周只管记，模式会自己浮现。</p><button class="btn sm primary" data-act="welcomed">知道了</button></div>`;
+  if (!DEMO && !everUsed && !lsGet('observer:welcomed')) h += `<div class="card" style="border-color:var(--accent)"><h3>第一次用，看这 3 条就够</h3>
+    <p style="margin:0 0 8px">① 每晚写完作业，点上面的<b>「下一步」</b>，一路点下去就行，大约 10 分钟。</p>
+    <p style="margin:0 0 8px">② 哪道题不会、哪一步卡住了，点<b>「＋ 记一个问题」</b>，说一句就行，过几天会让你再做一次。</p>
+    <p style="margin:0 0 8px">③ 实在想不出来，点<b>「问 AI 老师」</b>。它只给提示，不给答案。</p>
+    <p class="small faint" style="margin:0 0 8px">这里记的是实际发生了什么，不是考核。做错不扣分，记下来才有用。</p><button class="btn sm primary" data-act="welcomed">知道了</button></div>`;
   return h;
 }
 function banners(){
@@ -3196,6 +3197,7 @@ function vMe(part){
   }
   if (part === 'mine') return h + `</div><div>` + methodCard() + `</div></div>`;
   h = `<div class="cols"><div>`;
+  h += guideCard();
   h += syncCard();
   h += aiCard();
   const s = DB.settings;
@@ -3234,6 +3236,14 @@ async function aiSelfTest(){
 function aiTestHTML(){
   if (!state.aiTest) return '';
   return `<div style="margin-top:10px">` + state.aiTest.map(r => `<div class="row" style="flex-wrap:nowrap;padding:5px 0;border-top:1px solid var(--line);align-items:flex-start"><span style="width:22px">${r.st === 'ok' ? '✅' : r.st === 'bad' ? '❌' : r.st === 'skip' ? '➖' : '⏳'}</span><div style="flex:1"><div>${esc(r.name)}${r.ms ? ` <span class="small faint">${(r.ms / 1000).toFixed(1)} 秒</span>` : ''}</div>${r.msg ? `<div class="small ${r.st === 'bad' ? '' : 'faint'}" style="${r.st === 'bad' ? 'color:var(--danger)' : ''}">${esc(r.msg)}</div>` : ''}</div></div>`).join('') + `</div>`;
+}
+function guideCard(){
+  return `<details class="card"><summary><h3 style="display:inline">怎么用（给家长）</h3> <span class="small faint">2 分钟看完</span></summary>
+    <p style="margin:10px 0 6px"><b>每天，1 分钟</b>：打开「家长」页，看最上面的「今天」：做完没有、写了多久、他记下了什么问题。想聊的话，从「今晚只问孩子一句」里挑一句问他，只听，不讲题。</p>
+    <p style="margin:0 0 6px"><b>每周日，5 分钟</b>：看「本周复盘」最上面那一条，和「这周在试的调整」。系统每周只调一件事，下周自动看有没有效果。想留底就点「打印这周周报」。</p>
+    <p style="margin:0 0 6px"><b>什么时候需要你</b>：家长页出现橙色的「需要注意」时（连续没记、错题积压、某科老中途停、作业太多、太依赖 AI），按上面写的做一件事就好。考完试点「记一次考试」，拍成绩单自动填。</p>
+    <p style="margin:0 0 6px"><b>哪些不用你管</b>：重做排哪几道、单词背多少、古诗什么时候复习、作业多的晚上减量，这些 app 按他的记录自动安排。不用检查他做得对不对，也不用每天看复盘。</p>
+    <p class="small faint" style="margin:0">研究发现，初中生家长盯作业、盯分数效果往往适得其反；定好规则、偶尔聊聊学习的用处，效果更好。</p></details>`;
 }
 function aiCard(){
   if (aiReady() && !state.aiEdit) return `<div class="card"><h3>AI 学习教练 <span class="pill good">已开启</span></h3>
