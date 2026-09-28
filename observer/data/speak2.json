@@ -342,6 +342,420 @@
 "ans": "On Friday."
 }
 ]
+},
+{
+"id": "l07",
+"kind": "dialogue",
+"title": "Joining a Club",
+"lines": [
+[
+"M",
+"Hi, Jenny. Which club are you going to join this term?"
+],
+[
+"F",
+"I want to join the drama club. I love acting."
+],
+[
+"M",
+"When does the club meet?"
+],
+[
+"F",
+"Every Thursday after school, from four to five thirty."
+],
+[
+"M",
+"That sounds fun. I'll join the chess club with my cousin."
+]
+],
+"qs": [
+{
+"q": "Which club does Jenny want to join?",
+"keys": [
+[
+"drama"
+]
+],
+"ans": "The drama club."
+},
+{
+"q": "When does the club meet?",
+"keys": [
+[
+"thursday"
+]
+],
+"ans": "Every Thursday after school."
+}
+]
+},
+{
+"id": "l08",
+"kind": "dialogue",
+"title": "Buying Shoes",
+"lines": [
+[
+"F",
+"Can I help you?"
+],
+[
+"M",
+"Yes, I'm looking for a pair of running shoes."
+],
+[
+"F",
+"What size do you wear?"
+],
+[
+"M",
+"Size forty. Do you have them in blue?"
+],
+[
+"F",
+"Yes, here you are. They're on sale today, only two hundred yuan."
+]
+],
+"qs": [
+{
+"q": "What kind of shoes does the boy want?",
+"keys": [
+[
+"running"
+]
+],
+"ans": "Running shoes."
+},
+{
+"q": "How much are the shoes?",
+"keys": [
+[
+"two",
+"hundred"
+],
+[
+"200"
+]
+],
+"ans": "Two hundred yuan."
+}
+]
+},
+{
+"id": "l09",
+"kind": "dialogue",
+"title": "A Phone Call",
+"lines": [
+[
+"M",
+"Hello, may I speak to Linda, please?"
+],
+[
+"F",
+"Sorry, she isn't in. She has gone to the dentist. Can I take a message?"
+],
+[
+"M",
+"Yes, please. This is Peter. Please tell her the football match is changed to Sunday morning."
+],
+[
+"F",
+"OK, I'll tell her when she comes back."
+]
+],
+"qs": [
+{
+"q": "Where has Linda gone?",
+"keys": [
+[
+"dentist"
+]
+],
+"ans": "To the dentist."
+},
+{
+"q": "When is the football match now?",
+"keys": [
+[
+"sunday"
+]
+],
+"ans": "On Sunday morning."
+}
+]
+},
+{
+"id": "l10",
+"kind": "dialogue",
+"title": "Weekend Weather",
+"lines": [
+[
+"F",
+"Dad, what will the weather be like tomorrow?"
+],
+[
+"M",
+"The weather report says it will be cloudy in the morning and rainy in the afternoon."
+],
+[
+"F",
+"Oh no. We planned to go hiking."
+],
+[
+"M",
+"We can go early and come back before lunch."
+],
+[
+"F",
+"Good idea. I'll get up at six."
+]
+],
+"qs": [
+{
+"q": "What will the weather be like tomorrow afternoon?",
+"keys": [
+[
+"rain"
+],
+[
+"rainy"
+],
+[
+"raining"
+]
+],
+"ans": "Rainy."
+},
+{
+"q": "What time will the girl get up?",
+"keys": [
+[
+"six"
+],
+[
+"6"
+]
+],
+"ans": "At six."
+}
+]
+},
+{
+"id": "l11",
+"kind": "dialogue",
+"title": "Lost and Found",
+"lines": [
+[
+"M",
+"Excuse me, I lost my schoolbag this morning."
+],
+[
+"F",
+"What colour is it?"
+],
+[
+"M",
+"It's black, and there is a small bear on it."
+],
+[
+"F",
+"What's inside?"
+],
+[
+"M",
+"Some books, a pencil case and my keys."
+],
+[
+"F",
+"Let me check. Is this yours? Someone found it in the dining hall."
+]
+],
+"qs": [
+{
+"q": "What colour is the schoolbag?",
+"keys": [
+[
+"black"
+]
+],
+"ans": "Black."
+},
+{
+"q": "Where was the schoolbag found?",
+"keys": [
+[
+"dining",
+"hall"
+],
+[
+"dining"
+]
+],
+"ans": "In the dining hall."
+}
+]
+},
+{
+"id": "l12",
+"kind": "dialogue",
+"title": "Healthy Food",
+"lines": [
+[
+"F",
+"Tom, you often eat hamburgers for lunch."
+],
+[
+"M",
+"Yes, they're quick and tasty."
+],
+[
+"F",
+"But they aren't healthy. You should eat more vegetables."
+],
+[
+"M",
+"You're right. From next week, I'll bring rice and vegetables from home."
+],
+[
+"F",
+"Great. And drink more water instead of cola."
+]
+],
+"qs": [
+{
+"q": "What does Tom often eat for lunch?",
+"keys": [
+[
+"hamburger"
+],
+[
+"hamburgers"
+]
+],
+"ans": "Hamburgers."
+},
+{
+"q": "What should Tom drink instead of cola?",
+"keys": [
+[
+"water"
+]
+],
+"ans": "Water."
+}
+]
+},
+{
+"id": "l13",
+"kind": "passage",
+"title": "An English Speech Contest",
+"lines": [
+[
+"F",
+"Attention, please. Our school will hold an English speech contest next Friday afternoon in the school hall. Each speaker will have three minutes. The topic is My Dream. If you want to take part, please sign up with your English teacher before Wednesday. The top three students will get a dictionary and a certificate. We hope to see you there."
+]
+],
+"qs": [
+{
+"q": "Where will the contest be held?",
+"keys": [
+[
+"hall"
+]
+],
+"ans": "In the school hall."
+},
+{
+"q": "How long can each speaker talk?",
+"keys": [
+[
+"three",
+"minutes"
+],
+[
+"3",
+"minutes"
+],
+[
+"three"
+],
+[
+"3"
+]
+],
+"ans": "Three minutes."
+},
+{
+"q": "What is the topic of the speech?",
+"keys": [
+[
+"dream"
+]
+],
+"ans": "My Dream."
+},
+{
+"q": "What will the top three students get?",
+"keys": [
+[
+"dictionary"
+],
+[
+"certificate"
+]
+],
+"ans": "A dictionary and a certificate."
+}
+]
+},
+{
+"id": "l14",
+"kind": "passage",
+"title": "My Neighbour",
+"lines": [
+[
+"M",
+"My neighbour, Mr Wang, is a doctor at the city hospital. He is very busy and often works at night. Although he is tired, he always smiles when he meets us. Last winter, when my mother caught a bad cold, he came to our home and gave her some advice. On weekends, he plays badminton with his son in the park. Everyone in our building likes him."
+]
+],
+"qs": [
+{
+"q": "What does Mr Wang do?",
+"keys": [
+[
+"doctor"
+]
+],
+"ans": "He is a doctor."
+},
+{
+"q": "When does he often work?",
+"keys": [
+[
+"night"
+]
+],
+"ans": "At night."
+},
+{
+"q": "What was wrong with the speaker's mother last winter?",
+"keys": [
+[
+"cold"
+]
+],
+"ans": "She caught a bad cold."
+},
+{
+"q": "What does Mr Wang play with his son?",
+"keys": [
+[
+"badminton"
+]
+],
+"ans": "Badminton."
+}
+]
 }
 ],
 "retell": [
@@ -547,6 +961,347 @@
 {
 "cn": "询问 Tina 怎么去奶奶家",
 "expect": "How does Tina get to her grandma's home?"
+}
+]
+},
+{
+"id": "t04",
+"title": "Lily's Garden",
+"text": "Lily lives in a flat without a garden, but she loves plants. Two years ago, she decided to grow vegetables on her balcony. She bought some pots and seeds, and read books to learn how to take care of them. At first, many plants died because she gave them too much water. Now she grows tomatoes, peppers and lettuce, and her family often eats fresh salad. She has even started sharing her vegetables with her neighbours.",
+"points": [
+{
+"p": "住公寓，没有花园，但喜欢植物",
+"keys": [
+"flat",
+"plants",
+"garden"
+]
+},
+{
+"p": "两年前开始在阳台种菜",
+"keys": [
+"balcony",
+"vegetables",
+"two years"
+]
+},
+{
+"p": "买了花盆和种子，看书学习",
+"keys": [
+"pots",
+"seeds",
+"books",
+"read"
+]
+},
+{
+"p": "一开始浇水太多，很多植物死了",
+"keys": [
+"water",
+"died",
+"too much"
+]
+},
+{
+"p": "现在种番茄、辣椒、生菜",
+"keys": [
+"tomatoes",
+"peppers",
+"lettuce",
+"salad"
+]
+},
+{
+"p": "还和邻居分享",
+"keys": [
+"neighbours",
+"neighbors",
+"share",
+"sharing"
+]
+}
+],
+"map": "Lily 的情况 → 两年前开始做什么 → 怎么学 → 一开始的问题 → 现在种了什么 → 还做了什么",
+"asks": [
+{
+"cn": "询问 Lily 每天花多少时间照顾植物",
+"expect": "How much time does Lily spend taking care of her plants every day?"
+},
+{
+"cn": "询问她最喜欢种哪种蔬菜",
+"expect": "Which vegetable does she like growing best?"
+}
+]
+},
+{
+"id": "t05",
+"title": "A Kind Act",
+"text": "Last Tuesday, Mark was riding his bike home when he saw an old man fall down on the street. Many people walked past, but Mark stopped at once. He helped the man sit up and asked if he was hurt. The man said his leg hurt badly, so Mark called his daughter with the man's phone. Twenty minutes later, she arrived and took her father to hospital. The next day, she came to Mark's school to thank him.",
+"points": [
+{
+"p": "上周二骑车回家，看到老人摔倒",
+"keys": [
+"tuesday",
+"fall",
+"fell",
+"old man",
+"bike"
+]
+},
+{
+"p": "很多人走过，Mark 马上停下",
+"keys": [
+"stopped",
+"walked past",
+"at once"
+]
+},
+{
+"p": "扶老人坐起来，问伤到没有",
+"keys": [
+"sit up",
+"hurt",
+"helped"
+]
+},
+{
+"p": "用老人的手机打给他女儿",
+"keys": [
+"called",
+"daughter",
+"phone"
+]
+},
+{
+"p": "二十分钟后女儿送他去医院",
+"keys": [
+"hospital",
+"twenty minutes",
+"20 minutes"
+]
+},
+{
+"p": "第二天来学校感谢 Mark",
+"keys": [
+"thank",
+"school",
+"next day"
+]
+}
+],
+"map": "什么时间、看到什么 → 别人怎么做、Mark 怎么做 → 怎么帮 → 联系谁 → 结果 → 第二天",
+"asks": [
+{
+"cn": "询问老人为什么会摔倒",
+"expect": "Why did the old man fall down?"
+},
+{
+"cn": "询问 Mark 当时有没有害怕",
+"expect": "Was Mark afraid at that time?"
+}
+]
+},
+{
+"id": "t06",
+"title": "The Reading Club",
+"text": "Our class started a reading club last month. Every two weeks, we choose one book and read it at home. Then we meet on Friday afternoon to share our ideas. Each member has to say what they learned and ask one question. At the beginning, some students were too shy to speak. But our teacher encouraged us, and now everyone joins in the discussion. I have read three books so far, and my writing has improved a lot.",
+"points": [
+{
+"p": "上个月班里成立读书会",
+"keys": [
+"reading club",
+"last month",
+"club"
+]
+},
+{
+"p": "每两周选一本书在家读",
+"keys": [
+"two weeks",
+"choose",
+"one book"
+]
+},
+{
+"p": "周五下午见面分享想法",
+"keys": [
+"friday",
+"share",
+"ideas",
+"meet"
+]
+},
+{
+"p": "每人说学到什么、提一个问题",
+"keys": [
+"learned",
+"question",
+"each member"
+]
+},
+{
+"p": "一开始有人害羞，老师鼓励",
+"keys": [
+"shy",
+"encouraged",
+"teacher"
+]
+},
+{
+"p": "读了三本，写作进步很多",
+"keys": [
+"three books",
+"3 books",
+"writing",
+"improved"
+]
+}
+],
+"map": "读书会什么时候成立 → 怎么选书 → 什么时候见面 → 每人要做什么 → 一开始的问题 → 我的收获",
+"asks": [
+{
+"cn": "询问读书会有多少成员",
+"expect": "How many members are there in the reading club?"
+},
+{
+"cn": "询问下一本要读什么书",
+"expect": "What book will you read next?"
+}
+]
+},
+{
+"id": "t07",
+"title": "A Trip to the Mountains",
+"text": "During the National Day holiday, Amy and her parents travelled to Huangshan. They took a high-speed train and arrived in the evening. The next morning, they got up at four o'clock to watch the sunrise from the top of the mountain. It was very cold and windy, but the view was amazing. Amy took many photos of the sea of clouds and the old pine trees. Although her legs hurt after climbing for hours, she said it was her best trip ever.",
+"points": [
+{
+"p": "国庆假期和父母去黄山",
+"keys": [
+"national day",
+"huangshan",
+"holiday",
+"parents"
+]
+},
+{
+"p": "坐高铁，晚上到",
+"keys": [
+"train",
+"high speed",
+"evening"
+]
+},
+{
+"p": "第二天四点起床看日出",
+"keys": [
+"four",
+"4",
+"sunrise"
+]
+},
+{
+"p": "又冷风又大，但景色很美",
+"keys": [
+"cold",
+"windy",
+"view",
+"amazing"
+]
+},
+{
+"p": "拍了云海和松树",
+"keys": [
+"photos",
+"clouds",
+"pine"
+]
+},
+{
+"p": "腿疼，但是最好的一次旅行",
+"keys": [
+"legs",
+"hurt",
+"best trip"
+]
+}
+],
+"map": "什么时候、去哪里 → 怎么去 → 第二天做什么 → 天气和景色 → 拍了什么 → 感受",
+"asks": [
+{
+"cn": "询问他们在黄山住了几天",
+"expect": "How many days did they stay in Huangshan?"
+},
+{
+"cn": "询问 Amy 最喜欢哪张照片",
+"expect": "Which photo does Amy like best?"
+}
+]
+},
+{
+"id": "t08",
+"title": "Saving Pocket Money",
+"text": "Ben used to spend all his pocket money on snacks and games. Last year, his mother suggested that he should save some of it. At first, Ben thought it was boring. Then he decided to save money for a new bike. He put twenty yuan into a box every week and wrote down how much he had. It took him eight months, but he finally bought the bike himself. Now he feels proud and plans his money carefully.",
+"points": [
+{
+"p": "以前把零花钱都花在零食和游戏上",
+"keys": [
+"snacks",
+"games",
+"pocket money",
+"spend"
+]
+},
+{
+"p": "去年妈妈建议他存钱",
+"keys": [
+"mother",
+"suggested",
+"save"
+]
+},
+{
+"p": "一开始觉得无聊",
+"keys": [
+"boring",
+"at first"
+]
+},
+{
+"p": "决定存钱买新自行车",
+"keys": [
+"bike",
+"new bike"
+]
+},
+{
+"p": "每周存二十元，记下来",
+"keys": [
+"twenty",
+"20",
+"every week",
+"wrote"
+]
+},
+{
+"p": "八个月后自己买到车，现在会计划花钱",
+"keys": [
+"eight months",
+"8 months",
+"proud",
+"plans",
+"carefully"
+]
+}
+],
+"map": "以前怎么花钱 → 谁提了建议 → 一开始的想法 → 目标是什么 → 怎么存 → 结果和变化",
+"asks": [
+{
+"cn": "询问 Ben 的自行车花了多少钱",
+"expect": "How much did Ben's bike cost?"
+},
+{
+"cn": "询问他接下来想存钱买什么",
+"expect": "What does he want to save money for next?"
 }
 ]
 }
