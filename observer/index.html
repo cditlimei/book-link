@@ -285,6 +285,7 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
   #printbox .pi{break-inside:avoid;padding:6pt 0;border-bottom:.5pt dashed #999}
   #printbox .pq{font-size:12.5pt}
   #printbox .pblank{height:70pt}
+  #printbox .ppic{display:block;max-width:100%;max-height:7cm;margin:4pt 0;object-fit:contain}
   #printbox .pblank.sm{height:40pt;font-size:9pt;color:#888}
   #printbox .pbreak{break-before:page}
   #printbox table.pw{width:100%;border-collapse:collapse;font-size:11.5pt}
@@ -1920,8 +1921,10 @@ function download(name, text, type){
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type + ';charset=utf-8'}));
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
-function exportPrint(){
+async function exportPrint(){
   const f = state.exp, rows = exportRows(); let n = 0;
+  // 有原题照片的先取出来（本机没有就从私有仓库下载解密），印在题目下面
+  const pics = {}; for (const it of rows) if (it.photoId && !pics[it.photoId]) { const p = DB.photos.find(x => x.id === it.photoId); if (p) { try { pics[it.photoId] = await photoSrc(p); } catch(e) {} } }
   const [from, to, lab] = periodRange(f.period);
   let h = `<h1>${esc(DB.settings.child)}的错题本</h1><p class="pm">${lab}（${md(from)}–${md(to)}）· ${f.subj==='all'?'全部科目':esc(subjById(f.subj).name)} · 共 ${rows.length} 道 · 导出于 ${md(today())}</p>`;
   const answers = [];
@@ -1933,15 +1936,18 @@ function exportPrint(){
       h += `<h3>${typeName(ts[0])}（${ts.length}）</h3>`;
       for (const it of ts) { n++;
         h += `<div class="pi"><div class="pq"><b>${n}.</b> ${it.stem ? esc(it.stem) : esc(it.tag || '（没标知识点）')}</div>
-          <div class="pmeta">${md(it.d)} · ${subName(it) ? esc(subName(it)) + ' · ' : ''}${it.stem && it.tag ? esc(it.tag) + ' · ' : ''}${it.conf ? CONFN[it.conf] + ' · ' : ''}${it.ext ? esc(it.src) : '每日记录'}${!it.ext && itemStuck(it) ? ' · 当时说：「' + esc(itemStuck(it)) + '」' : ''}</div>
-          ${it.stem ? '<div class="pblank"></div>' : '<div class="pblank sm">翻到原题重做：</div>'}</div>`;
+          <div class="pmeta">${md(it.d)} · ${subName(it) ? esc(subName(it)) + ' · ' : ''}${it.stem && it.tag ? esc(it.tag) + ' · ' : ''}${it.conf ? CONFN[it.conf] + ' · ' : ''}${it.ext || it.src ? esc(it.src) : '每日记录'}${!it.ext && itemStuck(it) ? ' · 当时说：「' + esc(itemStuck(it)) + '」' : ''}</div>
+          ${pics[it.photoId] ? `<img class="ppic" src="${pics[it.photoId]}" alt="原题">` : ''}
+          ${it.stem || pics[it.photoId] ? '<div class="pblank"></div>' : '<div class="pblank sm">翻到原题重做：</div>'}</div>`;
         if (it.answer) answers.push(`<p><b>${n}.</b> ${esc(it.answer)}${it.note ? `<br><span class="pmeta">讲题提示：${esc(it.note)}</span>` : ''}</p>`);
       }
     }
   }
   if (f.answers && answers.length) h += `<div class="pbreak"></div><h2>答案</h2>` + answers.join('');
   let box = $('#printbox'); if (!box) { box = document.createElement('div'); box.id = 'printbox'; document.body.appendChild(box); }
-  box.innerHTML = h; setTimeout(() => window.print(), 50);
+  box.innerHTML = h;
+  await Promise.all([...box.querySelectorAll('img')].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+  setTimeout(() => window.print(), 50);
 }
 
 function periodRange(p){
