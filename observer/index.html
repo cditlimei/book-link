@@ -360,6 +360,24 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 <div id="toast"></div>
 <script src="vendor/ts-fsrs-5.4.2.umd.js"></script>
 <script>
+/* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
+const APP_V = 'v54';
+const ERRLOG_K = 'observer:errlog';
+function logErr(msg, src, line, col, stack){
+  try {
+    const clean = t => String(t || '').replace(/[一-鿿]{6,}/g, '…').slice(0, 160);   // 长串中文（可能是孩子写的内容）不存
+    const L = JSON.parse(localStorage.getItem(ERRLOG_K) || '[]'), d = new Date();
+    const at = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const where = (String(src || '').split('/').pop() || '') + (line ? ':' + line + ':' + (col || 0) : '');
+    const top = String(stack || '').split('\n').slice(1, 3).map(x => x.trim().replace(/https?:\/\/[^ )]*\//g, '')).join(' | ');
+    const e = {at, v: APP_V, m: clean(msg), w: where, s: clean(top), view: (() => { try { return [state.tab, state.learn && state.learn.view].filter(Boolean).join('/'); } catch(x) { return 'start'; } })()};
+    if (L.length && L[L.length - 1].m === e.m && L[L.length - 1].w === e.w) { L[L.length - 1].n = (L[L.length - 1].n || 1) + 1; L[L.length - 1].at = at; }
+    else L.push(e);
+    localStorage.setItem(ERRLOG_K, JSON.stringify(L.slice(-20)));
+  } catch(x) {}
+}
+window.addEventListener('error', ev => { if (ev && ev.message) logErr(ev.message, ev.filename, ev.lineno, ev.colno, ev.error && ev.error.stack); });
+window.addEventListener('unhandledrejection', ev => { const r = ev && ev.reason; logErr('Promise: ' + ((r && r.message) || r), '', 0, 0, r && r.stack); });
 'use strict';
 /* ================= 常量 ================= */
 const ET = [{k:'calc',n:'计算·书写',s:'执行'},{k:'concept',n:'概念·理解',s:'理解'},{k:'read',n:'审题·表达',s:'审题'}];
@@ -627,6 +645,31 @@ function examTip(d){
   const n = EXAM_N[nx.kind], what = nx.left === 0 ? `今天${n}考试，加油` : `离${n}考试还有 <b>${nx.left}</b> 天`;
   const more = nx.left === 0 ? '' : nx.left <= 3 ? '。考前三天只复习，不加新单词，早点睡' : nx.left <= 14 ? '。考前两周，重做里每天多一道以前做对的题回头看看' : '';
   return `<div class="tip">${what}${more}。</div>`;
+}
+/* 功能使用统计（近 14 天，只数天数/次数，从已有记录里算，不另外埋点）：决定下一步删减还是打磨 */
+function usageStats(from, to){
+  const S = {}, add = (k, d) => { if (d >= from && d <= to) (S[k] = S[k] || new Set()).add(d); };
+  for (const [d, dd] of Object.entries(DB.days)) { if (Object.values(dd.subj || {}).some(r => r.min > 0 || r.none)) add('hw', d); if (dd.aiMin > 0) add('ai', d); if (dd.praise) add('praise', d); if (dd.rest) add('rest', d); }
+  for (const it of allItems()) { for (const h of it.hist || []) add('redo', h.d); for (const h of it.vh || []) add(h.mix ? 'mix' : 'variant', h.d); for (const h of it.hints || []) add('hint', h.d);
+    if (it.src === '随手记') add('quick', it.d); if (it.src === '拍照识别') add('photo', it.d); }
+  for (const w of Object.values(DB.words)) for (const h of w.hist || []) add('words', h.d);
+  for (const r of Object.values(DB.recite)) for (const h of r.hist || []) { add('recite', h.d); if (h.seg != null) add('seg', h.d); }
+  for (const r of Object.values(DB.reads || {})) { for (const d of Object.keys(r.log || {})) add('read', d); for (const x of r.sums || []) add('readsum', x.d); }
+  for (const h of holList()) for (const t of h.tasks) for (const d of Object.keys(t.done || {})) add('hol', d);
+  for (const x of DB.speakRecs || []) add('speak', x.d); for (const x of DB.peRecs || []) add('pe', x.d); for (const x of DB.exams || []) add('exam', x.date);
+  const N = [['hw','记作业'],['redo','重做'],['words','背单词'],['recite','语文背诵'],['seg','分段背'],['read','名著记页数'],['readsum','名著说一句'],['hol','假期作业'],['quick','随手记问题'],['photo','拍照识别'],['ai','AI 老师'],['hint','AI 提示'],['variant','同类题'],['mix','混合练习'],['speak','英语听说'],['pe','体育'],['exam','考试记录'],['praise','家长点赞'],['rest','请假']];
+  return N.map(([k, n]) => ({k, n, days: S[k] ? S[k].size : 0}));
+}
+function diagCard(){
+  const t = today(), from = addD(t, -13), U = usageStats(from, t), used = U.filter(x => x.days), unused = U.filter(x => !x.days);
+  let E = []; try { E = JSON.parse(localStorage.getItem(ERRLOG_K) || '[]'); } catch(e) {}
+  const sum = `每日观察 ${APP_V} · ${md(from)}–${md(t)}：` + (used.length ? used.map(x => `${x.n} ${x.days} 天`).join('、') : '都没用') + (unused.length ? `；没用过：${unused.map(x => x.n).join('、')}` : '');
+  const errTxt = E.map(e => `${e.at} ${e.v} [${e.view}] ${e.m} @${e.w}${e.s ? ' ← ' + e.s : ''}${e.n > 1 ? ' ×' + e.n : ''}`).join('\n');
+  return `<div class="card"><h3>给开发看的</h3>
+    <details data-keep="diagU" ${(state.keep || {}).diagU ? 'open' : ''}><summary>这两周用了哪些功能</summary><div style="margin-top:8px">${used.map(x => `<div class="row" style="padding:3px 0"><span style="flex:1">${x.n}</span><span class="small muted">${x.days} 天</span></div>`).join('')}${unused.length ? `<p class="small faint" style="margin:8px 0 0">没用过：${unused.map(x => x.n).join('、')}</p>` : ''}
+      <button class="btn sm" style="margin-top:8px" data-act="copytxt" data-v="usage">复制这段发给开发</button><textarea id="copy-usage" readonly style="position:absolute;left:-9999px">${esc(sum)}</textarea></div></details>
+    <details data-keep="diagE" ${(state.keep || {}).diagE ? 'open' : ''} style="margin-top:8px"><summary>${E.length ? `最近有 <b>${E.reduce((a, e) => a + (e.n || 1), 0)}</b> 个问题` : '最近没有出错 ✓'}</summary>${E.length ? `<pre class="small" style="white-space:pre-wrap;word-break:break-all;margin:8px 0">${esc(errTxt)}</pre><textarea id="copy-err" readonly style="position:absolute;left:-9999px">${esc(errTxt)}</textarea><div class="row"><button class="btn sm" data-act="copytxt" data-v="err">复制发给开发</button><button class="btn sm ghost" data-act="errclear">清空</button></div>` : '<p class="small faint" style="margin:6px 0 0">按钮点了没反应、页面空白时，这里会记下原因。</p>'}</details>
+    <p class="small faint" style="margin:8px 0 0">只有天数和出错位置，不含题目、名字和写的内容。</p></div>`;
 }
 function examCard(){
   const t = today(), tk = termKey(t), E = DB.settings.examDates || {}, tl = termOf(t, DB.settings.startYear).label;
@@ -3586,7 +3629,7 @@ function vMe(part){
     <details style="margin-top:10px"><summary class="small muted">粘贴备份文本恢复</summary><textarea id="importt" placeholder="把备份文本粘贴在这里"></textarea><button class="btn sm" data-act="importtext" style="margin-top:6px">恢复</button></details>
     <p class="small faint" style="margin:10px 0 0">iPad 主屏幕上的图标和 Safari 里的网页是两份独立的存储。装到主屏幕之前在 Safari 里记过的数据，要先在 Safari 里「复制备份文本」，再到主屏幕 app 里粘贴恢复；开了云同步则会自动合并。</p></details>
     <div class="row" style="margin-top:12px"><a class="small" href="?demo" style="color:var(--accent)">打开示例模式看看效果</a><span class="spacer"></span>${DEMO?'':'<button class="btn danger sm" data-act="wipe">清空本机数据</button>'}</div></div>`;
-  return h + `</div></div>`;
+  return h + diagCard() + `</div></div>`;
 }
 async function aiSelfTest(){
   const rows = state.aiTest = [];
@@ -3959,6 +4002,10 @@ const ACT = {
     if (el.dataset.ok !== '1') { const it = allItems().find(x => x.id === k); if (it && hintOffer(it)) { state.hint = {id: k, phase: 'ask'}; render(); return; } }   // 先问要不要提示
     redoItem(k, el.dataset.ok === '1'); },
   hintgo: () => { hintGo(); },
+  copytxt: el => { const ta = $('#copy-' + el.dataset.v); if (!ta) return; const txt = ta.value;
+    const fallback = () => { try { ta.style.position = 'static'; ta.select(); document.execCommand('copy'); ta.style.position = 'absolute'; toast('已复制，去微信 / 飞书粘贴'); } catch(e) { toast('复制不了，长按上面的文字手动复制'); } };
+    try { navigator.clipboard.writeText(txt).then(() => toast('已复制，去微信 / 飞书粘贴'), fallback); } catch(e) { fallback(); } },
+  errclear: () => { try { localStorage.removeItem(ERRLOG_K); } catch(e) {} render(); },
   holgo: () => { const c = $('#holcard'); if (c) c.scrollIntoView({behavior: 'smooth', block: 'start'}); },
   rdtotal: el => { const i = +el.dataset.v, D = state.rd || {}, n = parseInt(($('#rd-total-' + i) || {}).value || D['total' + i], 10);
     if (!(n >= 10 && n <= 2000)) return toast('填书的总页数（10 到 2000）'); const r = readRec(readPlan(today()).tk, i); r.total = n; r.at = r.at || today(); saveRead(r); delete D['total' + i]; render(); },
