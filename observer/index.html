@@ -514,13 +514,13 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, peRecs:[], speakRecs:[], mixRecs:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, peRecs:[], speakRecs:[], mixRecs:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
-  for (const k of ['days','weeks','months','del','extReview','words','recite']) x[k] = x[k] || {};
+  for (const k of ['days','weeks','months','del','extReview','words','recite','hol']) x[k] = x[k] || {};
   for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs']) x[k] = x[k] || [];
   x.aiMem = x.aiMem || {};
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
@@ -611,10 +611,13 @@ const queueWhy = it => it.q === true ? (it.src === '拍照识别' ? '拍照识�
 const itemsOn = (d, sid) => (IDX[d] || []).filter(it => !sid || it.sid === sid);
 const isRest = d => !!(DB.days[d] && DB.days[d].rest);
 // 漏一天自动请假：同一周没用过请假时，单独漏掉的一天不算断（可以漏一天，不能连漏两天）
-const autoFreeze = d => !dayHasData(d) && !isRest(d) && dayHasData(addD(d, -1)) && !range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x));
-function streak(){ const ok = d => dayHasData(d) || isRest(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0, frozen = {};
+const autoFreeze = d => !dayCnt(d) && !isRest(d) && !holOk(d) && dayCnt(addD(d, -1)) && !range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x));
+// 假期：标了「出去」的日子像请假一样不断；做了当天假期作业的日子算打卡
+const holCnt = d => { const h = holAt(d); return !!h && !h.out[d] && h.tasks.some(t => (t.done || {})[d] > 0); };
+const dayCnt = d => dayHasData(d) || holCnt(d);
+function streak(){ const ok = d => dayHasData(d) || isRest(d) || holOk(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0, frozen = {};
   if (!ok(d) && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); }
-  while (n < 2000) { if (ok(d)) { if (dayHasData(d)) n++; d = addD(d, -1); continue; } if (!frozen[monOf(d)] && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); continue; } break; }
+  while (n < 2000) { if (ok(d)) { if (dayCnt(d)) n++; d = addD(d, -1); continue; } if (!frozen[monOf(d)] && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); continue; } break; }
   return n; }
 /* 月历热力图：每天按实际做了多少着色（空白=没记，浅=记了一些，中=作业都记了，深=作业+重做或单词），请假单独标 */
 function dayLevel(d){
@@ -633,12 +636,74 @@ function monthHeat(m){
   return `<div class="heat">${cells}</div><div class="small faint" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap"><span>这个月记了 <b>${n}</b> 天，其中 <b>${full}</b> 天全做完</span><span><i class="hc l1 key"></i>记了一些 <i class="hc l2 key"></i>作业记全 <i class="hc l3 key"></i>全做完 <i class="hc lr key"></i>请假</span></div>`;
 }
 function streakPill(){ const n = streak(); if (n > 1) return `<button class="streak" data-act="monthtog" aria-label="看这个月">连续 <b>${n}</b> 天 ▾</button>`; const b = bestStreak(); return b >= 3 ? `<button class="streak" data-act="monthtog" style="background:var(--surface2);color:var(--ink2)">最长 ${b} 天 · 今天接着来</button>` : ''; }
-function bestStreak(){ const ok = d => dayHasData(d) || isRest(d); const ds = Object.keys(DB.days).filter(ok).sort(); let best = 0, cur = 0, prev = null, frozen = {};
+function bestStreak(){ const ok = d => dayHasData(d) || isRest(d) || holOk(d); const ds = [...new Set(Object.keys(DB.days).concat(holList().flatMap(h => range(h.from, h.to).filter(x => x <= today()))))].filter(ok).sort(); let best = 0, cur = 0, prev = null, frozen = {};
   for (const d of ds) { const gap = prev ? addD(prev, 1) === d ? 0 : addD(prev, 2) === d && !frozen[monOf(addD(prev, 1))] ? 1 : 2 : 2;
     if (gap === 1) frozen[monOf(addD(prev, 1))] = 1;
-    cur = gap < 2 ? cur + (dayHasData(d) ? 1 : 0) : (dayHasData(d) ? 1 : 0); prev = d; if (cur > best) best = cur; } return Math.max(best, streak()); }
+    cur = gap < 2 ? cur + (dayCnt(d) ? 1 : 0) : (dayCnt(d) ? 1 : 0); prev = d; if (cur > best) best = cur; } return Math.max(best, streak()); }
 const autoUsedIn = (d) => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && x < today() && !dayHasData(x) && !isRest(x) && dayHasData(addD(x, -1)) && (dayHasData(addD(x, 1)) || addD(x, 1) === today()));
 const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x)) || autoUsedIn(d);
+
+/* ================= 假期作业：放假前录清单，按可用天数自动拆到每天；落下的自动平摊到后面 =================
+   日期来源：国务院办公厅 2026 年节假日安排（国庆 10/1–10/7）、深圳市教育局 2026–2027 学年校历（义务教育寒假 1/23 起，2/22 开学）。家长可改 */
+const HOL_PRESET = [{id:'2026-gq', name:'国庆', from:'2026-10-01', to:'2026-10-07'}, {id:'2027-hj', name:'寒假', from:'2027-01-23', to:'2027-02-21'}];
+const holList = () => { const DH = DB.hol || {}; return HOL_PRESET.map(p => Object.assign({}, p, {tasks:[], out:{}}, DH[p.id] || {}))
+  .concat(Object.values(DH).filter(h => !HOL_PRESET.some(p => p.id === h.id))); };
+const holAt = d => holList().find(h => h.from <= d && d <= h.to) || null;
+const holSoon = d => holList().find(h => h.from > d && dayDiff(d, h.from) <= 3) || null;
+const holDays = h => range(h.from, h.to).filter(x => !h.out[x]);                 // 能做作业的日子（标了「出去」的不算）
+const holDone = (t, pred) => Object.entries(t.done || {}).filter(([x]) => pred(x)).reduce((a, [, v]) => a + v, 0);
+// 今天该做几份：剩下的量 ÷ 剩下能做的天数（含今天），向上取整；今天标了出去就是 0
+function holQuota(h, t, d){
+  if (h.out[d] || d < h.from || d > h.to) return 0;
+  const left = Math.max(0, t.n - holDone(t, x => x < d)), days = holDays(h).filter(x => x >= d).length;
+  return days ? Math.min(left, Math.ceil(left / days)) : left;
+}
+// 落后量：按天均匀应完成的份数 − 实际完成；超过两天的量才算落下
+function holBehind(h, d){
+  const all = holDays(h), past = all.filter(x => x < d).length; if (!all.length || !past) return [];
+  return h.tasks.map(t => ({t, lag: t.n * past / all.length - holDone(t, x => x < d)})).filter(o => o.lag >= Math.max(1, 2 * o.t.n / all.length) - 1e-9);
+}
+const holOk = d => { const h = holAt(d); return !!h && (!!h.out[d] || h.tasks.some(t => (t.done || {})[d] > 0)); };
+function saveHol(h){ const r = Object.assign({}, h); r.u = now(); DB.hol = DB.hol || {}; DB.hol[h.id] = r; save(); }
+const holTaskName = t => `${(subjects(today()).find(s => s.id === t.sid) || {name: ''}).name}${t.sid ? ' · ' : ''}${t.what}`;
+// 录入 / 修改清单：state.holE 是草稿，改动前先 holRead 把输入框的值收回来，避免重绘丢字
+function holRead(){ const E = state.holE; if (!E) return; const q = s => document.querySelector(s);
+  E.tasks.forEach((t, i) => { const w = q(`#hw-${i}`), n = q(`#hn-${i}`), sd = q(`#hs-${i}`); if (w) t.what = w.value.trim(); if (n) t.n = Math.max(1, Math.min(99, parseInt(n.value, 10) || 1)); if (sd) t.sid = sd.value; });
+  const f = q('#hol-from'), to = q('#hol-to'); if (f && f.value) E.from = f.value; if (to && to.value) E.to = to.value; }
+function vHol(){
+  const E = state.holE, S = subjects(today());
+  let h = `<div class="wiz" role="dialog" aria-label="假期作业"><div class="wiz-top"><div style="flex:1;font-weight:600">${esc(E.name)}假期作业</div><button class="wiz-x" data-act="holclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  h += `<p class="small muted" style="margin:0 0 10px">一项一行：哪科、做什么、一共几份（比如「数学 · 试卷 · 3」）。放假后每天自动分好。</p>`;
+  h += E.tasks.map((t, i) => `<div class="row" style="gap:6px;margin-bottom:8px;flex-wrap:nowrap"><select id="hs-${i}" class="wiz-in" style="width:5.5em;padding:8px 4px">${S.map(s => `<option value="${s.id}" ${s.id === t.sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="" ${!t.sid ? 'selected' : ''}>其他</option></select><input id="hw-${i}" class="wiz-in" style="flex:1;min-width:0" placeholder="做什么" value="${esc(t.what)}"><input id="hn-${i}" class="wiz-in" type="number" inputmode="numeric" min="1" max="99" style="width:3.6em" value="${t.n}"><button class="btn sm ghost" data-act="holdel" data-v="${i}" aria-label="删掉这项">×</button></div>`).join('');
+  h += `<button class="btn sm" data-act="holadd">＋ 加一项</button>`;
+  h += `<details style="margin-top:14px"><summary class="small muted">放假日期、哪几天出去玩</summary><div class="row" style="margin:8px 0 4px;flex-wrap:nowrap"><span class="small muted" style="width:2em">从</span><input id="hol-from" type="date" class="wiz-in" style="flex:1;min-width:0" value="${E.from}"></div><div class="row" style="margin:0 0 8px;flex-wrap:nowrap"><span class="small muted" style="width:2em">到</span><input id="hol-to" type="date" class="wiz-in" style="flex:1;min-width:0" value="${E.to}"></div>
+    <p class="small faint" style="margin:0 0 6px">点一下标成「出去玩」，那天不派作业。</p><div class="row" style="gap:6px">${range(E.from, E.to).map(x => `<button class="chip ${E.out[x] ? 'on' : ''}" data-act="holoutday" data-v="${x}">${md(x)}</button>`).join('')}</div></details>`;
+  return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="holclose">取消</button><button class="btn primary" data-act="holsave">保存</button></div></div>`;
+}
+function holLeftList(h){ return h.tasks.map(t => ({t, left: t.n - holDone(t, () => true)})).filter(o => o.left > 0); }
+function holidayCard(d){
+  const soon = holSoon(d), h = holAt(d);
+  if (soon && !h) return `<div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>${esc(soon.name)}假期快到了</h3><p class="small muted" style="margin:0 0 8px">${md(soon.from)}到${md(soon.to)}，放 ${range(soon.from, soon.to).length} 天。${soon.tasks.length ? `已经录了 ${soon.tasks.length} 项假期作业，放假后每天自动分好。` : '老师布置了假期作业，就先录进来，放假后每天自动分好，不用最后几天赶。'}</p><button class="btn sm primary" data-act="holedit" data-v="${soon.id}">${soon.tasks.length ? '看看清单' : '录假期作业'}</button></div>`;
+  if (!h) return '';
+  const nth = dayDiff(h.from, d) + 1, total = range(h.from, h.to).length;
+  let c = `<div class="card"><div class="row"><h3 style="margin:0">${esc(h.name)}第 ${nth}/${total} 天 · 假期作业</h3><span class="spacer"></span><button class="btn sm ghost" data-act="holedit" data-v="${h.id}">改清单</button></div>`;
+  if (!h.tasks.length) c += `<p class="small muted" style="margin:6px 0 8px">还没录假期作业。</p><button class="btn sm primary" data-act="holedit" data-v="${h.id}">录假期作业</button>`;
+  else if (h.out[d]) c += `<p class="muted" style="margin:6px 0 8px">今天出去玩，不派作业，连续天数不会断。</p><button class="btn sm ghost" data-act="holout" data-v="0">今天不出去了</button>`;
+  else {
+    const rows = h.tasks.map(t => ({t, q: holQuota(h, t, d), k: (t.done || {})[d] || 0})).filter(o => o.q > 0 || o.k > 0);
+    const all = rows.every(o => o.k >= o.q);
+    c += rows.length ? rows.map(o => `<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span style="flex:1">${o.k >= o.q ? '✓ ' : ''}${esc(holTaskName(o.t))} <span class="small muted">今天 ${o.q} 份${o.k ? ` · 做了 ${o.k}` : ''}</span></span>${o.k ? `<button class="btn sm ghost" data-act="holdo" data-v="${o.t.id}" data-n="-1" aria-label="撤回一份">−</button>` : ''}<button class="btn sm ${o.k >= o.q ? 'ghost' : 'primary'}" data-act="holdo" data-v="${o.t.id}" data-n="1">做完 1 份</button></div>`).join('')
+      : `<p class="muted" style="margin:6px 0">今天没有分到假期作业。</p>`;
+    if (rows.length && all) c += `<div style="margin-top:8px;font-weight:600;color:var(--good)">今天的假期作业做完了 ✓</div>`;
+    c += `<div class="row" style="margin-top:8px"><span class="small faint" style="flex:1">整个假期：做了 ${h.tasks.reduce((a, t) => a + Math.min(t.n, holDone(t, () => true)), 0)}/${h.tasks.reduce((a, t) => a + t.n, 0)} 份</span>${d < h.to ? `<button class="btn sm ghost" data-act="holout" data-v="1">今天出去玩</button>` : ''}</div>`;
+  }
+  c += `</div>`;
+  if (d === h.to) {   // 收假前一晚：只列清单，不催
+    const L = holLeftList(h), rd = LIB.recite ? reciteDue().length : 0, ed = dueList().length;
+    c += `<div class="card" style="background:var(--amber-bg);border-color:transparent"><h3>明天开学</h3>` + (L.length || rd || ed ? `<ul style="margin:6px 0 0;padding-left:20px">${L.map(o => `<li>${esc(holTaskName(o.t))}还差 ${o.left} 份</li>`).join('')}${ed ? `<li>到期的错题 ${ed} 道</li>` : ''}${rd ? `<li>该复习的背诵 ${rd} 篇</li>` : ''}</ul>` : `<p class="muted" style="margin:6px 0 0">假期作业都做完了，也没有到期的复习。收拾好书包就行。</p>`) + `</div>`;
+  }
+  return c;
+}
 function dayHasData(d){
   if (itemsOn(d).length) return true;
   const dd = DB.days[d]; if (!dd) return false;
@@ -1057,7 +1122,7 @@ function mergeDB(L, R){
   M.del = Object.assign({}, Ld);
   for (const id in Rd) if ((Rd[id]||0) > (M.del[id]||0)) { M.del[id] = Rd[id]; rN = true; }
   for (const id in Ld) if (!Rd[id]) lN = true;
-  for (const k of ['days','weeks','months','extReview','words','recite','aiMem']) {
+  for (const k of ['days','weeks','months','extReview','words','recite','aiMem','hol']) {
     const a = L[k]||{}, b = R[k]||{}; M[k] = M[k] || {};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
@@ -1176,7 +1241,7 @@ function render(){
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
   document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
   hydratePhotos(); updateBadge();
@@ -1245,10 +1310,13 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     const learning = LIB.recite ? LIB.recite.items.filter(x => ['learning','upd'].includes(rStateX(x))).length : 0;
     const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today())), rDue = reciteDue().length;
     const wordsOk = LIB.done && (!LIB.words || wLeft === 0);
-    const allDone = filled >= subs.length && left === 0 && wordsOk && !rDue;
+    // 假期（录了清单）：平时的「记作业」变可选，今晚完成看假期作业今日份
+    const hH = holAt(d), holMode = !!(hH && hH.tasks.length), holMet = holMode && (!!hH.out[d] || hH.tasks.every(t => ((t.done || {})[d] || 0) >= holQuota(hH, t, d)));
+    const allDone = (holMode ? holMet : filled >= subs.length) && left === 0 && wordsOk && !rDue;
     if (!dayHasData(d) && !isRest(d) && autoFreeze(addD(d, -1)) && streak() > 1) h += `<div class="tip">昨天没记，自动用了一次请假。<b>今天记一下，就是连续 ${streak() + 1} 天</b>。</div>`;
     if (heavyNight() && !late && !allDone) h += `<div class="tip">今天作业写了 ${homeworkMin(d)} 分钟，已经超过 90 分钟。今晚<b>重做只排 1 道、单词只背 8 个</b>，早点休息。</div>`;
     if (late && !allDone && !isRest(d)) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
+    h += holidayCard(d);
     const dowP = P(d).getDay(); const showProg = allDone || dowP === 0 || dowP === 6;
     if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[(() => { const n = subs.filter(x => { const r = dd.subj[x.id]; return r && !r.none && r.min > 0; }).length; return n ? '自己把 ' + n + ' 科作业记清楚了' : filled ? '今天都没作业' : ''; })(), dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
     if (allDone) h += progressCard();
@@ -1258,7 +1326,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     if (isRest(d) && !dayHasData(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
     let slOpen0 = state.slistOpen; if (slOpen0 == null) { try { slOpen0 = localStorage.getItem('observer:slOpen') === '1'; } catch(e) { slOpen0 = false; } }
     const T = [
-      {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
+      holMode ? {t: '记作业', s: filled ? `${filled} 科` : '假期可选', done: true, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: '记今天的作业'} : {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
       {t: '重做错题', s: left ? left + ' 道' : dn ? '做完了' : '今天没有', done: left === 0, act: 'tab', v: 'errors', go: `重做 ${left} 道错题`},
       {t: '背单词', s: !LIB.done ? '…' : !LIB.words ? '词库没加载到' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有', done: wordsOk, opt: !LIB.done, act: 'golearn', v: 'card', go: `背 ${wLeft} 个单词`},
       {t: '背古诗', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
@@ -2638,11 +2706,12 @@ const recRev = x => (x && x.rev) || 1;
 const recStale = x => { const r = DB.recite[x.id]; return !!r && ['can','dict'].includes(r.st) && (r.rev || 1) < recRev(x); };
 const rStateX = x => recStale(x) ? 'upd' : rState(x.id);
 const segDone = (x, k) => { const r = DB.recite[x.id]; return !!(r && r.segs && r.segRev === recRev(x) && r.segs[k]); };
-// 按日期估计课本进度：秋季 9/1、春季 3/1 开学，一学期 6 个单元约 3 周一个；只用来排序和标「最近要背」
+// 按日期估计课本进度：秋季 9/1 开学、春季按寒假结束第二天（无预设时 3/1），一学期 6 个单元约 3 周一个；只用来排序和标「最近要背」
 function curUnit(term){
   if (term !== termKey(today())) return 0;
   const t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7);
-  const start = term.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : y + '-03-01';
+  const hj = HOL_PRESET.find(p => p.name === '寒假' && p.to.startsWith(y + '-'));   // 深圳校历：寒假结束第二天开学（2027-02-22）
+  const start = term.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : hj ? addD(hj.to, 1) : y + '-03-01';
   return Math.min(6, Math.max(1, Math.floor(dayDiff(start, t) / 21) + 1));
 }
 
@@ -3224,6 +3293,12 @@ function askCard(){
 /* 家长 10 秒速览：孩子今晚做完了没有、花了多久、记了什么问题 */
 function todayGlance(){
   const d = today(), dd = dayObj(d) || {subj:{}}, subs = orderedSubjects(d), filled = subs.filter(s => filledRec(dd.subj[s.id])).length;
+  const hh = holAt(d);
+  if (hh && hh.tasks.length && !filled && !itemsOn(d).length) {   // 假期里没有平时的作业记录，速览看假期作业
+    if (hh.out[d]) return `<div class="card"><h3>今天</h3><p class="muted" style="margin:0">${esc(hh.name)}假期，今天标了出去玩。</p></div>`;
+    const R = hh.tasks.map(t => ({t, q: holQuota(hh, t, d), k: (t.done || {})[d] || 0})).filter(o => o.q > 0 || o.k > 0);
+    return `<div class="card"><h3>今天 · ${esc(hh.name)}假期作业</h3><p style="margin:0">${R.length ? R.map(o => `${o.k >= o.q ? '✓' : '·'} ${esc(holTaskName(o.t))} ${o.k}/${o.q}`).join('<br>') : '今天没分到作业'}</p></div>`;
+  }
   if (!filled && !itemsOn(d).length && !doneToday() && !isRest(d)) return `<div class="card"><h3>今天</h3><p class="muted" style="margin:0">孩子今天还没开始记。</p></div>`;
   if (isRest(d) && !dayHasData(d)) return `<div class="card"><h3>今天</h3><p class="muted" style="margin:0">孩子今天请了休息。</p></div>`;
   const recs = subs.map(s => [s, dd.subj[s.id]]).filter(([, r]) => r && !r.none && r.min > 0), mins = recs.reduce((a, [, r]) => a + r.min, 0), stops = recs.filter(([, r]) => r.intr && r.intr !== 'none');
@@ -3247,7 +3322,7 @@ function attentionItems(){
   if (DEMO) return [];
   const t = today(), A = [], used = Object.keys(DB.days).filter(dayHasData).length; if (used < 3) return A;
   const y1 = addD(t, -1), y2 = addD(t, -2);
-  if (!dayHasData(t) && !dayHasData(y1) && !dayHasData(y2) && !isRest(y1) && !isRest(y2)) A.push(['连续两天没记', '昨天和前天都没有记录。别追问，今晚陪他一起把今天记上就好。']);
+  if (!dayHasData(t) && !dayHasData(y1) && !dayHasData(y2) && !isRest(y1) && !isRest(y2) && !holOk(t) && !holOk(y1) && !holOk(y2)) A.push(['连续两天没记', '昨天和前天都没有记录。别追问，今晚陪他一起把今天记上就好。']);
   const backlog = dueList().length; if (backlog >= 15) A.push([`错题积压 ${backlog} 道`, `每天只排 ${redoQuota()} 道，积压会越来越多。可以周末挑一天多做几道，或者把「找不到原题」的移出去。`]);
   const last = range(addD(t, -7), y1).filter(dayHasData).slice(-5);
   if (last.length >= 4) { for (const sb of subjects(t)) { const n = last.filter(d => { const r = ((DB.days[d] || {}).subj || {})[sb.id]; return r && r.intr && r.intr !== 'none'; }).length; if (n >= 4) A.push([`${sb.name}最近 ${last.length} 天里 ${n} 天中途停下`, `可以问一句：「${sb.name}做到哪一步开始想停？」只听，不批评。`]); }
@@ -3256,6 +3331,9 @@ function attentionItems(){
   { const mon = monOf(t), aiMin = range(mon, t).reduce((a, d) => a + ((DB.days[d] || {}).aiMin || 0), 0); let n = 0, okN = 0;
     for (const it of allItems()) for (const h of (it.vh || [])) if (h.d >= mon && h.d <= t) { n++; if (h.ok) okN++; }
     if (aiMin >= 40 && n >= 4 && okN / n < 0.5) A.push([`这周用 AI 老师 ${Math.round(aiMin)} 分钟，自己做同类题只对了 ${okN}/${n}`, `可能有点依赖 AI 了。可以在「设置」把每晚 AI 时长先调到 10 分钟，卡住时先翻课本例题再问。`]); }
+  { const h = holAt(t); if (h) { const B = holBehind(h, t);
+      if (B.length) A.unshift(['假期作业落下了', B.map(o => `${holTaskName(o.t)}少做了约 ${Math.round(o.lag)} 份`).join('；') + '。已经自动平摊到后面几天，不用补一大堆；问问他是不是哪项太难。']);
+      if (t === h.to) { const L = holLeftList(h); if (L.length) A.unshift(['明天开学', L.map(o => `${holTaskName(o.t)}还差 ${o.left} 份`).join('；') + '。']); } } }
   return A.slice(0, 3);
 }
 function attentionCard(){ const A = attentionItems(); if (!A.length) return '';
@@ -3584,6 +3662,17 @@ const ACT = {
   qpopen: el => { state.qp = {sid: (el && el.dataset.s) || state.openSubj || state._lastQp || null, text: ''}; render(); setTimeout(() => { const t = $('#qp-text'); if (t && state.qp.sid) t.focus(); }, 50); },
   qpsubj: el => { state.qp.text = ($('#qp-text') || {}).value || state.qp.text; state.qp.sid = el.dataset.v; render(); },
   qpclose: () => { const t = ($('#qp-text') || {}).value || ''; if (t.trim() && !confirm('还没保存，确定不要了？')) return; state.qp = null; render(); },
+  holedit: el => { const h = holList().find(x => x.id === el.dataset.v); if (!h) return; const E = state.holE = JSON.parse(JSON.stringify(h)); E.out = E.out || {};
+    if (!E.tasks.length) E.tasks.push({id: uid('ht'), sid: (subjects(today())[0] || {}).id || '', what: '', n: 1, done: {}}); render(); },
+  holadd: () => { holRead(); const E = state.holE; E.tasks.push({id: uid('ht'), sid: (E.tasks[E.tasks.length - 1] || {}).sid || '', what: '', n: 1, done: {}}); render(); setTimeout(() => { const w = $('#hw-' + (E.tasks.length - 1)); w && w.focus(); }, 50); },
+  holdel: el => { holRead(); state.holE.tasks.splice(+el.dataset.v, 1); render(); },
+  holoutday: el => { holRead(); const E = state.holE, x = el.dataset.v; if (E.out[x]) delete E.out[x]; else E.out[x] = true; render(); },
+  holclose: () => { state.holE = null; render(); },
+  holsave: () => { holRead(); const E = state.holE; if (E.from > E.to) { toast('放假日期前后颠倒了'); return; }
+    E.tasks = E.tasks.filter(t => t.what); saveHol(E); state.holE = null; toast(E.tasks.length ? `存好了：${E.tasks.length} 项，放假后每天自动分` : '清单已清空'); render(); },
+  holdo: el => { const h = holAt(today()); if (!h) return; const t = h.tasks.find(x => x.id === el.dataset.v); if (!t) return; const d = today(); t.done = t.done || {};
+    t.done[d] = Math.max(0, (t.done[d] || 0) + (+el.dataset.n)); if (!t.done[d]) delete t.done[d]; saveHol(h); render(); },
+  holout: el => { const h = holAt(today()); if (!h) return; if (el.dataset.v === '1') h.out[today()] = true; else delete h.out[today()]; saveHol(h); render(); },
   qpsave: () => { const Q = state.qp, t = (($('#qp-text') || {}).value || Q.text || '').trim();
     if (!Q.sid) return toast('先选是哪一科'); if (!t) return toast('写一句遇到的问题，或者点话筒说');
     const d = state.date, g = kwGuess(Q.sid, t), conf = /有把握|以为(是)?对|以为做对/.test(t) ? 'sure' : /不确定|犹豫|拿不准/.test(t) ? 'unsure' : /不会|不知道怎么/.test(t) ? 'no' : null;
