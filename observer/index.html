@@ -515,13 +515,13 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, peRecs:[], speakRecs:[], mixRecs:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, reads:{}, peRecs:[], speakRecs:[], mixRecs:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
-  for (const k of ['days','weeks','months','del','extReview','words','recite','hol']) x[k] = x[k] || {};
+  for (const k of ['days','weeks','months','del','extReview','words','recite','hol','reads']) x[k] = x[k] || {};
   for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs']) x[k] = x[k] || [];
   x.aiMem = x.aiMem || {};
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
@@ -855,6 +855,7 @@ function findings(st, prev, anchors, nDays, monthly){
     }
   }
   if (st.redoN >= 3) out.push({k: st.redoOk/st.redoN >= 0.6 ? 'good' : 'info', t:`重做了 ${st.redoN} 次，做对 ${st.redoOk} 次（${pct(st.redoOk, st.redoN)}%）。` + (st.redoOk/st.redoN < 0.5 ? ' 重做正确率偏低，说明这些题的概念还没补上，先回课本，别急着再做。' : '')});
+  { const rw = readWeek(st.from, st.to); if (rw.pages || rw.sums) out.push({k: 'info', t: `名著阅读：读了 ${rw.pages} 页${rw.sums ? `，读完说了 ${rw.sums} 次` : ''}`}); }
   { const hs = hintStats(st.from, st.to); if (hs.n >= 2) out.push({k: hs.ok / hs.n >= 0.6 ? 'good' : 'info', t: `AI 提示之后自己再做：${hs.n} 次里做对 ${hs.ok} 次（${pct(hs.ok, hs.n)}%）。看的是提示有没有帮他自己做出来，不是用了多久`}); }
   const tired = st.mood.tired, others = st.days.filter(d => d in st.errByDay && !tired.includes(d));
   if (tired.length >= 2 && others.length >= 2) {
@@ -1153,7 +1154,7 @@ function mergeDB(L, R){
   M.del = Object.assign({}, Ld);
   for (const id in Rd) if ((Rd[id]||0) > (M.del[id]||0)) { M.del[id] = Rd[id]; rN = true; }
   for (const id in Ld) if (!Rd[id]) lN = true;
-  for (const k of ['days','weeks','months','extReview','words','recite','aiMem','hol']) {
+  for (const k of ['days','weeks','months','extReview','words','recite','aiMem','hol','reads']) {
     const a = L[k]||{}, b = R[k]||{}; M[k] = M[k] || {};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
@@ -1208,7 +1209,7 @@ async function syncNow(manual, depth){
 const isTyping = () => { const a = document.activeElement; return a && /INPUT|TEXTAREA/.test(a.tagName); };
 let pendingRender = false;
 let focusVal = null;
-const DRAFT_IN = /^(voice|rgstem|qptext|hol)$/;
+const DRAFT_IN = /^(voice|rgstem|qptext|hol|rd)$/;
 document.addEventListener('focusin', e => { const el = e.target; focusVal = el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') && !DRAFT_IN.test(el.dataset.in) ? el.value : null; });
 document.addEventListener('focusout', e => { const el = e.target; if (focusVal != null && el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') && el.value !== focusVal) { onDataIn({target: el}); flush(); toast('已保存 ✓'); } focusVal = null; });
 document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(() => { if (!isTyping()) render(); }, 50); } });
@@ -1362,7 +1363,9 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       {t: '重做错题', s: left ? left + ' 道' : dn ? '做完了' : '今天没有', done: left === 0, act: 'tab', v: 'errors', go: `重做 ${left} 道错题`},
       {t: '背单词', s: !LIB.done ? '…' : !LIB.words ? '词库没加载到' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有', done: wordsOk, opt: !LIB.done, act: 'golearn', v: 'card', go: `背 ${wLeft} 个单词`},
       {t: '背古诗', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
+    // 清单保持精简：一天最多一行可选加练，原有加练优先；没有时才放「读名著」（开始读了才出现，没开始的从学习页进）
     const ex = extraTask(d); if (ex) T.push(ex);
+    else { const RP = readPlan(d); if (RP.cur && !holMode) T.push({t: '读名著', s: RP.done ? '今天读过' : `今天 ${RP.q} 页 · 可选`, done: RP.done, opt: true, act: 'golearn', v: 'read', go: ''}); }
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
     { const seen = (() => { try { return localStorage.getItem('observer:praiseSeen') || ''; } catch(e) { return ''; } })();
@@ -3073,6 +3076,7 @@ function vLearn(){
   if (L.view === 'words') return vWords();
   if (L.view === 'card') return vWordCard();
   if (L.view === 'recite') return vRecite();
+  if (L.view === 'read') return vRead();
   if (L.view === 'poem') return vPoem();
   if (L.view === 'books') return vBooks();
   if (!LIB.tried || (LIB.words === null && LIB.recite === null && LIB.books === null && !LIB.done)) { LIB.done = true; }
@@ -3086,10 +3090,65 @@ function vLearn(){
   let h = `<h2>学习</h2><div class="tiles">` +
     tile('lv', 'card', '英语单词', !LIB.words ? '加载中…' : wq ? `今天 ${wq} 个` : '今天背完了', W.length ? `已掌握 ${mastered}/${W.length}` : '') +
     tile('lv', 'recite', '语文背诵', RI.length ? `会背 ${can}/${cur.length}` : '加载中…', esc(termName(tk))) +
+    (() => { const RP = readPlan(today()); return RP.recs.length ? tile('lv', 'read', '名著阅读', RP.cur ? `${RP.cur.nowp}/${RP.cur.r.total} 页` : RP.started ? '都读完了' : '还没开始', RP.cur ? `《${RP.cur.title}》` : esc(termName(RP.tk))) : ''; })() +
     tile('lv', 'speak', '英语听说', last ? `最近 ${last.acc}%` : '还没练过', '中考 25 分') +
     tile('lv', 'pe', '体育', est.field != null ? `现场估 ${est.field}/36` : DB.peRecs.length ? `记了 ${DB.peRecs.length} 次` : '还没测过', '中考 50 分') +
     tile('link', '../math/', '数学练习', '每天一站', '北师大七上') +
     tile('lv', 'books', '教材与中考', '版本 · 电子课本', '中考考什么') + `</div>`;
+  return h;
+}
+/* ================= 名著阅读：课本「整本书阅读」书目（按 2022 修订版电子课本目录核对，九下修订版未上线暂缺） =================
+   先读完一本再读下一本；今天份 = 全部剩余页数 ÷ 离期末剩余天数，落下自动平摊。读完一章用一两句话说说（提取练习），AI 只回一句不打分 */
+const READ_BOOKS = {'7a': [['朝花夕拾', '鲁迅'], ['西游记', '吴承恩']], '7b': [['骆驼祥子', '老舍'], ['钢铁是怎样炼成的', '奥斯特洛夫斯基']],
+  '8a': [['红星照耀中国', '埃德加·斯诺'], ['红岩', '罗广斌 杨益言']], '8b': [['经典常谈', '朱自清'], ['昆虫记', '法布尔']], '9a': [['简·爱', '夏洛蒂·勃朗特'], ['唐诗三百首', '蘅塘退士 编']]};
+function readRec(tk, i){ const id = tk + '-' + i; return (DB.reads || {})[id] || {id, total: 0, log: {}, sums: []}; }
+function saveRead(r){ DB.reads = DB.reads || {}; r.u = now(); DB.reads[r.id] = r; save(); }
+const readAt = (r, pred) => Math.max(0, ...Object.entries(r.log || {}).filter(([d]) => pred(d)).map(([, v]) => +v || 0));
+function readDeadline(t){ const e = examDate(t, 'end'); if (e) return addD(e, -1);
+  const y = +t.slice(0, 4), m = +t.slice(5, 7); return termKey(t).endsWith('a') ? (m >= 8 ? y + 1 : y) + '-01-20' : y + '-07-05'; }
+function readPlan(t){
+  const tk = termKey(t), dl = readDeadline(t), days = Math.max(1, dayDiff(t, dl) + 1);
+  const recs = (READ_BOOKS[tk] || []).map(([title, author], i) => { const r = readRec(tk, i), before = Math.min(r.total || 0, readAt(r, d => d < t)), nowp = Math.min(r.total || 1e9, readAt(r, () => true));
+    return {title, author, i, r, before, nowp, left: r.total ? Math.max(0, r.total - before) : 0}; });
+  const cur = recs.find(o => o.r.total && o.nowp < o.r.total) || null, allLeft = recs.reduce((a, o) => a + o.left, 0);
+  const q = cur ? Math.min(cur.r.total - cur.before, Math.ceil(allLeft / days)) : 0;
+  return {tk, dl, days, recs, cur, q, done: !!cur && cur.nowp - cur.before >= q, started: recs.some(o => o.r.total)};
+}
+// 落后：从开始读那天起按天均匀应读的页数 − 实际读的页数，超过 3 天的量才算
+function readBehind(t){
+  const P = readPlan(t), R = P.recs.filter(o => o.r.total); if (!R.length) return 0;
+  const s0 = R.map(o => o.r.at || Object.keys(o.r.log || {}).sort()[0] || t).sort()[0], span = Math.max(1, dayDiff(s0, P.dl) + 1), past = Math.max(0, dayDiff(s0, t));
+  const tot = R.reduce((a, o) => a + o.r.total, 0), done = R.reduce((a, o) => a + o.before, 0), lag = tot * past / span - done;
+  return lag >= 3 * tot / span && lag >= 10 ? Math.round(lag) : 0;
+}
+function readWeek(from, to){ let pages = 0, sums = 0;
+  for (const id in (DB.reads || {})) { const r = DB.reads[id]; pages += Math.max(0, readAt(r, d => d <= to) - readAt(r, d => d < from)); sums += (r.sums || []).filter(s => s.d >= from && s.d <= to).length; }
+  return {pages, sums}; }
+async function readFb(id, k){
+  const r = DB.reads[id], S = r && r.sums[k]; if (!S || !aiReady()) return; const [tk, i] = id.split('-'), b = (READ_BOOKS[tk] || [])[+i]; if (!b) return;
+  try { const out = await aiChat([{role: 'system', content: `你是初中语文老师，学生在读课本规定的名著《${b[0]}》（${b[1]}）。他读完一部分后用自己的话说了内容。只回一句，不超过 60 字：先具体说他抓住了什么，再用提问的方式点出一个可能漏掉的关键人物或情节，不直接讲答案、不打分。不确定书里的情节时，只肯定他说的并问一个问题，不要编造情节。不用「错」「差」这类词。`},
+      {role: 'user', content: `读到：${S.ch || '（没写章节）'}\n他说：${S.text}`}]);
+    const R2 = DB.reads[id]; if (R2 && R2.sums[k]) { R2.sums[k].fb = (out || '').trim().slice(0, 120); R2.u = now(); save(); render(); } } catch(e) {}
+}
+function vRead(){
+  const t = today(), P = readPlan(t), D = state.rd || (state.rd = {});
+  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">名著阅读</h2></div><p class="small muted" style="margin:8px 4px 12px">课本规定的整本书阅读，中考语文会考人物和情节。${P.recs.length ? `按计划 ${md(P.dl)} 前读完这学期的 ${P.recs.length} 本，先读完一本再读下一本。` : ''}</p>`;
+  if (!P.recs.length) return h + `<div class="card empty">这学期的名著书目还没收录（九年级下册修订版课本还没上线）。</div>`;
+  for (const o of P.recs) {
+    const r = o.r, isCur = P.cur === o;
+    h += `<div class="card"><div class="row"><h3 style="margin:0">《${esc(o.title)}》</h3><span class="small muted">${esc(o.author)}</span><span class="spacer"></span>${r.total && o.nowp >= r.total ? '<span class="pill good">读完了</span>' : isCur ? '<span class="pill accent">正在读</span>' : ''}</div>`;
+    if (!r.total) { h += `<p class="small muted" style="margin:8px 0">翻到最后一页，这本书一共多少页？</p><div class="row" style="flex-wrap:nowrap"><input id="rd-total-${o.i}" data-in="rd" data-f="total" data-v="${o.i}" class="wiz-in" type="number" inputmode="numeric" min="10" max="2000" style="flex:1;min-width:0" placeholder="总页数" value="${esc(D['total' + o.i] || '')}"><button class="btn sm primary" data-act="rdtotal" data-v="${o.i}">开始读</button></div></div>`; continue; }
+    const pct = Math.round(100 * Math.min(o.nowp, r.total) / r.total);
+    h += `<div style="height:10px;background:var(--surface2);border-radius:5px;margin:10px 0 4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:5px"></div></div><div class="small muted">读到第 ${o.nowp} 页 / 共 ${r.total} 页${isCur ? (P.done ? ' · 今天的份读完了 ✓' : ` · 今天读到第 ${Math.min(r.total, o.before + P.q)} 页就够了`) : ''}</div>${isCur && P.recs.some(x => !x.r.total) ? '<div class="small faint">另一本也填上页数，每天读多少才算得准。</div>' : ''}`;
+    if (o.nowp < r.total) h += `<div class="row" style="margin-top:8px;flex-wrap:nowrap"><input id="rd-page-${o.i}" data-in="rd" data-f="page" data-v="${o.i}" class="wiz-in" type="number" inputmode="numeric" style="flex:1;min-width:0" placeholder="读到第几页" value="${esc(D['page' + o.i] || '')}"><button class="btn sm primary" data-act="rdpage" data-v="${o.i}">记下</button></div>`;
+    h += `<details style="margin-top:10px" ${D['open' + o.i] ? 'open' : ''} data-rdopen="${o.i}"><summary class="small" style="color:var(--accent)">读完一章，用一两句话说说讲了什么</summary>
+      <input id="rd-ch-${o.i}" data-in="rd" data-f="ch" data-v="${o.i}" class="wiz-in" style="margin-top:8px" placeholder="第几章 / 篇名（比如《藤野先生》）" value="${esc(D['ch' + o.i] || '')}">
+      <textarea id="rd-text-${o.i}" data-in="rd" data-f="text" data-v="${o.i}" class="wiz-in" style="min-height:80px;margin-top:6px" placeholder="这一章讲了谁、发生了什么（可以点键盘上的话筒说）">${esc(D['text' + o.i] || '')}</textarea>
+      <button class="btn sm" style="margin-top:6px" data-act="rdsum" data-v="${o.i}">说完了</button></details>`;
+    const S = (r.sums || []).slice(-3).reverse();
+    if (S.length) h += S.map(s => `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><div class="small faint">${mdShort(s.d)} ${esc(s.ch || '')}</div><div>${esc(s.text)}</div>${s.fb ? `<div class="small" style="color:var(--accent);margin-top:2px">${esc(s.fb)}</div>` : ''}</div>`).join('');
+    h += `</div>`;
+  }
   return h;
 }
 const termKey = d => { const t = termOf(d, DB.settings.startYear); return ['7a','7b','8a','8b','9a','9b'][Math.max(0, Math.min(5, t.cidx))]; };
@@ -3433,15 +3492,16 @@ function attentionItems(){
     const hs = hintStats(mon, t);   // Khan 的 next-item correctness：提示后下一次重做自己做对没有
     if (hs.n >= 4 && hs.ok / hs.n < 0.5) A.push([`AI 提示后自己做对 ${hs.ok}/${hs.n}`, '提示没怎么帮上他自己做出来。可能题目超出现在的水平，周末陪他看一道课本例题，比多要提示更管用。']);
     else if (aiMin >= 40 && n >= 4 && okN / n < 0.5) A.push([`这周用 AI 老师 ${Math.round(aiMin)} 分钟，自己做同类题只对了 ${okN}/${n}`, `可能有点依赖 AI 了。可以在「设置」把每晚 AI 时长先调到 10 分钟，卡住时先翻课本例题再问。`]); }
+  { const lag = readBehind(t); if (lag && !holAt(t)) A.push([`名著阅读落后约 ${lag} 页`, '已经自动平摊到后面几天。可以周末一起读半小时，读完让他讲讲读到了什么。']); }
   { const h = holAt(t); if (h) { const B = holBehind(h, t);
       if (B.length) A.unshift(['假期作业落下了', B.map(o => `${holTaskName(o.t)}少做了约 ${Math.round(o.lag)} 份`).join('；') + '。已经自动平摊到后面几天，不用补一大堆；问问他是不是哪项太难。']);
       if (t === h.to) { const L = holLeftList(h); if (L.length) A.unshift(['明天开学', L.map(o => `${holTaskName(o.t)}还差 ${o.left} 份`).join('；') + '。']); } } }
   return A.slice(0, 3);
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
-const WHATS_NEW = {v: '2026-09-29',
-  kid: ['长的课文可以<b>一段一段背</b>了，每段过了打勾，全过了整篇算会。', '国庆的<b>假期作业</b>先录进来，放假后每天自动分好，出去玩那天不断签。', '重做点「还是不会」时，可以<b>要一个提示</b>：只给提示，不给答案。'],
-  parent: ['背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。', '单词和背诵的复习按 FSRS 算法排（同样记得住、复习少两三成）；AI 在孩子卡住时主动给提示，周复盘看「提示后自己做对」。', '设置里可以填期中、期末日期：考前两周自动加回检，考前三天不加新单词。']};
+const WHATS_NEW = {v: '2026-09-29b',
+  kid: ['「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。', '长的课文可以<b>一段一段背</b>了，每段过了打勾，全过了整篇算会。', '重做点「还是不会」时，可以<b>要一个提示</b>：只给提示，不给答案。'],
+  parent: ['名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。', '单词和背诵的复习按 FSRS 算法排（同样记得住、复习少两三成）；AI 在孩子卡住时主动给提示，周复盘看「提示后自己做对」。', '设置里可以填期中、期末日期：考前两周自动加回检，考前三天不加新单词。']};
 function whatsNew(who){
   let seen = ''; try { seen = localStorage.getItem('observer:new-' + who) || ''; } catch(e) { return ''; }
   if (seen >= WHATS_NEW.v) return '';
@@ -3879,6 +3939,16 @@ const ACT = {
     if (el.dataset.ok !== '1') { const it = allItems().find(x => x.id === k); if (it && hintOffer(it)) { state.hint = {id: k, phase: 'ask'}; render(); return; } }   // 先问要不要提示
     redoItem(k, el.dataset.ok === '1'); },
   hintgo: () => { hintGo(); },
+  rdtotal: el => { const i = +el.dataset.v, D = state.rd || {}, n = parseInt(($('#rd-total-' + i) || {}).value || D['total' + i], 10);
+    if (!(n >= 10 && n <= 2000)) return toast('填书的总页数（10 到 2000）'); const r = readRec(readPlan(today()).tk, i); r.total = n; r.at = r.at || today(); saveRead(r); delete D['total' + i]; render(); },
+  rdpage: el => { const i = +el.dataset.v, D = state.rd || {}, tk = readPlan(today()).tk, r = readRec(tk, i), n = parseInt(($('#rd-page-' + i) || {}).value || D['page' + i], 10);
+    if (!(n >= 1)) return toast('填读到第几页'); if (n > r.total) return toast(`这本书一共 ${r.total} 页`);
+    r.log = Object.assign({}, r.log, {[today()]: n}); saveRead(r); delete D['page' + i]; toast(n >= r.total ? `《${READ_BOOKS[tk][i][0]}》读完了！` : '记下了 ✓'); render(); },
+  rdsum: el => { const i = +el.dataset.v, D = state.rd || {}, tk = readPlan(today()).tk, r = readRec(tk, i);
+    const text = (($('#rd-text-' + i) || {}).value || D['text' + i] || '').trim(), ch = (($('#rd-ch-' + i) || {}).value || D['ch' + i] || '').trim();
+    if (text.length < 6) return toast('用一两句话说说这一章讲了什么');
+    r.sums = (r.sums || []).concat([{d: today(), ch: ch.slice(0, 30), text: text.slice(0, 300)}]).slice(-60); saveRead(r); delete D['text' + i]; delete D['ch' + i];
+    toast(aiReady() ? '记下了 ✓ AI 看一眼就回你' : '记下了 ✓'); render(); readFb(r.id, r.sums.length - 1); },
   newseen: el => { try { localStorage.setItem('observer:new-' + el.dataset.v, WHATS_NEW.v); } catch(e) {} render(); },
   hintno: () => { const H = state.hint; state.hint = null; if (H && H.phase === 'ask' && !H.fromQp) redoItem(H.id, false); else render(); },   // 不要提示 = 记下还是不会；看过提示后关掉 = 留着再做
   hintclose: () => { state.hint = null; render(); },
@@ -3969,6 +4039,7 @@ function onDataIn(e){
   const el = e.target.closest && e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
   if (k === 'qptext') { if (state.qp) state.qp.text = v; return; }
+  if (k === 'rd') { (state.rd = state.rd || {})[f + el.dataset.v] = v; return; }   // 名著页草稿
   if (k === 'hol') { const E = state.holE; if (!E) return;   // 边输入边写回草稿：后台同步等引起的重绘不丢字
     if (f === 'from' || f === 'to') { if (v) E[f] = v; return; }
     const t = E.tasks[+el.dataset.v]; if (t) t[f] = f === 'n' ? Math.max(1, Math.min(99, parseInt(v, 10) || 1)) : f === 'what' ? v.trim() : v; return; }
@@ -3992,6 +4063,7 @@ function onDataIn(e){
   save();
 }
 document.addEventListener('input', onDataIn);
+document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.rdopen != null) (state.rd = state.rd || {})['open' + d.dataset.rdopen] = d.open; }, true);   // 名著「说一说」折叠区重绘后保持展开
 document.addEventListener('compositionend', onDataIn);   // iPad 拼音选字确认后，Safari 有时不再发 input
 
 document.addEventListener('change', e => {
