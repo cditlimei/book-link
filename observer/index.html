@@ -361,7 +361,7 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 <script src="vendor/ts-fsrs-5.4.2.umd.js"></script>
 <script>
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v54';
+const APP_V = 'v55';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -2809,11 +2809,22 @@ function uniqWords(){ if (!LIB.words) return []; if (!LIB._uniq) { const m = new
 function wordsOf(book, unit){ return (LIB.words && LIB.words.words || []).filter(w => (!book || w.book === book) && (!unit || w.unit === unit)); }
 const shortCn = cn => { const first = String(cn||'').split('；')[0]; const m = first.match(/^([a-z]+\.\s*)?(.*)$/); const parts = m[2].split('，').slice(0, 2).join('，'); return (m[1] || '') + parts; };
 function wordQueue(){ const L = state.learn || {}; return memo('wq|' + today() + '|' + L.book + '|' + L.unit, wordQueue0).slice(); }
+// 课本词跟进度：本学期课本（沪教版，书后各单元词表）已学到的单元先出，前面单元没背的在前；之后接中考词库。英语一学期 8 个单元，约 16 天一个
+const termBook = t => (((LIB.words && LIB.words.books) || []).find(b => b.term === termKey(t)) || {}).id || null;
+function enUnit(t){ const u = curUnit(termKey(t)); if (!u) return 0; const tk = termKey(t), y = +t.slice(0, 4), m = +t.slice(5, 7), hj = holList().find(p => p.name === '寒假' && p.to.startsWith(y + '-'));
+  const start = tk.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : hj ? addD(hj.to, 1) : y + '-03-01'; return Math.min(8, Math.max(1, Math.floor(dayDiff(start, t) / 16) + 1)); }
+function autoFresh(t){
+  const tb = termBook(t), cu = enUnit(t), seen = new Set(), out = [];
+  const push = w => { const k = wordKey(w); if (seen.has(k) || wState(w)) return; seen.add(k); out.push(w); };
+  if (tb && cu) for (const w of LIB.words.words) if (w.book === tb && +String(w.unit).replace(/\D/g, '') <= cu) push(w);
+  for (const w of LIB.words.words) if (w.book !== tb) push(w);
+  return out;
+}
 function wordQueue0(){
   const t = today(), L = state.learn || (state.learn = {view:'home', book:null, unit:null});
   const due = uniqWords().filter(w => { const s = wState(w); return s && !s.done && s.due <= t; }).sort((a, b) => (wState(a).u || 0) - (wState(b).u || 0));   // 刚答错的排到后面，隔几张再考
   const newToday = Object.values(DB.words).filter(s => s.first === t).length;
-  const fresh = wordsOf(L.book, L.unit).filter(w => !wState(w)).slice(0, Math.max(0, newPerDay() - newToday));
+  const fresh = (!L.unit && (!L.book || L.book === termBook(t)) ? autoFresh(t) : wordsOf(L.book, L.unit).filter(w => !wState(w))).slice(0, Math.max(0, newPerDay() - newToday));
   const isRetry = w => { const s = wState(w); return s.triesD === t && s.due === t; };
   const reviews = due.filter(w => !isRetry(w)), retries = due.filter(isRetry);
   return reviews.concat(fresh.slice(0, 3), retries, fresh.slice(3));   // 当晚没想起来的词，隔 3 张再考
@@ -3236,14 +3247,14 @@ function vWordCard(){
   const q = wordsDoneToday() >= wordsTonight() ? q0.filter(isRetry) : q0;
   let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">背单词</h2><span class="spacer"></span><span class="small faint">今晚还剩 ${Math.min(q.length, Math.max(0, wordsTonight() - wordsDoneToday()))}</span><button class="btn sm ghost" data-act="lv" data-v="words">单词表 / 打印</button></div>` + `<details style="margin-top:6px"><summary class="small faint">怎么背</summary><p class="small faint" style="margin:6px 0 0">看中文想英文，想完再翻面听发音。每天新学 ${newPerDay()} 个（按最近的正确率自动调：记得牢就多学，记不住就少学），记住的隔 1、3、7、21 天再考，第 4 次还记得就算掌握。</p></details>`;
   if (!q.length) return h + `<div class="card empty" style="margin-top:12px">今天的单词背完了。明天再来，隔天复习才记得牢。<div style="margin-top:12px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button></div></div>`;
-  const w = q[0], s = wState(w), flip = L.flip, mustSpell = !!s && (s.box || 0) >= 2, spellOk = (L.typed || '').trim().toLowerCase() === w.w.toLowerCase();
+  const w = q[0], s = wState(w), flip = L.flip, mustSpell = !!s && (s.box || 0) >= 2 && !w.u, spellOk = (L.typed || '').trim().toLowerCase() === w.w.toLowerCase();
   h += `<div class="card" style="margin-top:12px;text-align:center;padding:28px 16px">
     <div class="small faint">${s ? '复习 · 第 ' + ((s.hist||[]).length + 1) + ' 次' : '新词'}${w.unit ? ' · ' + esc(w.unit) : ''}</div>
     <div style="font-size:26px;font-weight:700;margin:14px 0 4px">${esc(shortCn(w.cn))}</div>
     ${!flip ? `<input type="text" id="w-spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${mustSpell ? '这一轮要拼出来' : '拼一下（可选）'}" value="${esc(L.typed||'')}" style="max-width:260px;margin:12px auto 0;display:block;text-align:center;font-family:Georgia,serif;font-size:20px">` : ''}
     ${flip ? `<div style="font-size:34px;font-weight:700;margin:22px 0 4px;font-family:Georgia,serif">${esc(w.w)}</div><div class="muted">${esc(w.p || '')}</div>
       ${L.typed ? (L.typed.trim().toLowerCase() === w.w.toLowerCase() ? '<div class="pill good" style="display:inline-block;margin-top:8px">拼对了</div>' : `<div class="small" style="margin-top:8px;color:var(--amber)">你拼的是：${esc(L.typed)}</div>`) : ''}
-      <div class="small faint" style="margin-top:6px">${esc(w.cn || '')}</div>
+      <div class="small faint" style="margin-top:6px">${esc(w.cn || '')}</div>${w.book === termBook(today()) ? `<div class="small" style="margin-top:4px;color:var(--accent)">课本 ${esc(w.unit)}${w.u ? ' · 只要求认识，不用会拼' : ''}</div>` : ''}
       <button class="btn sm" style="margin-top:10px" data-act="say" data-v="${esc(w.w)}">${SPK} 再听一遍</button>` : `<p class="small faint" style="margin-top:22px">${mustSpell ? '记住两轮了，这次要把它拼出来' : '先在心里想（或写在纸上）英文怎么说'}</p>`}</div>`;
   h += flip && mustSpell ? (spellOk ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">拼对了 ✓ 下一个</button></div>`
       : `<div class="row"><button class="btn" style="flex:2;min-height:52px" data-act="wmark" data-v="0">拼错了，过两天再考</button><button class="btn ghost" style="flex:1;min-height:52px" data-act="wmark" data-v="1">只是手滑</button></div>`)
