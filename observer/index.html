@@ -354,6 +354,7 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 <nav id="tabs"></nav>
 <div id="wiz"></div>
 <div id="toast"></div>
+<script src="vendor/ts-fsrs-5.4.2.umd.js"></script>
 <script>
 'use strict';
 /* ================= 常量 ================= */
@@ -831,6 +832,7 @@ function findings(st, prev, anchors, nDays, monthly){
     }
   }
   if (st.redoN >= 3) out.push({k: st.redoOk/st.redoN >= 0.6 ? 'good' : 'info', t:`重做了 ${st.redoN} 次，做对 ${st.redoOk} 次（${pct(st.redoOk, st.redoN)}%）。` + (st.redoOk/st.redoN < 0.5 ? ' 重做正确率偏低，说明这些题的概念还没补上，先回课本，别急着再做。' : '')});
+  { const hs = hintStats(st.from, st.to); if (hs.n >= 2) out.push({k: hs.ok / hs.n >= 0.6 ? 'good' : 'info', t: `AI 提示之后自己再做：${hs.n} 次里做对 ${hs.ok} 次（${pct(hs.ok, hs.n)}%）。看的是提示有没有帮他自己做出来，不是用了多久`}); }
   const tired = st.mood.tired, others = st.days.filter(d => d in st.errByDay && !tired.includes(d));
   if (tired.length >= 2 && others.length >= 2) {
     const a = sum(tired.map(d=>st.errByDay[d]||0))/tired.length, b = sum(others.map(d=>st.errByDay[d]||0))/others.length;
@@ -960,7 +962,7 @@ function doneToday(){ const t = today(); return allItems().filter(it => (it.hist
 function finalMiss(id, selfOk){
   const ext = id.startsWith('m:'), it = ext ? extItems().find(x => x.id === id) : DB.items.find(x => x.id === id); if (!it) return;
   const t = today(); it.hist = (it.hist || []).concat([{d: t, ok: !!selfOk, pend: true}]); it.box = BOXES.length - 1; it.due = addD(t, 2); it.u = now();
-  if (ext) DB.extReview[id] = {box: it.box, due: it.due, hist: it.hist, done: it.done, u: it.u};
+  if (ext) DB.extReview[id] = {box: it.box, due: it.due, hist: it.hist, done: it.done, hints: it.hints, u: it.u};
   save(); render(); toast(selfOk ? '先记下了，2 天后再过最后一关' : '差一点，2 天后再来一次最后一关');
 }
 function redoItem(id, ok, verified){
@@ -974,7 +976,7 @@ function redoItem(id, ok, verified){
   if (ok && (it.done || sureOnce)) { it.done = true; it.box = BOXES.length; toast(sureOnce ? '回检做对了，这道结束' : '还记得，很好'); }
   else if (ok) { it.box = (it.box||0) + 1; if (it.box >= BOXES.length) { it.done = true; toast('这道算掌握了'); } else { it.due = addD(t, BOXES[it.box]); toast(BOXES[it.box]+' 天后再做一次'); } }
   else { it.box = 0; it.done = false; it.due = addD(t, 1); toast('明天再来一次，不着急'); }
-  if (ext) DB.extReview[id] = {box:it.box, due:it.due, hist:it.hist, done:it.done, u:it.u};
+  if (ext) DB.extReview[id] = {box:it.box, due:it.due, hist:it.hist, done:it.done, hints:it.hints, u:it.u};
   save(); render();
 }
 
@@ -1241,7 +1243,7 @@ function render(){
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.hint ? vHint() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
   document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
   hydratePhotos(); updateBadge();
@@ -1853,6 +1855,39 @@ function tutorOpen(sid, first){
   if (tutorMinutesToday() >= tutorLimit()) { toast(`今天已经用了 ${tutorLimit()} 分钟，明天再来`); return; }
   state.tutor = {sid: sid || null, msgs: [], t0: Date.now(), busy: false, img: null, draft: first || ''};
   render();
+}
+/* 主动提示：重做点「还是不会」时，AI 在这道题旁边主动问一句（Khanmigo 被动等提问只有 15% 学生用）。每题每天一次；
+   提示用混合式——指出最可能出问题的那一步 + 问一个问题（2026 年 RCT：比只问反思问题更能让学生动手改）。
+   效果看「提示后下一次重做做对没有」（Khan 的 next-item correctness），不看用了几分钟 */
+const HINT_RULE = `这一次只给一条提示，不超过 80 字：先具体指出最可能出问题的那一步或那个概念（只指位置和原因，不写出正确结果），再问一个能让他自己发现问题的问题。不给答案，不写完整过程。`;
+const hintRec = id => id.startsWith('m:') ? (DB.extReview[id] = DB.extReview[id] || {}) : DB.items.find(x => x.id === id);
+const hintedToday = it => (it.hints || []).some(h => h.d === today());
+const hintOffer = it => aiReady() && !hintedToday(it) && !!(it.stem || it.tag) && tutorMinutesToday() < tutorLimit();
+async function hintGo(){
+  const H = state.hint, it = allItems().find(x => x.id === H.id); if (!it) { state.hint = null; render(); return; }
+  const rec = hintRec(H.id); rec.hints = (rec.hints || []).concat([{d: today(), at: (it.hist || []).length}]).slice(-10); rec.u = now();
+  const dd = touchDay(today()); dd.aiMin = (dd.aiMin || 0) + 0.5; save();
+  H.phase = 'wait'; render();
+  const s = subjById(it.sid), q = [`科目：${s.name}`, it.stem ? `题目：${it.stem}` : `知识点：${it.tag}`, subName(it) ? `以前的问题类型：${subName(it)}` : '', it.kidAnswer ? `他上次写的：${it.kidAnswer}` : '', it.note ? `错因记录：${it.note}` : ''].filter(Boolean).join('\n');
+  try { const out = await aiChat([{role: 'system', content: TUTOR_RULES + '\n' + HINT_RULE + '\n' + learnerProfile(it.sid)}, {role: 'user', content: q + '\n他重做这道题还是不会，请给一条提示。'}]);
+    if (state.hint !== H) return; H.text = (out || '').trim() || '先把题目再读一遍，圈出已知条件和要求的量，看看第一步用哪个。'; H.phase = 'show'; }
+  catch(e) { if (state.hint !== H) return; H.phase = 'show'; H.err = e.message || 'AI 暂时连不上'; }
+  render();
+}
+function vHint(){
+  const H = state.hint, it = allItems().find(x => x.id === H.id); if (!it) return '';
+  let h = `<div class="wiz" role="dialog" aria-label="提示"><div class="wiz-top"><div style="flex:1;font-weight:600">${esc(subjById(it.sid).name)} · 这道再想想</div><button class="wiz-x" data-act="hintno" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (it.stem) h += `<div class="card" style="white-space:pre-wrap">${esc(it.stem)}</div>`;
+  if (H.phase === 'ask') return h + `<p style="font-size:17px">要一个提示吗？</p><p class="small muted">AI 只给提示，不给答案。看完自己再做一遍。</p></div><div class="wiz-foot"><button class="btn" data-act="hintno">不用了</button><button class="btn primary" data-act="hintgo">要一个提示</button></div></div>`;
+  if (H.phase === 'wait') return h + `<p class="muted">AI 在想…</p></div></div>`;
+  h += H.err ? `<div class="signal">${esc(H.err)}</div>` : `<div class="card" style="background:var(--accent-bg);border-color:transparent;font-size:17px;line-height:1.7">${esc(H.text)}</div><p class="small muted">自己再做一遍，做完回来点「做对了」或「还是不会」。</p>`;
+  return h + `</div><div class="wiz-foot"><button class="btn primary" style="flex:1" data-act="hintclose">我再试试</button></div></div>`;
+}
+// 提示效果：每次提示之后这道题的下一次重做结果（还没重做的不算）
+function hintStats(from, to){
+  let n = 0, ok = 0, open = 0;
+  for (const it of allItems()) for (const h of (it.hints || [])) { if (h.d < from || h.d > to) continue; const nx = (it.hist || [])[h.at]; if (!nx) { open++; continue; } n++; if (nx.ok) ok++; }
+  return {n, ok, open};
 }
 function tutorMessages(){
   const T = state.tutor;
@@ -2644,7 +2679,26 @@ async function loadLib(){
   LIB.done = true;
   if (state.tab === 'learn' || (state.tab === 'today' && !state.wiz && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)))) render();
 }
-const WBOX = [1, 3, 7, 21];                   // 单词复习间隔：记得越牢隔得越久，第 4 次记住 = 掌握
+const WBOX = [1, 3, 7, 21];                   // 旧的固定间隔（FSRS 不可用时兜底）：第 4 次记住 = 掌握
+/* FSRS（ts-fsrs 5.4.2，MIT）：按每次记得的程度算下次复习日。同样的记住程度，复习次数比固定间隔少 20–30%（open-spaced-repetition 基准，7 亿条复习记录）。
+   只到天：关掉分钟级学习步骤；最长 90 天，中考前每篇每季度至少回来一次。评分 1 忘了 / 2 吃力 / 3 记得 / 4 很轻松 */
+const FS = (() => { try { const F = window.FSRS; return {F, f: F.fsrs(F.generatorParameters({enable_fuzz: false, learning_steps: [], relearning_steps: [], maximum_interval: 90}))}; } catch(e) { return null; } })();
+const FS_MASTER = 60;                         // 下次间隔 ≥ 60 天算掌握
+function fsStep(c, d, rating){
+  if (!FS) return null;
+  try {
+    const at = new Date(d + 'T20:00:00'), T = x => new Date(x + 'T20:00:00');
+    const card = c ? {due: T(c.due), stability: c.s, difficulty: c.df, elapsed_days: 0, scheduled_days: 0, learning_steps: 0, reps: c.r, lapses: c.l, state: c.st, last_review: c.lr ? T(c.lr) : undefined} : FS.F.createEmptyCard(at);
+    const n = FS.f.next(card, at, rating).card, days = Math.max(1, Math.round((n.due - at) / 864e5));
+    return {s: n.stability, df: n.difficulty, r: n.reps, l: n.lapses, st: n.state, lr: d, due: addD(d, days), days};
+  } catch(e) { return null; }
+}
+// 老记录第一次用 FSRS 时，按历史每天最后一次结果回放一遍（不从头开始）
+function fsReplay(hist, rate){
+  const byDay = {}; for (const h of hist || []) { const r = rate(h); if (r) byDay[h.d] = r; }
+  let c = null; for (const d of Object.keys(byDay).sort()) { const n = fsStep(c, d, byDay[d]); if (!n) return null; c = n; } return c;
+}
+const wordRate = h => h.ok ? (h.known || h.sp ? 4 : 3) : 1;
 const NEW_PER_DAY = 10;
 /* 新词数量跟着孩子走：近 7 天复习正确率 ≥ 85%（至少背了 3 晚）→ 每天 15 个；低于 60% → 5 个，先把旧的记牢 */
 function newPerDay(){
@@ -2673,23 +2727,38 @@ function wordQueue(){
   const reviews = due.filter(w => !isRetry(w)), retries = due.filter(isRetry);
   return reviews.concat(fresh.slice(0, 3), retries, fresh.slice(3));   // 当晚没想起来的词，隔 3 张再考
 }
-function markWord(w, ok){
-  const k = wordKey(w), t = today(), s = DB.words[k] || {box:-1, hist:[], first:t};
-  s.hist = (s.hist || []).concat([{d:t, ok}]).slice(-12);
-  if (ok) { s.box = (s.box || 0) + 1; if (s.box >= WBOX.length) { s.done = true; s.due = null; } else s.due = addD(t, WBOX[s.box]); }
-  else { s.box = 0; s.done = false; s.tries = s.triesD === t ? (s.tries || 0) + 1 : 1; s.triesD = t; s.due = s.tries >= 2 ? addD(t, 1) : t; }   // 当晚再考一次，第二次还没想起来就明天
+function markWord(w, ok, sp){
+  const k = wordKey(w), t = today(), s = DB.words[k] || {box:-1, hist:[], first:t}, retry = s.triesD === t;
+  if (FS && s.fs == null && (s.hist || []).length) s.fs = fsReplay(s.hist, wordRate);
+  s.hist = (s.hist || []).concat([Object.assign({d:t, ok}, sp ? {sp: true} : {})]).slice(-12);
+  if (ok) { s.box = (s.box || 0) + 1; const n = fsStep(s.fs, t, sp ? 4 : 3);
+    if (n) { s.fs = n; if (n.days >= FS_MASTER) { s.done = true; s.due = null; } else s.due = n.due; }
+    else if (s.box >= WBOX.length) { s.done = true; s.due = null; } else s.due = addD(t, WBOX[s.box]); }
+  else { s.box = 0; s.done = false; if (!retry) { const n = fsStep(s.fs, t, 1); if (n) s.fs = n; }   // 当晚重考又错不重复记遗忘
+    s.tries = retry ? (s.tries || 0) + 1 : 1; s.triesD = t; s.due = s.tries >= 2 ? addD(t, 1) : t; }   // 当晚再考一次，第二次还没想起来就明天
   s.u = now(); DB.words[k] = s; save();
 }
 const RST = [['','没背'],['learning','在背'],['can','会背了'],['dict','默写全对'],['upd','内容有更新'],['rv-ok','复习还会'],['rv-no','复习忘了'],['voice','语音检验'],['type','默写检验']];
 const rState = id => (DB.recite[id] || {}).st || '';
 const RBOX = [3, 7, 21];                   // 会背之后隔 3、7、21 天回来检查，第 3 次还会就算记牢
-function setRecite(id, st){ const r = DB.recite[id] || {hist:[]}, it = LIB.recite && LIB.recite.items.find(i => i.id === id), stale = !!it && (r.rev || 1) < recRev(it);
-  r.st = st; r.hist = (r.hist||[]).concat([{d:today(), st}]).slice(-20);
-  if (st === 'can' || st === 'dict') { if (r.box == null || r.box < 0 || stale) { r.box = 0; r.due = addD(today(), RBOX[0]); r.solid = false; } if (it) r.rev = recRev(it); } else { r.box = -1; r.due = null; }
+// 检验分数 → FSRS 评分：98%+ 很轻松、90%+ 记得、70%+ 吃力、以下忘了
+const recRate = p => p >= 98 ? 4 : p >= 90 ? 3 : p >= 70 ? 2 : 1;
+const recHistRate = h => h.score != null ? recRate(h.score) : ({'rv-ok': 3, 'rv-no': 1, can: 3, dict: 4})[h.st] || 0;
+function setRecite(id, st, rating){ const r = DB.recite[id] || {hist:[]}, it = LIB.recite && LIB.recite.items.find(i => i.id === id), stale = !!it && (r.rev || 1) < recRev(it), t = today();
+  const past = (r.hist || []).filter(h => h.d < t);
+  r.st = st; r.hist = (r.hist||[]).concat([{d:t, st}]).slice(-20);
+  if (st === 'can' || st === 'dict') { if (r.box == null || r.box < 0 || stale) {
+      const n = fsStep(stale ? null : fsReplay(past, recHistRate), t, rating || (st === 'dict' ? 4 : 3));   // 内容更新过的按新篇目从头排
+      r.box = 0; r.solid = false; if (n) { r.fs = n; r.due = n.due; } else r.due = addD(t, RBOX[0]); }
+    if (it) r.rev = recRev(it); } else { r.box = -1; r.due = null; r.fs = null; }
   r.u = now(); DB.recite[id] = r; save(); }
-function reviewRecite(id, ok){ const r = DB.recite[id]; if (!r) return; const t = today(); r.hist = (r.hist||[]).concat([{d:t, st: ok ? 'rv-ok' : 'rv-no'}]).slice(-20);
-  if (ok) { r.box = (r.box || 0) + 1; r.due = r.box >= RBOX.length ? null : addD(t, RBOX[r.box]); if (r.box >= RBOX.length) r.solid = true; }
-  else { r.box = Math.max(0, (r.box || 0) - 1); r.due = addD(t, 1); r.solid = false; }   // 忘了只退一格、明天再背；重学很快
+function reviewRecite(id, ok, rating){ const r = DB.recite[id]; if (!r) return; const t = today(), rt = rating || (ok ? 3 : 1);
+  if (FS && r.fs == null) r.fs = fsReplay((r.hist || []).filter(h => h.d < t), recHistRate);
+  r.hist = (r.hist||[]).concat([{d:t, st: rt >= 2 ? 'rv-ok' : 'rv-no'}]).slice(-20);
+  const n = fsStep(r.fs, t, rt);
+  if (n) { r.fs = n; r.due = n.due; r.box = rt >= 3 ? (r.box || 0) + 1 : rt === 1 ? Math.max(0, (r.box || 0) - 1) : (r.box || 0); r.solid = rt >= 2 && n.days >= FS_MASTER; }
+  else if (rt >= 3) { r.box = (r.box || 0) + 1; r.due = r.box >= RBOX.length ? null : addD(t, RBOX[r.box]); if (r.box >= RBOX.length) r.solid = true; }
+  else if (rt === 1) { r.box = Math.max(0, (r.box || 0) - 1); r.due = addD(t, 1); r.solid = false; }   // 忘了只退一格、明天再背；重学很快
   r.u = now(); save(); }
 const reciteDue = () => (LIB.recite ? LIB.recite.items : []).filter(x => { const r = DB.recite[x.id]; return r && r.due && r.due <= today(); });
 // 长篇分段背：全文超过 160 字才切，按字数均分成 2–5 段，段内不拆句。返回 [[起行, 止行), ...]，短篇返回 []
@@ -3123,7 +3192,7 @@ async function finishCheck(){
   const pctv = Math.round(res.score * 100), r = DB.recite[x.id] || {hist: []}, cur = r.st || '', eff = rStateX(x);
   r.hist = (r.hist || []).concat([Object.assign({d: today(), st: strict ? 'type' : 'voice', score: pctv}, si == null ? {} : {seg: si})]).slice(-20); r.u = now(); DB.recite[x.id] = r;
   const dueNow = eff !== 'upd' && r.due && r.due <= today();   // 复习可以只抽一段背
-  if (dueNow && pctv >= 90) reviewRecite(x.id, true); else if (dueNow && pctv < 70) reviewRecite(x.id, false);
+  if (dueNow) reviewRecite(x.id, pctv >= 70, recRate(pctv));   // 70–90 分记「吃力」，间隔排短一些
   if (si != null) {
     const ok = strict ? pctv >= 98 : pctv >= 90; R.segOk = ok;
     if (ok) { if (r.segRev !== recRev(x)) { r.segs = {}; r.segRev = recRev(x); } r.segs[si] = strict || r.segs[si] === 'dict' ? 'dict' : 'can'; }
@@ -3132,7 +3201,7 @@ async function finishCheck(){
     else if (all && !['can','dict'].includes(eff)) { R.allDone = true; setRecite(x.id, 'can'); }
     else if (!cur) setRecite(x.id, 'learning'); else save();
   }
-  else if (strict && pctv >= 98) setRecite(x.id, 'dict'); else if (!strict && pctv >= 90 && !['can','dict'].includes(eff)) setRecite(x.id, 'can'); else if (!cur) setRecite(x.id, 'learning'); else save();
+  else if (strict && pctv >= 98) setRecite(x.id, 'dict', 4); else if (!strict && pctv >= 90 && !['can','dict'].includes(eff)) setRecite(x.id, 'can', recRate(pctv)); else if (!cur) setRecite(x.id, 'learning'); else save();
   render();
 }
 function vReciteCheck(){
@@ -3330,7 +3399,9 @@ function attentionItems(){
   // AI 依赖：这周用 AI 老师多，但自己做同类题 / 混合练习的正确率不到一半（Bastani 2024：不设限的 AI 辅导撤掉后成绩更差）
   { const mon = monOf(t), aiMin = range(mon, t).reduce((a, d) => a + ((DB.days[d] || {}).aiMin || 0), 0); let n = 0, okN = 0;
     for (const it of allItems()) for (const h of (it.vh || [])) if (h.d >= mon && h.d <= t) { n++; if (h.ok) okN++; }
-    if (aiMin >= 40 && n >= 4 && okN / n < 0.5) A.push([`这周用 AI 老师 ${Math.round(aiMin)} 分钟，自己做同类题只对了 ${okN}/${n}`, `可能有点依赖 AI 了。可以在「设置」把每晚 AI 时长先调到 10 分钟，卡住时先翻课本例题再问。`]); }
+    const hs = hintStats(mon, t);   // Khan 的 next-item correctness：提示后下一次重做自己做对没有
+    if (hs.n >= 4 && hs.ok / hs.n < 0.5) A.push([`AI 提示后自己做对 ${hs.ok}/${hs.n}`, '提示没怎么帮上他自己做出来。可能题目超出现在的水平，周末陪他看一道课本例题，比多要提示更管用。']);
+    else if (aiMin >= 40 && n >= 4 && okN / n < 0.5) A.push([`这周用 AI 老师 ${Math.round(aiMin)} 分钟，自己做同类题只对了 ${okN}/${n}`, `可能有点依赖 AI 了。可以在「设置」把每晚 AI 时长先调到 10 分钟，卡住时先翻课本例题再问。`]); }
   { const h = holAt(t); if (h) { const B = holBehind(h, t);
       if (B.length) A.unshift(['假期作业落下了', B.map(o => `${holTaskName(o.t)}少做了约 ${Math.round(o.lag)} 份`).join('；') + '。已经自动平摊到后面几天，不用补一大堆；问问他是不是哪项太难。']);
       if (t === h.to) { const L = holLeftList(h); if (L.length) A.unshift(['明天开学', L.map(o => `${holTaskName(o.t)}还差 ${o.left} 份`).join('；') + '。']); } } }
@@ -3594,7 +3665,7 @@ const ACT = {
   wunit: el => { state.learn.unit = el.dataset.v || null; render(); },
   say: el => speak(el.dataset.v, 'en-US'),
   wflip: () => { const sp = $('#w-spell'); state.learn.typed = sp ? sp.value : ''; const q0 = wordQueue()[0], s0 = q0 && wState(q0); if (s0 && (s0.box || 0) >= 2 && !state.learn.typed.trim()) { toast('这个词已经记住两轮了，这一轮要拼出来'); if (sp) sp.focus(); return; } state.learn.flip = true; render(); const q = wordQueue(); if (q[0]) speak(q[0].w, 'en-US'); },
-  wmark: el => { const q = wordQueue(); if (q[0]) markWord(q[0], el.dataset.v === '1'); state.learn.flip = false; state.learn.typed = ''; render(); },
+  wmark: el => { const q = wordQueue(); if (q[0]) { const sp = $('#w-spell'), ty = ((sp ? sp.value : '') || state.learn.typed || '').trim().toLowerCase(); markWord(q[0], el.dataset.v === '1', !!ty && ty === q[0].w.toLowerCase()); } state.learn.flip = false; state.learn.typed = ''; render(); },
   wknown: () => { const q = wordQueue(); const w = q[0]; if (!w) return; const sp = $('#w-spell'), ty = (sp ? sp.value : '').trim().toLowerCase(); if (ty !== w.w.toLowerCase()) { toast(ty ? '拼得不对，先当新词背' : '先在上面拼一下，拼对了才算早就会了'); if (sp) sp.focus(); return; } const t = today(); DB.words[wordKey(w)] = {box: WBOX.length, done: true, due: null, first: t, hist: [{d: t, ok: true, known: true}], u: now()}; save(); state.learn.typed = ''; render(); },
   wprint: el => printWords(el.dataset.v),
   wcsv: () => { const L = state.learn, q = v => /[",\n]/.test(v||'') ? '"' + String(v).replace(/"/g,'""') + '"' : (v||'');
@@ -3678,7 +3749,9 @@ const ACT = {
     const d = state.date, g = kwGuess(Q.sid, t), conf = /有把握|以为(是)?对|以为做对/.test(t) ? 'sure' : /不确定|犹豫|拿不准/.test(t) ? 'unsure' : /不会|不知道怎么/.test(t) ? 'no' : null;
     const it = {id: uid('i'), d, sid: Q.sid, type: g.type, sub: g.sub || undefined, tag: '', stem: t.slice(0, 300), conf, src: '随手记', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()};
     DB.items.push(it); const r = rec(d, Q.sid, true); if (!r.stuck && !r.none) r.stuck = t.slice(0, 80); touchDay(d); save();
-    state._lastQp = Q.sid; state.qp = null; render(); toast('记下了 ✓' + (aiReady() ? ' AI 正在归类' : '')); qpClassify(it.id); },
+    state._lastQp = Q.sid; state.qp = null;
+    if (d === today() && /不会|卡住|卡在|不懂|想不出|没思路|不知道怎么/.test(t) && hintOffer(it)) state.hint = {id: it.id, phase: 'ask', fromQp: true};   // 正卡着：顺手问要不要提示
+    render(); toast('记下了 ✓' + (aiReady() ? ' AI 正在归类' : '')); qpClassify(it.id); },
   praise: el => { setDayField(today(), 'praise', PRAISE[+el.dataset.v]); save(); render(); toast('孩子下次打开 app 会看到'); },
   praiseseen: el => { try { const old = (localStorage.getItem('observer:praiseSeen') || '').split('|').slice(-6); localStorage.setItem('observer:praiseSeen', old.concat([el.dataset.v]).join('|')); } catch(e) {} render(); },
   praiseundo: () => { setDayField(today(), 'praise', ''); save(); render(); },
@@ -3759,7 +3832,12 @@ const ACT = {
   tpause: () => timerPause(),
   tstop: () => timerStop(),
   ev: el => { state.errView = el.dataset.v; render(); },
-  redo: el => { const k = el.dataset.v, t0 = Date.now(); if (ACT._lastRedo && ACT._lastRedo.k === k && t0 - ACT._lastRedo.t < 800) return; if (ACT._lastRedo && t0 - ACT._lastRedo.t < 400) return; ACT._lastRedo = {k, t: t0}; redoItem(k, el.dataset.ok === '1'); },
+  redo: el => { const k = el.dataset.v, t0 = Date.now(); if (ACT._lastRedo && ACT._lastRedo.k === k && t0 - ACT._lastRedo.t < 800) return; if (ACT._lastRedo && t0 - ACT._lastRedo.t < 400) return; ACT._lastRedo = {k, t: t0};
+    if (el.dataset.ok !== '1') { const it = allItems().find(x => x.id === k); if (it && hintOffer(it)) { state.hint = {id: k, phase: 'ask'}; render(); return; } }   // 先问要不要提示
+    redoItem(k, el.dataset.ok === '1'); },
+  hintgo: () => { hintGo(); },
+  hintno: () => { const H = state.hint; state.hint = null; if (H && H.phase === 'ask' && !H.fromQp) redoItem(H.id, false); else render(); },   // 不要提示 = 记下还是不会；看过提示后关掉 = 留着再做
+  hintclose: () => { state.hint = null; render(); },
   skipitem: el => { if (!confirm('找不到原题，就把这道移出重做队列？')) return; const it = DB.items.find(x => x.id === el.dataset.v); it.done = true; it.skipped = true; it.u = now(); save(); render(); },
   alldue: (el, e) => { e.preventDefault(); state.showAllDue = true; render(); },
   errp: el => { state.errPeriod = el.dataset.v; render(); },

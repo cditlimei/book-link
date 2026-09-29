@@ -9,3 +9,6 @@
 
 ## speak.json 与 audio/en/
 模仿朗读短文为本应用原创；示范音频由 edge-tts（en-US-JennyNeural）生成。
+
+## vendor/ts-fsrs-5.4.2.umd.js
+单词与背诵的复习间隔用 [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) 5.4.2（FSRS 算法，MIT License, Copyright (c) 2026 Open Spaced Repetition），原样收录 npm 包里的 UMD 构建，许可证原文见 `vendor/ts-fsrs-LICENSE.txt`。
