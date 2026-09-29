@@ -71,8 +71,9 @@ h3{font-family:var(--serif);font-size:17px;margin:0 0 8px}
 .spacer{flex:1}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:640px){.grid2{grid-template-columns:1fr}}
-.cols{display:grid;grid-template-columns:1fr;gap:0 16px}
-@media (min-width:760px){.cols{grid-template-columns:1.25fr 1fr}}
+.cols{display:grid;grid-template-columns:minmax(0,1fr);gap:0 16px}
+.cols>*{min-width:0}
+@media (min-width:760px){.cols{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
 
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:14px;line-height:1.2;min-height:34px;white-space:nowrap}
 .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -557,7 +558,11 @@ async function load(){
   if (DEMO) SYNC = {};
 }
 let writeT = null, pendingLocal = false;
+// 一次刷新里重复算的结果（单词队列、连续天数）只算一次；render 开始和 save 时清空
+let RC = {};
+const memo = (k, f) => (k in RC ? RC[k] : (RC[k] = f()));
 function save(){
+  RC = {};
   DB.u = now(); pendingLocal = true;
   clearTimeout(writeT); writeT = setTimeout(flush, 250);
   scheduleSync();
@@ -638,7 +643,8 @@ const autoFreeze = d => !dayCnt(d) && !isRest(d) && !holOk(d) && dayCnt(addD(d, 
 // 假期：标了「出去」的日子像请假一样不断；做了当天假期作业的日子算打卡
 const holCnt = d => { const h = holAt(d); return !!h && !h.out[d] && h.tasks.some(t => (t.done || {})[d] > 0); };
 const dayCnt = d => dayHasData(d) || holCnt(d);
-function streak(){ const ok = d => dayHasData(d) || isRest(d) || holOk(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0, frozen = {};
+function streak(){ return memo('streak', streak0); }
+function streak0(){ const ok = d => dayHasData(d) || isRest(d) || holOk(d); let d = ok(today()) ? today() : addD(today(), -1), n = 0, frozen = {};
   if (!ok(d) && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); }
   while (n < 2000) { if (ok(d)) { if (dayCnt(d)) n++; d = addD(d, -1); continue; } if (!frozen[monOf(d)] && autoFreeze(d)) { frozen[monOf(d)] = 1; d = addD(d, -1); continue; } break; }
   return n; }
@@ -659,7 +665,8 @@ function monthHeat(m){
   return `<div class="heat">${cells}</div><div class="small faint" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap"><span>这个月记了 <b>${n}</b> 天，其中 <b>${full}</b> 天全做完</span><span><i class="hc l1 key"></i>记了一些 <i class="hc l2 key"></i>作业记全 <i class="hc l3 key"></i>全做完 <i class="hc lr key"></i>请假</span></div>`;
 }
 function streakPill(){ const n = streak(); if (n > 1) return `<button class="streak" data-act="monthtog" aria-label="看这个月">连续 <b>${n}</b> 天 ▾</button>`; const b = bestStreak(); return b >= 3 ? `<button class="streak" data-act="monthtog" style="background:var(--surface2);color:var(--ink2)">最长 ${b} 天 · 今天接着来</button>` : ''; }
-function bestStreak(){ const ok = d => dayHasData(d) || isRest(d) || holOk(d); const ds = [...new Set(Object.keys(DB.days).concat(holList().flatMap(h => range(h.from, h.to).filter(x => x <= today()))))].filter(ok).sort(); let best = 0, cur = 0, prev = null, frozen = {};
+function bestStreak(){ return memo('best', bestStreak0); }
+function bestStreak0(){ const ok = d => dayHasData(d) || isRest(d) || holOk(d); const ds = [...new Set(Object.keys(DB.days).concat(holList().flatMap(h => range(h.from, h.to).filter(x => x <= today()))))].filter(ok).sort(); let best = 0, cur = 0, prev = null, frozen = {};
   for (const d of ds) { const gap = prev ? addD(prev, 1) === d ? 0 : addD(prev, 2) === d && !frozen[monOf(addD(prev, 1))] ? 1 : 2 : 2;
     if (gap === 1) frozen[monOf(addD(prev, 1))] = 1;
     cur = gap < 2 ? cur + (dayCnt(d) ? 1 : 0) : (dayCnt(d) ? 1 : 0); prev = d; if (cur > best) best = cur; } return Math.max(best, streak()); }
@@ -669,8 +676,12 @@ const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && is
 /* ================= 假期作业：放假前录清单，按可用天数自动拆到每天；落下的自动平摊到后面 =================
    日期来源：国务院办公厅 2026 年节假日安排（国庆 10/1–10/7）、深圳市教育局 2026–2027 学年校历（义务教育寒假 1/23 起，2/22 开学）。家长可改 */
 const HOL_PRESET = [{id:'2026-gq', name:'国庆', from:'2026-10-01', to:'2026-10-07'}, {id:'2027-hj', name:'寒假', from:'2027-01-23', to:'2027-02-21'}];
-const holList = () => { const DH = DB.hol || {}; return HOL_PRESET.map(p => Object.assign({}, p, {tasks:[], out:{}}, DH[p.id] || {}))
-  .concat(Object.values(DH).filter(h => !HOL_PRESET.some(p => p.id === h.id))); };
+// 连续天数每往回数一天都要查假期，三年数据下每次重拼很慢（压测今天页 231ms）：假期表没变就复用
+let HOLC = null;
+const holList = () => { const DH = DB.hol || {}, key = Object.keys(DH).map(k => k + ':' + (DH[k].u || 0)).join('|');
+  if (HOLC && HOLC.db === DB && HOLC.key === key) return HOLC.v;
+  const v = HOL_PRESET.map(p => Object.assign({}, p, {tasks:[], out:{}}, DH[p.id] || {})).concat(Object.values(DH).filter(h => !HOL_PRESET.some(p => p.id === h.id)));
+  HOLC = {db: DB, key, v}; return v; };
 const holAt = d => holList().find(h => h.from <= d && d <= h.to) || null;
 const holSoon = d => holList().find(h => h.from > d && dayDiff(d, h.from) <= 3) || null;
 const holDays = h => range(h.from, h.to).filter(x => !h.out[x]);                 // 能做作业的日子（标了「出去」的不算）
@@ -1258,6 +1269,7 @@ function updateBadge(){
     const pr = n ? navigator.setAppBadge(n) : navigator.clearAppBadge && navigator.clearAppBadge(); if (pr && pr.catch) pr.catch(() => {}); } catch(e) {}
 }
 function render(){
+  RC = {};
   reindex();
   try { ensureAutoPlans(); } catch(e) {}
   renderChrome();
@@ -2752,7 +2764,8 @@ const SPK = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:curre
 function uniqWords(){ if (!LIB.words) return []; if (!LIB._uniq) { const m = new Map(); for (const w of LIB.words.words) if (!m.has(wordKey(w))) m.set(wordKey(w), w); LIB._uniq = [...m.values()]; } return LIB._uniq; }
 function wordsOf(book, unit){ return (LIB.words && LIB.words.words || []).filter(w => (!book || w.book === book) && (!unit || w.unit === unit)); }
 const shortCn = cn => { const first = String(cn||'').split('；')[0]; const m = first.match(/^([a-z]+\.\s*)?(.*)$/); const parts = m[2].split('，').slice(0, 2).join('，'); return (m[1] || '') + parts; };
-function wordQueue(){
+function wordQueue(){ const L = state.learn || {}; return memo('wq|' + today() + '|' + L.book + '|' + L.unit, wordQueue0).slice(); }
+function wordQueue0(){
   const t = today(), L = state.learn || (state.learn = {view:'home', book:null, unit:null});
   const due = uniqWords().filter(w => { const s = wState(w); return s && !s.done && s.due <= t; }).sort((a, b) => (wState(a).u || 0) - (wState(b).u || 0));   // 刚答错的排到后面，隔几张再考
   const newToday = Object.values(DB.words).filter(s => s.first === t).length;
@@ -3601,13 +3614,13 @@ function guideCard(){
 function aiCard(){
   if (aiReady() && !state.aiEdit) return `<div class="card"><h3>AI 学习教练 <span class="pill good">已开启</span></h3>
     <p class="small muted" style="margin:0 0 8px">${(AI.model || 'glm-4.6v-flash') === 'glm-4.6v-flash' ? 'GLM-4.6V-Flash（免费）' : esc(AI.model)}${asrPaused() ? ' · 语音识别余额不足，暂时用设备自带识别' : ''}</p>
-    <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [10, 15, 20, 30, 45, 60].map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分钟</button>`).join('') + `</div>
+    <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [...new Set([10, 20, 30, 45, tutorLimit()])].sort((x, y) => x - y).map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分</button>`).join('') + `</div>
     <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="aitest">检查 AI 功能</a><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div>${aiTestHTML()}${memCard()}</div>`;
   return `<div class="card"><h3>AI 学习教练 · 语音识别 ${aiReady() ? '<span class="pill good">已开启</span>' : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">用智谱大模型：背诵检验时把录音转成文字，以及之后的 AI 辅导。密钥只存在这台设备上，不进备份文件。发给模型的只有学习内容，不含名字、学校、排名和你的情绪记录。</p>
     <label class="f">智谱 API 密钥</label><input type="password" id="ai-key" value="${esc(AI.key||'')}" placeholder="在 open.bigmodel.cn 的「API Keys」里新建" autocomplete="off">
     <details style="margin-top:10px"><summary class="small faint">高级：换模型</summary><label class="f">辅导用的模型</label><select id="ai-model">${[['glm-4.6v-flash','GLM-4.6V-Flash（免费，能看图）'],['glm-5.3-flash','GLM-5.3-Flash（更强，按量付费）']].map(([k,n]) => `<option value="${k}" ${(AI.model||'glm-4.6v-flash')===k?'selected':''}>${n}</option>`).join('')}</select></details>
-    <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [10, 15, 20, 30, 45, 60].map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分钟</button>`).join('') + `</div>
+    <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [...new Set([10, 20, 30, 45, tutorLimit()])].sort((x, y) => x - y).map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分</button>`).join('') + `</div>
     <p class="small faint" style="margin:6px 0 0">几次加起来算，第二天自动恢复。建议不超过 30 分钟：先自己想，卡住了再问，才不会养成依赖。</p>
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="aisave">保存并测试</button>${aiReady() ? '<button class="btn ghost danger" data-act="aioff">清除密钥</button>' : ''}</div>
     <details style="margin-top:10px"><summary class="small muted">怎么拿到密钥（约 3 分钟）</summary><ol class="guide"><li>打开 open.bigmodel.cn，用手机号注册并实名。</li><li>右上角头像 →「API Keys」→「添加新的 API Key」，复制。</li><li>粘贴到上面，点「保存并测试」。免费模型不花钱；语音识别按量计费，背一首诗约几分钱。</li></ol></details></div>`;
@@ -4150,7 +4163,7 @@ function seedDemo(){
   await load();
   await loadExt();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e) {}
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || (location.hostname === 'localhost' && /[?&]sw=1/.test(location.search)))) navigator.serviceWorker.register('sw.js').catch(()=>{});
   render();
   if (loadedFrom === 'legacy') { pendingLocal = true; flush(); }
   const hs = location.hash.match(/setup=(OBS1\.[A-Za-z0-9_-]+)/);
