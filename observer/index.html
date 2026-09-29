@@ -603,7 +603,29 @@ let IDX = {}, REP = {};
 function reindex(){ IDX = {}; REP = {}; const from = addD(today(), -30);
   for (const it of DB.items) { (IDX[it.d] = IDX[it.d] || []).push(it); if (it.sub && it.d >= from) REP[it.sid + '|' + it.sub] = (REP[it.sid + '|' + it.sub] || 0) + 1; } }
 /* 进不进重做：只挑最值得重做的，保证每天 3 道做得完（她 2026-09-26 定） */
-const examSeason = t => { const d = P(t), m = d.getMonth() + 1, day = d.getDate(); return (m === 12 && day >= 24) || (m === 1 && day <= 20) || (m === 6 && day >= 12) || (m === 7 && day <= 5); };
+// 考试季：家长填了本学期期中/期末日期就按「考前 14 天到考试当天」算；期末没填时沿用固定窗口（12/24–1/20、6/12–7/5）
+const examDate = (t, kind) => ((DB.settings.examDates || {})[termKey(t) + '-' + kind]) || '';
+const EXAM_N = {mid: '期中', end: '期末'};
+function nextExam(t){   // 本学期还没考的最近一场：{kind, d, left}
+  const L = ['mid', 'end'].map(k => ({kind: k, d: examDate(t, k)})).filter(x => x.d && x.d >= t).sort((a, b) => a.d < b.d ? -1 : 1);
+  return L.length ? Object.assign(L[0], {left: dayDiff(t, L[0].d)}) : null;
+}
+const examSeason = t => { const nx = nextExam(t); if (nx && nx.left <= 14) return true;
+  if (examDate(t, 'end')) return false;
+  const d = P(t), m = d.getMonth() + 1, day = d.getDate(); return (m === 12 && day >= 24) || (m === 1 && day <= 20) || (m === 6 && day >= 12) || (m === 7 && day <= 5); };
+const examCram = t => { const nx = nextExam(t); return !!nx && nx.left <= 3; };   // 考前 3 天：只复习不加新的
+function examTip(d){
+  const nx = nextExam(d); if (!nx || nx.left > 21) return '';
+  const n = EXAM_N[nx.kind], what = nx.left === 0 ? `今天${n}考试，加油` : `离${n}考试还有 <b>${nx.left}</b> 天`;
+  const more = nx.left === 0 ? '' : nx.left <= 3 ? '。考前三天只复习，不加新单词，早点睡' : nx.left <= 14 ? '。考前两周，重做里每天多一道以前做对的题回头看看' : '';
+  return `<div class="tip">${what}${more}。</div>`;
+}
+function examCard(){
+  const t = today(), tk = termKey(t), E = DB.settings.examDates || {}, tl = termOf(t, DB.settings.startYear).label;
+  return `<div class="card"><h3>考试日期</h3><p class="small muted" style="margin:0 0 8px">填了日期，考前两周自动多安排回检、考前三天不加新单词，今天页显示倒计时。各校日期不同，看学校通知填。</p>
+    <div class="grid2"><div><label class="f">${esc(tl)}期中</label><input type="date" data-in="examd" data-f="${tk}-mid" value="${esc(E[tk + '-mid'] || '')}"></div>
+    <div><label class="f">${esc(tl)}期末</label><input type="date" data-in="examd" data-f="${tk}-end" value="${esc(E[tk + '-end'] || '')}"></div></div></div>`;
+}
 function queued(it){
   if (it.q === true) return true; if (it.q === false) return false;
   return !!(it.ext || it.conf === 'sure' || ((it.conf === 'no' || it.conf === 'unsure') && it.type === 'concept') || (it.sub && (REP[it.sid + '|' + it.sub] || 0) >= 2));
@@ -641,7 +663,7 @@ function bestStreak(){ const ok = d => dayHasData(d) || isRest(d) || holOk(d); c
   for (const d of ds) { const gap = prev ? addD(prev, 1) === d ? 0 : addD(prev, 2) === d && !frozen[monOf(addD(prev, 1))] ? 1 : 2 : 2;
     if (gap === 1) frozen[monOf(addD(prev, 1))] = 1;
     cur = gap < 2 ? cur + (dayCnt(d) ? 1 : 0) : (dayCnt(d) ? 1 : 0); prev = d; if (cur > best) best = cur; } return Math.max(best, streak()); }
-const autoUsedIn = (d) => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && x < today() && !dayHasData(x) && !isRest(x) && dayHasData(addD(x, -1)) && (dayHasData(addD(x, 1)) || addD(x, 1) === today()));
+const autoUsedIn = (d) => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && x < today() && !dayCnt(x) && !isRest(x) && !holOk(x) && dayCnt(addD(x, -1)) && (dayCnt(addD(x, 1)) || addD(x, 1) === today()));
 const restUsed = d => range(monOf(d), addD(monOf(d), 6)).some(x => x !== d && isRest(x)) || autoUsedIn(d);
 
 /* ================= 假期作业：放假前录清单，按可用天数自动拆到每天；落下的自动平摊到后面 =================
@@ -661,8 +683,9 @@ function holQuota(h, t, d){
 }
 // 落后量：按天均匀应完成的份数 − 实际完成；超过两天的量才算落下
 function holBehind(h, d){
-  const all = holDays(h), past = all.filter(x => x < d).length; if (!all.length || !past) return [];
-  return h.tasks.map(t => ({t, lag: t.n * past / all.length - holDone(t, x => x < d)})).filter(o => o.lag >= Math.max(1, 2 * o.t.n / all.length) - 1e-9);
+  return h.tasks.map(t => { const all = holDays(h).filter(x => !t.at || x >= t.at), past = all.filter(x => x < d).length;   // 放假中途才录的作业，从录入那天算
+    return {t, all: all.length, lag: all.length && past ? t.n * past / all.length - holDone(t, x => x < d) : 0}; })
+    .filter(o => o.all && o.lag > 0 && o.lag >= Math.max(1, 2 * o.t.n / o.all) - 1e-9);
 }
 const holOk = d => { const h = holAt(d); return !!h && (!!h.out[d] || h.tasks.some(t => (t.done || {})[d] > 0)); };
 function saveHol(h){ const r = Object.assign({}, h); r.u = now(); DB.hol = DB.hol || {}; DB.hol[h.id] = r; save(); }
@@ -675,9 +698,9 @@ function vHol(){
   const E = state.holE, S = subjects(today());
   let h = `<div class="wiz" role="dialog" aria-label="假期作业"><div class="wiz-top"><div style="flex:1;font-weight:600">${esc(E.name)}假期作业</div><button class="wiz-x" data-act="holclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
   h += `<p class="small muted" style="margin:0 0 10px">一项一行：哪科、做什么、一共几份（比如「数学 · 试卷 · 3」）。放假后每天自动分好。</p>`;
-  h += E.tasks.map((t, i) => `<div class="row" style="gap:6px;margin-bottom:8px;flex-wrap:nowrap"><select id="hs-${i}" class="wiz-in" style="width:5.5em;padding:8px 4px">${S.map(s => `<option value="${s.id}" ${s.id === t.sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="" ${!t.sid ? 'selected' : ''}>其他</option></select><input id="hw-${i}" class="wiz-in" style="flex:1;min-width:0" placeholder="做什么" value="${esc(t.what)}"><input id="hn-${i}" class="wiz-in" type="number" inputmode="numeric" min="1" max="99" style="width:3.6em" value="${t.n}"><button class="btn sm ghost" data-act="holdel" data-v="${i}" aria-label="删掉这项">×</button></div>`).join('');
+  h += E.tasks.map((t, i) => `<div class="row" style="gap:6px;margin-bottom:8px;flex-wrap:nowrap"><select id="hs-${i}" data-in="hol" data-f="sid" data-v="${i}" class="wiz-in" style="width:5.5em;padding:8px 4px">${S.map(s => `<option value="${s.id}" ${s.id === t.sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="" ${!t.sid ? 'selected' : ''}>其他</option></select><input id="hw-${i}" data-in="hol" data-f="what" data-v="${i}" class="wiz-in" style="flex:1;min-width:0" placeholder="做什么" value="${esc(t.what)}"><input id="hn-${i}" data-in="hol" data-f="n" data-v="${i}" class="wiz-in" type="number" inputmode="numeric" min="1" max="99" style="width:3.6em" value="${t.n}"><button class="btn sm ghost" data-act="holdel" data-v="${i}" aria-label="删掉这项">×</button></div>`).join('');
   h += `<button class="btn sm" data-act="holadd">＋ 加一项</button>`;
-  h += `<details style="margin-top:14px"><summary class="small muted">放假日期、哪几天出去玩</summary><div class="row" style="margin:8px 0 4px;flex-wrap:nowrap"><span class="small muted" style="width:2em">从</span><input id="hol-from" type="date" class="wiz-in" style="flex:1;min-width:0" value="${E.from}"></div><div class="row" style="margin:0 0 8px;flex-wrap:nowrap"><span class="small muted" style="width:2em">到</span><input id="hol-to" type="date" class="wiz-in" style="flex:1;min-width:0" value="${E.to}"></div>
+  h += `<details style="margin-top:14px"><summary class="small muted">放假日期、哪几天出去玩</summary><div class="row" style="margin:8px 0 4px;flex-wrap:nowrap"><span class="small muted" style="width:2em">从</span><input id="hol-from" data-in="hol" data-f="from" type="date" class="wiz-in" style="flex:1;min-width:0" value="${E.from}"></div><div class="row" style="margin:0 0 8px;flex-wrap:nowrap"><span class="small muted" style="width:2em">到</span><input id="hol-to" data-in="hol" data-f="to" type="date" class="wiz-in" style="flex:1;min-width:0" value="${E.to}"></div>
     <p class="small faint" style="margin:0 0 6px">点一下标成「出去玩」，那天不派作业。</p><div class="row" style="gap:6px">${range(E.from, E.to).map(x => `<button class="chip ${E.out[x] ? 'on' : ''}" data-act="holoutday" data-v="${x}">${md(x)}</button>`).join('')}</div></details>`;
   return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="holclose">取消</button><button class="btn primary" data-act="holsave">保存</button></div></div>`;
 }
@@ -1060,11 +1083,17 @@ async function ghPush(text, sha){
   return 'ok';
 }
 /* 通用：按字段取新（字段时间 fu[f]，没有就用整条 u），hist 取并集 */
-function mergeRec(x, y){
+// perField：周/月表的写入给每个字段记 fu 时间，按字段合并；背诵/单词/错题本/AI 档案/假期只更新整条的 u，
+// 按字段比会因为合并后留下的空 fu 把本机新改动当成 0 时间（审查发现），所以整条取较新的一方，hist 两边取并集
+function mergeRec(x, y, perField){
   const clone = o => JSON.parse(JSON.stringify(o));
-  const out = clone(x); out.fu = Object.assign({}, x.fu||{}); let l = false, r = false;
+  let out, l = false, r = false;
+  if (!perField) { const yn = (y.u || 0) > (x.u || 0); out = clone(yn ? y : x); delete out.fu;
+    const same = JSON.stringify(Object.assign({}, x, {u: 0, fu: 0, hist: 0})) === JSON.stringify(Object.assign({}, y, {u: 0, fu: 0, hist: 0}));
+    if (!same) { if (yn) r = true; else l = true; } }
+  else { out = clone(x); out.fu = Object.assign({}, x.fu||{}); }
   const ft = (o, f) => o[f] === undefined ? -1 : o.fu ? (o.fu[f] || 0) : (o.u || 0);
-  for (const f of new Set(Object.keys(x).concat(Object.keys(y)))) {
+  if (perField) for (const f of new Set(Object.keys(x).concat(Object.keys(y)))) {
     if (f === 'u' || f === 'fu' || f === 'hist') continue;
     if (JSON.stringify(x[f]) === JSON.stringify(y[f])) continue;
     const a = ft(x, f), b = ft(y, f);
@@ -1084,7 +1113,7 @@ function mergeRec(x, y){
 function mergeSettings(x, y){
   const clone = o => JSON.parse(JSON.stringify(o));
   const {subjects: sa = [], anchors: aa = {}, ...xr} = x, {subjects: sb = [], anchors: ab = {}, ...yr} = y;
-  const m = mergeRec(xr, yr); let l = m.l, r = m.r; const out = m.v;
+  const m = mergeRec(xr, yr, true); let l = m.l, r = m.r; const out = m.v;
   const A = new Map(sa.map(s => [s.id, s])), B = new Map(sb.map(s => [s.id, s]));
   out.subjects = [...new Set([...A.keys(), ...B.keys()])].map(id => { const p = A.get(id), q = B.get(id);
     if (p && !q) { l = true; return clone(p); } if (q && !p) { r = true; return clone(q); }
@@ -1128,7 +1157,7 @@ function mergeDB(L, R){
     const a = L[k]||{}, b = R[k]||{}; M[k] = M[k] || {};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
-      if (x && y) { const m = k === 'days' ? mergeDay(x, y) : mergeRec(x, y); M[k][key] = m.v; lN = lN || m.l; rN = rN || m.r; continue; }
+      if (x && y) { const m = k === 'days' ? mergeDay(x, y) : mergeRec(x, y, k === 'weeks' || k === 'months'); M[k][key] = m.v; lN = lN || m.l; rN = rN || m.r; continue; }
       if (x && (!y || (x.u||0) > (y.u||0))) lN = true;
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
@@ -1179,7 +1208,7 @@ async function syncNow(manual, depth){
 const isTyping = () => { const a = document.activeElement; return a && /INPUT|TEXTAREA/.test(a.tagName); };
 let pendingRender = false;
 let focusVal = null;
-const DRAFT_IN = /^(voice|rgstem|qptext)$/;
+const DRAFT_IN = /^(voice|rgstem|qptext|hol)$/;
 document.addEventListener('focusin', e => { const el = e.target; focusVal = el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') && !DRAFT_IN.test(el.dataset.in) ? el.value : null; });
 document.addEventListener('focusout', e => { const el = e.target; if (focusVal != null && el && el.matches && el.matches('textarea[data-in],input[type=text][data-in]') && el.value !== focusVal) { onDataIn({target: el}); flush(); toast('已保存 ✓'); } focusVal = null; });
 document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(() => { if (!isTyping()) render(); }, 50); } });
@@ -1245,7 +1274,7 @@ function render(){
   state._wk = wk;
   $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.hint ? vHint() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
-  document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor) ? 'hidden' : '';
+  document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor || state.holE || state.hint) ? 'hidden' : '';
   hydratePhotos(); updateBadge();
 }
 
@@ -1292,7 +1321,7 @@ function vToday(){
   const filled = subs.filter(s => filledRec(dd.subj[s.id])).length;
   const due = dueList(), dn = doneToday(), left = redoLeftToday();
   const mon = monOf(d);
-  let h = isToday ? banners() : '';
+  let h = isToday ? banners() + whatsNew('kid') : '';
   h += `<div class="card hero"><div class="hero-top"><button class="navbtn" data-act="day" data-v="-1">‹</button>
     <div style="flex:1;min-width:0"><div class="d">${md(d)}</div><div class="w">${wd(d)}${isToday?' · 今天':' · <a href="#" data-act="day" data-v="0" style="color:var(--accent)">回到今天</a>'}${isToday ? streakPill() : ''}</div></div>
 ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${state.showWeek ? '▴' : '▾'}</button>` : ''}<button class="navbtn" data-act="day" data-v="1" ${isToday?'disabled':''}>›</button>
@@ -1315,17 +1344,18 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     // 假期（录了清单）：平时的「记作业」变可选，今晚完成看假期作业今日份
     const hH = holAt(d), holMode = !!(hH && hH.tasks.length), holMet = holMode && (!!hH.out[d] || hH.tasks.every(t => ((t.done || {})[d] || 0) >= holQuota(hH, t, d)));
     const allDone = (holMode ? holMet : filled >= subs.length) && left === 0 && wordsOk && !rDue;
-    if (!dayHasData(d) && !isRest(d) && autoFreeze(addD(d, -1)) && streak() > 1) h += `<div class="tip">昨天没记，自动用了一次请假。<b>今天记一下，就是连续 ${streak() + 1} 天</b>。</div>`;
+    if (!dayCnt(d) && !isRest(d) && autoFreeze(addD(d, -1)) && streak() > 1) h += `<div class="tip">昨天没记，自动用了一次请假。<b>今天记一下，就是连续 ${streak() + 1} 天</b>。</div>`;
     if (heavyNight() && !late && !allDone) h += `<div class="tip">今天作业写了 ${homeworkMin(d)} 分钟，已经超过 90 分钟。今晚<b>重做只排 1 道、单词只背 8 个</b>，早点休息。</div>`;
     if (late && !allDone && !isRest(d)) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
     h += holidayCard(d);
+    h += examTip(d);
     const dowP = P(d).getDay(); const showProg = allDone || dowP === 0 || dowP === 6;
     if (allDone) h += `<div class="card" style="text-align:center;background:var(--good-bg);border-color:transparent"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今晚完成 ✓</div><div class="small muted">${[(() => { const n = subs.filter(x => { const r = dd.subj[x.id]; return r && !r.none && r.min > 0; }).length; return n ? '自己把 ' + n + ' 科作业记清楚了' : filled ? '今天都没作业' : ''; })(), dn ? '重做了 ' + dn + ' 道题' : '', wDone ? '背了 ' + wDone + ' 个单词' : ''].filter(Boolean).join('，')}。早点休息。</div></div>`;
     if (allDone) h += progressCard();
     if (allDone) { const old = allItems().filter(it => it.done && !it.skipped && it.d >= addD(d, -33) && it.d <= addD(d, -27) && (it.tag || it.stem));
       if (old.length) { const it = old[(P(d).getDate()) % old.length];
         h += `<div class="card" style="background:var(--good-bg);border-color:transparent"><div class="small faint">一个月前的今天</div><div style="margin-top:4px">${md(it.d)}你在<b>${esc(it.tag || (it.stem || '').slice(0, 18))}</b>上出过错，现在已经会了 ✓</div></div>`; } }
-    if (isRest(d) && !dayHasData(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
+    if (isRest(d) && !dayCnt(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
     let slOpen0 = state.slistOpen; if (slOpen0 == null) { try { slOpen0 = localStorage.getItem('observer:slOpen') === '1'; } catch(e) { slOpen0 = false; } }
     const T = [
       holMode ? {t: '记作业', s: filled ? `${filled} 科` : '假期可选', done: true, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: '记今天的作业'} : {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
@@ -1865,12 +1895,12 @@ const hintedToday = it => (it.hints || []).some(h => h.d === today());
 const hintOffer = it => aiReady() && !hintedToday(it) && !!(it.stem || it.tag) && tutorMinutesToday() < tutorLimit();
 async function hintGo(){
   const H = state.hint, it = allItems().find(x => x.id === H.id); if (!it) { state.hint = null; render(); return; }
-  const rec = hintRec(H.id); rec.hints = (rec.hints || []).concat([{d: today(), at: (it.hist || []).length}]).slice(-10); rec.u = now();
-  const dd = touchDay(today()); dd.aiMin = (dd.aiMin || 0) + 0.5; save();
   H.phase = 'wait'; render();
+  const record = () => { const rec = hintRec(H.id); rec.hints = (rec.hints || []).concat([{d: today(), at: (it.hist || []).length}]).slice(-10); rec.u = now();
+    const dd = touchDay(today()); dd.aiMin = (dd.aiMin || 0) + 0.5; save(); };   // AI 没回上来不算提示过，也不算进「提示后做对」
   const s = subjById(it.sid), q = [`科目：${s.name}`, it.stem ? `题目：${it.stem}` : `知识点：${it.tag}`, subName(it) ? `以前的问题类型：${subName(it)}` : '', it.kidAnswer ? `他上次写的：${it.kidAnswer}` : '', it.note ? `错因记录：${it.note}` : ''].filter(Boolean).join('\n');
   try { const out = await aiChat([{role: 'system', content: TUTOR_RULES + '\n' + HINT_RULE + '\n' + learnerProfile(it.sid)}, {role: 'user', content: q + '\n他重做这道题还是不会，请给一条提示。'}]);
-    if (state.hint !== H) return; H.text = (out || '').trim() || '先把题目再读一遍，圈出已知条件和要求的量，看看第一步用哪个。'; H.phase = 'show'; }
+    if (state.hint !== H) return; H.text = (out || '').trim() || '先把题目再读一遍，圈出已知条件和要求的量，看看第一步用哪个。'; H.phase = 'show'; record(); }
   catch(e) { if (state.hint !== H) return; H.phase = 'show'; H.err = e.message || 'AI 暂时连不上'; }
   render();
 }
@@ -2689,7 +2719,7 @@ function fsStep(c, d, rating){
   try {
     const at = new Date(d + 'T20:00:00'), T = x => new Date(x + 'T20:00:00');
     const card = c ? {due: T(c.due), stability: c.s, difficulty: c.df, elapsed_days: 0, scheduled_days: 0, learning_steps: 0, reps: c.r, lapses: c.l, state: c.st, last_review: c.lr ? T(c.lr) : undefined} : FS.F.createEmptyCard(at);
-    const n = FS.f.next(card, at, rating).card, days = Math.max(1, Math.round((n.due - at) / 864e5));
+    const n = FS.f.next(card, at, rating).card, days = Math.min(90, Math.max(1, Math.round((n.due - at) / 864e5)));
     return {s: n.stability, df: n.difficulty, r: n.reps, l: n.lapses, st: n.state, lr: d, due: addD(d, days), days};
   } catch(e) { return null; }
 }
@@ -2702,6 +2732,7 @@ const wordRate = h => h.ok ? (h.known || h.sp ? 4 : 3) : 1;
 const NEW_PER_DAY = 10;
 /* 新词数量跟着孩子走：近 7 天复习正确率 ≥ 85%（至少背了 3 晚）→ 每天 15 个；低于 60% → 5 个，先把旧的记牢 */
 function newPerDay(){
+  if (examCram(today())) return 0;
   const from = addD(today(), -7); let n = 0, ok = 0; const nights = new Set();
   for (const s of Object.values(DB.words)) for (const h of (s.hist||[])) if (h.d >= from && !h.known) { n++; if (h.ok) ok++; nights.add(h.d); }
   if (n < 20 || nights.size < 3) return NEW_PER_DAY;
@@ -2760,7 +2791,7 @@ function reviewRecite(id, ok, rating){ const r = DB.recite[id]; if (!r) return; 
   else if (rt >= 3) { r.box = (r.box || 0) + 1; r.due = r.box >= RBOX.length ? null : addD(t, RBOX[r.box]); if (r.box >= RBOX.length) r.solid = true; }
   else if (rt === 1) { r.box = Math.max(0, (r.box || 0) - 1); r.due = addD(t, 1); r.solid = false; }   // 忘了只退一格、明天再背；重学很快
   r.u = now(); save(); }
-const reciteDue = () => (LIB.recite ? LIB.recite.items : []).filter(x => { const r = DB.recite[x.id]; return r && r.due && r.due <= today(); });
+const reciteDue = () => (LIB.recite ? LIB.recite.items : []).filter(x => { const r = DB.recite[x.id]; return r && r.due && r.due <= today() && !recStale(x); });
 // 长篇分段背：全文超过 160 字才切，按字数均分成 2–5 段，段内不拆句。返回 [[起行, 止行), ...]，短篇返回 []
 function recSegs(x){
   const t = x && x.mode !== 'title' && x.text || [], len = t.map(l => (l.match(/[一-鿿]/g) || []).length), T = len.reduce((a, b) => a + b, 0);
@@ -2779,7 +2810,7 @@ const segDone = (x, k) => { const r = DB.recite[x.id]; return !!(r && r.segs && 
 function curUnit(term){
   if (term !== termKey(today())) return 0;
   const t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7);
-  const hj = HOL_PRESET.find(p => p.name === '寒假' && p.to.startsWith(y + '-'));   // 深圳校历：寒假结束第二天开学（2027-02-22）
+  const hj = holList().find(p => p.name === '寒假' && p.to.startsWith(y + '-'));   // 深圳校历：寒假结束第二天开学（2027-02-22）
   const start = term.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : hj ? addD(hj.to, 1) : y + '-03-01';
   return Math.min(6, Math.max(1, Math.floor(dayDiff(start, t) / 21) + 1));
 }
@@ -3257,7 +3288,7 @@ function vPoem(){
   if (st === 'upd') h += `</div><div class="card" style="background:var(--amber-bg);border-color:transparent"><h3>这篇内容按课本更新了</h3><p class="small muted" style="margin:0">对照教育部电子课本核对过，${x.mode === 'full' ? '现在收的是课本要求背诵的全文' : '改了个别字'}。以前「会背了」是按旧内容记的，再背一遍新版本；以前的记录都还在。</p>`;
   if (sg.length && x.text) h += `</div><div class="card"><div class="row"><h3 style="margin:0">分段背</h3><span class="spacer"></span><span class="small muted">过了 ${sg.filter((_, k) => segDone(x, k)).length}/${sg.length} 段</span></div><p class="small muted" style="margin:4px 0 8px">一段一段背，每段背对九成就打勾，${sg.length} 段都过了整篇记「会背了」。</p>` +
     sg.map(([a], k) => `<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">第 ${k + 1} 段 <span class="small faint">「${esc(x.text[a].replace(/[，。；：？！、“”]/g, '').slice(0, 4))}…」</span></span>${segDone(x, k) ? '<span class="pill good">✓</span>' : ''}<button class="btn sm" data-act="rcheck" data-v="voice" data-s="${k}">背这段</button><button class="btn sm ghost" data-act="rcheck" data-v="type" data-s="${k}">默写</button></div>`).join('');
-  const rvSeg = sg.length ? ((rr.hist || []).length % sg.length) : -1;
+  const rvSeg = sg.length ? (dayDiff('2026-01-01', today()) % sg.length) : -1;
   if (st !== 'upd' && rr.due && rr.due <= today()) h += `</div><div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>今天该复习这篇了</h3><p class="small muted" style="margin:0 0 8px">${rvSeg >= 0 ? `长篇不用整篇背，抽一段就行：<b>第 ${rvSeg + 1} 段</b>。` : ''}不看原文背一遍：90% 以上算还记得，隔更久再查；低于 70% 就改回「在背」。</p>${rvSeg >= 0 ? `<button class="btn sm primary" data-act="rcheck" data-v="voice" data-s="${rvSeg}">背第 ${rvSeg + 1} 段</button>` : ''}`;
   h += `</div><div class="small muted" style="margin:0 4px 10px">现在：<b>${(RST.find(r => r[0] === st) || ['', '没背'])[1]}</b>${rr.solid ? ' <span class="pill good">已经记牢</span>' : rr.due ? ' · 下次复习 ' + mdShort(rr.due) : ''} · 背给我听，背对九成就自动记「会背了」</div><div>`;
   const hist = (DB.recite[x.id] || {}).hist || [];
@@ -3407,10 +3438,20 @@ function attentionItems(){
       if (t === h.to) { const L = holLeftList(h); if (L.length) A.unshift(['明天开学', L.map(o => `${holTaskName(o.t)}还差 ${o.left} 份`).join('；') + '。']); } } }
   return A.slice(0, 3);
 }
+/* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
+const WHATS_NEW = {v: '2026-09-29',
+  kid: ['长的课文可以<b>一段一段背</b>了，每段过了打勾，全过了整篇算会。', '国庆的<b>假期作业</b>先录进来，放假后每天自动分好，出去玩那天不断签。', '重做点「还是不会」时，可以<b>要一个提示</b>：只给提示，不给答案。'],
+  parent: ['背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。', '单词和背诵的复习按 FSRS 算法排（同样记得住、复习少两三成）；AI 在孩子卡住时主动给提示，周复盘看「提示后自己做对」。', '设置里可以填期中、期末日期：考前两周自动加回检，考前三天不加新单词。']};
+function whatsNew(who){
+  let seen = ''; try { seen = localStorage.getItem('observer:new-' + who) || ''; } catch(e) { return ''; }
+  if (seen >= WHATS_NEW.v) return '';
+  if (Object.keys(DB.days).filter(dayHasData).length < 3) { try { localStorage.setItem('observer:new-' + who, WHATS_NEW.v); } catch(e) {} return ''; }
+  return `<div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>${who === 'kid' ? '这次更新了什么' : '最近更新（给家长）'}</h3><ul style="margin:4px 0 8px;padding-left:20px">${WHATS_NEW[who].map(x => `<li style="margin:3px 0">${x}</li>`).join('')}</ul><button class="btn sm" data-act="newseen" data-v="${who}">知道了</button></div>`;
+}
 function attentionCard(){ const A = attentionItems(); if (!A.length) return '';
   return `<div class="card" style="border-color:var(--amber)"><h3 style="color:var(--amber)">需要注意</h3>` + A.map(([t, d]) => `<div style="padding:6px 0;border-top:1px solid var(--line)"><b>${esc(t)}</b><div class="small muted" style="margin-top:2px">${esc(d)}</div></div>`).join('') + `</div>`; }
 function parentNotes(){
-  let h = todayGlance() + attentionCard();
+  let h = whatsNew('parent') + todayGlance() + attentionCard();
   const n = Object.keys(DB.days).length;
   if (!DEMO && n >= 3 && !syncReady()) {
     const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
@@ -3449,6 +3490,7 @@ function vMe(part){
   h += syncCard();
   h += aiCard();
   const s = DB.settings;
+  h += examCard();
   h += `<div class="card"><h3>设置</h3>
     <div class="grid2"><div><label class="f">孩子的称呼</label><input type="text" data-in="set" data-f="child" value="${esc(s.child)}"></div>
     <div><label class="f">七年级入学年份</label><input type="number" data-in="set" data-f="startYear" value="${s.startYear}"></div></div>
@@ -3640,7 +3682,7 @@ const ACT = {
   rcheck: el => { try { window.__poemAudio && window.__poemAudio.pause(); } catch(e) {} state.rcheck = {id: state.learn.poem, mode: el.dataset.v, phase: 'ready', said: '', seg: el.dataset.s != null && el.dataset.s !== '' ? +el.dataset.s : null}; loadPY(); render(); },
   rcstart: () => loadPY().then(recStart),
   rcstop: () => recStop(),
-  rcdict: () => { state.rcheck = {id: state.rcheck.id, mode: 'dict', phase: 'ready', said: ''}; render(); },
+  rcdict: () => { state.rcheck = {id: state.rcheck.id, mode: 'dict', phase: 'ready', said: '', seg: state.rcheck.seg}; render(); },
   rctype: () => { state.rcheck.said = $('#rc-type').value; state.rcheck.phase = 'busy'; finishCheck(); },
   rcagain: () => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: '', seg: state.rcheck.seg}; render(); },
   rcseg: el => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: '', seg: +el.dataset.v}; render(); },
@@ -3734,13 +3776,14 @@ const ACT = {
   qpsubj: el => { state.qp.text = ($('#qp-text') || {}).value || state.qp.text; state.qp.sid = el.dataset.v; render(); },
   qpclose: () => { const t = ($('#qp-text') || {}).value || ''; if (t.trim() && !confirm('还没保存，确定不要了？')) return; state.qp = null; render(); },
   holedit: el => { const h = holList().find(x => x.id === el.dataset.v); if (!h) return; const E = state.holE = JSON.parse(JSON.stringify(h)); E.out = E.out || {};
-    if (!E.tasks.length) E.tasks.push({id: uid('ht'), sid: (subjects(today())[0] || {}).id || '', what: '', n: 1, done: {}}); render(); },
-  holadd: () => { holRead(); const E = state.holE; E.tasks.push({id: uid('ht'), sid: (E.tasks[E.tasks.length - 1] || {}).sid || '', what: '', n: 1, done: {}}); render(); setTimeout(() => { const w = $('#hw-' + (E.tasks.length - 1)); w && w.focus(); }, 50); },
+    if (!E.tasks.length) E.tasks.push({id: uid('ht'), sid: (subjects(today())[0] || {}).id || '', what: '', n: 1, done: {}, at: today()}); render(); },
+  holadd: () => { holRead(); const E = state.holE; E.tasks.push({id: uid('ht'), sid: (E.tasks[E.tasks.length - 1] || {}).sid || '', what: '', n: 1, done: {}, at: today()}); render(); setTimeout(() => { const w = $('#hw-' + (E.tasks.length - 1)); w && w.focus(); }, 50); },
   holdel: el => { holRead(); state.holE.tasks.splice(+el.dataset.v, 1); render(); },
   holoutday: el => { holRead(); const E = state.holE, x = el.dataset.v; if (E.out[x]) delete E.out[x]; else E.out[x] = true; render(); },
   holclose: () => { state.holE = null; render(); },
   holsave: () => { holRead(); const E = state.holE; if (E.from > E.to) { toast('放假日期前后颠倒了'); return; }
-    E.tasks = E.tasks.filter(t => t.what); saveHol(E); state.holE = null; toast(E.tasks.length ? `存好了：${E.tasks.length} 项，放假后每天自动分` : '清单已清空'); render(); },
+    const old = ((holList().find(h => h.id === E.id) || {}).tasks || []);
+    E.tasks = E.tasks.map(t => t.what || !Object.keys(t.done || {}).length ? t : Object.assign(t, {what: (old.find(o => o.id === t.id) || {}).what || '（没写名字）'})).filter(t => t.what); saveHol(E); state.holE = null; toast(E.tasks.length ? `存好了：${E.tasks.length} 项，放假后每天自动分` : '清单已清空'); render(); },
   holdo: el => { const h = holAt(today()); if (!h) return; const t = h.tasks.find(x => x.id === el.dataset.v); if (!t) return; const d = today(); t.done = t.done || {};
     t.done[d] = Math.max(0, (t.done[d] || 0) + (+el.dataset.n)); if (!t.done[d]) delete t.done[d]; saveHol(h); render(); },
   holout: el => { const h = holAt(today()); if (!h) return; if (el.dataset.v === '1') h.out[today()] = true; else delete h.out[today()]; saveHol(h); render(); },
@@ -3836,6 +3879,7 @@ const ACT = {
     if (el.dataset.ok !== '1') { const it = allItems().find(x => x.id === k); if (it && hintOffer(it)) { state.hint = {id: k, phase: 'ask'}; render(); return; } }   // 先问要不要提示
     redoItem(k, el.dataset.ok === '1'); },
   hintgo: () => { hintGo(); },
+  newseen: el => { try { localStorage.setItem('observer:new-' + el.dataset.v, WHATS_NEW.v); } catch(e) {} render(); },
   hintno: () => { const H = state.hint; state.hint = null; if (H && H.phase === 'ask' && !H.fromQp) redoItem(H.id, false); else render(); },   // 不要提示 = 记下还是不会；看过提示后关掉 = 留着再做
   hintclose: () => { state.hint = null; render(); },
   skipitem: el => { if (!confirm('找不到原题，就把这道移出重做队列？')) return; const it = DB.items.find(x => x.id === el.dataset.v); it.done = true; it.skipped = true; it.u = now(); save(); render(); },
@@ -3925,6 +3969,10 @@ function onDataIn(e){
   const el = e.target.closest && e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
   if (k === 'qptext') { if (state.qp) state.qp.text = v; return; }
+  if (k === 'hol') { const E = state.holE; if (!E) return;   // 边输入边写回草稿：后台同步等引起的重绘不丢字
+    if (f === 'from' || f === 'to') { if (v) E[f] = v; return; }
+    const t = E.tasks[+el.dataset.v]; if (t) t[f] = f === 'n' ? Math.max(1, Math.min(99, parseInt(v, 10) || 1)) : f === 'what' ? v.trim() : v; return; }
+  if (k === 'examd') { const E = Object.assign({}, DB.settings.examDates || {}); if (v) E[f] = v; else delete E[f]; setSetting('examDates', E); save(); return; }
   if (k === 'aimem') { const m = DB.aiMem[el.dataset.s]; if (m) { m.text = v; m.u = now(); save(); } return; }
   if (k === 'rgstem') { if (state.precog) state.precog.list[+el.dataset.v].stem = v; return; }
   if (k === 'day') setDayField(state.date, f, v);
