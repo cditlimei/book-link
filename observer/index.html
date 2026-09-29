@@ -350,6 +350,124 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 .wiz-sum{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:16px}
 .wiz-sum b{flex:none;white-space:nowrap}
 .fillbtn{width:100%;min-height:56px;border-radius:var(--r);font-size:17px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+/* ================= 设计层 v2（2026-09-29）：参照 Apple HIG——5 级字号、去边框靠留白和轻阴影分层、分组列表+图标、大标题 =================
+   只覆盖外观，不动结构；整块删掉即回到旧样式 */
+:root{
+  --bg:#f3f1ec; --surface:#ffffff; --surface2:#f0ede6; --surface3:#f7f5f0;
+  --ink:#1d1b18; --ink2:#67625a; --ink3:#a19b91; --line:#ebe6dc;
+  --accent:#2b4c7e; --accent-bg:#e8eef7;
+  --amber:#a8650f; --amber-bg:#fbefdc;
+  --good:#2e7a57; --good-bg:#e2f1e8;
+  --shadow:0 1px 2px rgba(30,25,15,.04),0 8px 24px rgba(30,25,15,.06);
+  --mono:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",Arial,sans-serif;
+  --r:18px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121211; --surface:#1d1c1a; --surface2:#292724; --surface3:#191816;
+  --ink:#f3f0ea; --ink2:#b3ada2; --ink3:#7f796f; --line:#2f2d29;
+  --accent:#9dbdf0; --accent-bg:#1f2b3d; --amber:#f0b35e; --amber-bg:#3a2d18; --good:#7ccfa5; --good-bg:#18301f;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset;
+}}
+html,body{font-size:17px;line-height:1.5;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
+h2{font-family:var(--sans);font-size:28px;font-weight:700;letter-spacing:-.01em;margin:4px 0 8px}
+h3{font-family:var(--sans);font-size:17px;font-weight:600;margin:0 0 8px}
+.small{font-size:13px} .sub{font-size:15px}
+.card{border:0;border-radius:var(--r);padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.tip{border-radius:14px;font-size:15px;padding:12px 16px}
+.btn{border:0;background:var(--surface2);border-radius:14px;font-weight:500;min-height:44px;transition:transform .12s ease,opacity .12s}
+.btn:active{transform:scale(.97);opacity:.85}
+.btn.sm{border-radius:12px;min-height:36px;font-size:15px}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.primary{box-shadow:0 6px 16px rgba(43,76,126,.22)}
+.chip{border:0;background:var(--surface2);font-weight:500}
+.seg{border:0;background:var(--surface2);border-radius:12px;padding:2px}
+.seg button{border:0;border-radius:10px}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.pill{font-weight:500;padding:3px 9px}
+input[type=text],input[type=number],input[type=date],input[type=password],textarea,select{border:1px solid transparent;background:var(--surface2);border-radius:12px}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);background:var(--surface)}
+a{color:var(--accent);text-decoration:none}
+.redo .row a.small,.small a{font-weight:500;text-decoration:none}
+#top{border-bottom:0}
+.brand{font-family:var(--sans);font-size:17px;font-weight:700;letter-spacing:0}
+#tabs{background:rgba(255,255,255,.82);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid rgba(0,0,0,.08)}
+@media (prefers-color-scheme:dark){#tabs{background:rgba(29,28,26,.82);border-top-color:rgba(255,255,255,.08)}}
+.tabin button{font-size:11px;font-weight:500}
+.tabin button svg{width:25px;height:25px;stroke-width:1.6}
+
+/* 今天：大标题日期、主按钮、分组清单（图标方块 + 完成打勾动画） */
+.card.hero{background:transparent;box-shadow:none;padding:4px 2px 6px}
+.hero .d{font-family:var(--sans);font-size:32px;font-weight:700;letter-spacing:-.02em}
+.hero .w{font-size:15px}
+.navbtn{border:0;background:var(--surface2);border-radius:50%;width:36px;height:36px;color:var(--ink2)}
+.streak{font-weight:600;background:var(--amber-bg)}
+.streak b{font-family:var(--sans)}
+.fillbtn{min-height:58px;border-radius:18px;font-size:18px;letter-spacing:.01em}
+.card.todo{padding:0;overflow:hidden}
+.todo-r{padding:12px 16px;gap:14px;border-top:.5px solid var(--line);font-size:17px;min-height:60px;transition:background .15s}
+.todo-r:active{background:var(--surface2)}
+.todo-r .t{font-weight:600}
+.todo-r .s{font-size:15px}
+.todo-r .chev{font-size:22px;color:var(--ink3);opacity:.7}
+.todo-r .ck{width:36px;height:36px;border-radius:10px;border:0;position:relative;background:var(--surface2);font-size:17px}
+.todo-r .ck::after{content:'';position:absolute;inset:7px;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat;background:var(--icc,var(--ink2))}
+.todo-r.done .ck{background:var(--good) !important;color:#fff;font-weight:700;animation:pop .35s ease}
+.todo-r.done .ck::after{display:none}
+.todo-r.done .t{color:var(--ink3);font-weight:500}
+.todo-r.next{background:linear-gradient(90deg,var(--accent-bg),transparent 70%)}
+@keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.tools .btn{background:var(--surface);box-shadow:var(--shadow);border:0;color:var(--ink);font-weight:500}
+/* 学习方块：左上角图标 */
+.tile{border:0;border-radius:20px;padding:16px;min-height:124px;gap:3px}
+.tile::before{content:'';width:40px;height:40px;border-radius:12px;background:var(--ict,var(--surface2));margin-bottom:8px;flex:none}
+.tile::after{content:'';position:absolute;top:24px;left:24px;width:24px;height:24px;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat;background:var(--icc,var(--ink2))}
+.tile{position:relative}
+.tile .tn{font-size:17px}
+.tile.due{box-shadow:0 0 0 2px var(--accent) inset,var(--shadow);border:0}
+
+.todo-r[data-act=wizstart] .ck,.todo-r[data-act=slopen] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M4 20h4L19 9l-4-4L4 16v4z'/><path d='M14 6l4 4'/></svg>");background:#e8eef7;--icc:#2b4c7e}
+.todo-r[data-v=errors] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M20 12a8 8 0 1 1-2.3-5.7'/><path d='M20 4v5h-5'/></svg>");background:#fbefdc;--icc:#a8650f}
+.todo-r[data-v=card] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 18l4.5-12L12 18M4.7 14h5.6'/><circle cx='17' cy='15' r='3'/><path d='M20 12v6'/></svg>");background:#efe9f7;--icc:#6a4c9c}
+.todo-r[data-v=recite] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z'/><path d='M5 17a3 3 0 0 1 3-3h11'/></svg>");background:#e2f1e8;--icc:#2e7a57}
+.todo-r[data-v=read] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z'/><path d='M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z'/></svg>");background:#e1f0ef;--icc:#2a7270}
+.todo-r[data-act=holgo] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/></svg>");background:#fdeee3;--icc:#b5582a}
+.todo-r[data-v=speak] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5 11a7 7 0 0 0 14 0M12 18v3'/></svg>");background:#f8e8ee;--icc:#a1476a}
+.todo-r[data-v=pe] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12h4l3-8 4 16 3-8h4'/></svg>");background:#fbe9e7;--icc:#a4443a}
+.tile[data-v=card]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 18l4.5-12L12 18M4.7 14h5.6'/><circle cx='17' cy='15' r='3'/><path d='M20 12v6'/></svg>");--ict:#efe9f7;--icc:#6a4c9c}
+.tile[data-v=recite]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z'/><path d='M5 17a3 3 0 0 1 3-3h11'/></svg>");--ict:#e2f1e8;--icc:#2e7a57}
+.tile[data-v=read]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z'/><path d='M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z'/></svg>");--ict:#e1f0ef;--icc:#2a7270}
+.tile[data-v=speak]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5 11a7 7 0 0 0 14 0M12 18v3'/></svg>");--ict:#f8e8ee;--icc:#a1476a}
+.tile[data-v=pe]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12h4l3-8 4 16 3-8h4'/></svg>");--ict:#fbe9e7;--icc:#a4443a}
+.tile[href="../math/"]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M5 8h6M8 5v6M13 16h6M5 16l5 5M10 16l-5 5M14 7h5'/></svg>");--ict:#e8eef7;--icc:#2b4c7e}
+.tile[data-v=books]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M4 5h5v14H4zM10 5h5v14h-5z'/><path d='M16 6l4 1-3 13-4-1'/></svg>");--ict:#eeece6;--icc:#67625a}
+@media (prefers-color-scheme:dark){
+.todo-r[data-act=wizstart]:not(.done) .ck,.todo-r[data-act=slopen]:not(.done) .ck{background:#1f2b3d;--icc:#9dbdf0}
+.todo-r[data-v=errors]:not(.done) .ck{background:#3a2d18;--icc:#f0b35e}
+.todo-r[data-v=card]:not(.done) .ck{background:#2c2440;--icc:#c1a8ee}
+.todo-r[data-v=recite]:not(.done) .ck{background:#18301f;--icc:#7ccfa5}
+.todo-r[data-v=read]:not(.done) .ck{background:#15302f;--icc:#79cfcb}
+.todo-r[data-act=holgo]:not(.done) .ck{background:#3a2517;--icc:#f2a377}
+.todo-r[data-v=speak]:not(.done) .ck{background:#3a1f2a;--icc:#eea3c0}
+.todo-r[data-v=pe]:not(.done) .ck{background:#3a1f1c;--icc:#f0a098}
+.tile[data-v=card]{--ict:#2c2440;--icc:#c1a8ee}
+.tile[data-v=recite]{--ict:#18301f;--icc:#7ccfa5}
+.tile[data-v=read]{--ict:#15302f;--icc:#79cfcb}
+.tile[data-v=speak]{--ict:#3a1f2a;--icc:#eea3c0}
+.tile[data-v=pe]{--ict:#3a1f1c;--icc:#f0a098}
+.tile[href="../math/"]{--ict:#1f2b3d;--icc:#9dbdf0}
+.tile[data-v=books]{--ict:#2a2825;--icc:#b3ada2}
+}
+
+/* 重做卡：去掉左侧色条，按钮圆润 */
+.redo{border-left:0}
+.redo.sure{box-shadow:0 0 0 1.5px var(--amber-bg) inset,var(--shadow)}
+.redo .q{font-family:var(--sans);font-size:19px;font-weight:600;line-height:1.5}
+.redo .btn{min-height:46px;padding:10px 20px;border-radius:14px}
+/* 课文：长篇左对齐首行缩进，诗词逐行居中 */
+.prose-text{text-align:left !important}
+.prose-text>div{text-indent:2em}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
 </style>
 </head>
 <body>
@@ -1475,7 +1593,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
   more = h; h = h0; nMore = (more.match(/<h3/g) || []).length;
   if (state.slistOpen == null) { try { state.slistOpen = localStorage.getItem('observer:slOpen') === '1'; } catch(e) { state.slistOpen = false; } }
   const slOpen = !isToday || state.slistOpen;
-  if (isToday) h += `<details class="more" id="slist-d" ${slOpen ? 'open' : ''}><summary data-act="sltog">边写边计时${DB.timer && DB.timer.d === d ? `<span class="pill amber" style="margin-left:8px">${esc(subjById(DB.timer.sid).name)}计时中${slOpen ? '' : '，点开停止'}</span>` : '（边写边计时用）'}</summary>`;
+  if (isToday) h += `<details class="more" id="slist-d" ${slOpen ? 'open' : ''}><summary data-act="sltog">边写边计时${DB.timer && DB.timer.d === d ? `<span class="pill amber" style="margin-left:8px">${esc(subjById(DB.timer.sid).name)}计时中${slOpen ? '' : '，点开停止'}</span>` : '<span class="small faint" style="margin-left:6px">· 各科明细</span>'}</summary>`;
   h += `<div class="slist" id="slist"><div class="slist-h"><h3 style="margin:0">各科作业</h3><span class="small faint">点开填写</span><span class="spacer"></span>
     <span class="small faint">精神</span><div class="seg sm">` + MOOD.map(m => `<button data-act="mood" data-v="${m.k}" class="${dd.mood===m.k?'on':''}">${m.n}</button>`).join('') + `</div></div>`;
   for (const s of subs) h += subjRow(d, s, dd.subj[s.id]);
@@ -3427,7 +3545,8 @@ function vPoem(){
   if (x.text && mode === 'blank') h += `<div class="row" style="margin-top:8px;justify-content:flex-end"><span class="small faint">难度</span><div class="seg sm">` + [[1,'提示多'],[2,'提示少'],[3,'全默']].map(([k,n]) => `<button data-act="plvl" data-v="${k}" class="${lvl===k?'on':''}">${n}</button>`).join('') + `</div></div>`;
   h += `<div class="card" style="margin-top:12px;text-align:center"><h2 style="margin:6px 0 2px">${esc(x.title)}</h2><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>
     ${x.mode === 'excerpt' ? '<div class="pill amber" style="display:inline-block;margin-top:8px">默写常考重点句 · 全文看课本</div>' : ''}${x.checked === false ? '<div class="small faint" style="margin-top:6px">这篇还没逐字校对，背之前对照课本看一眼</div>' : ''}`;
-  if (x.text) h += `<div style="font-family:var(--serif);font-size:19px;line-height:2;margin:16px 0 6px">` + x.text.map((ln, i) => (segAt[i] != null ? `<div class="small faint" style="font-family:var(--sans);margin-top:${i ? 10 : 0}px">第 ${segAt[i] + 1} 段${segDone(x, segAt[i]) ? ' ✓' : ''}</div>` : '') + (mode === 'blank' && !(L.reveal||{})[i] ? `<div data-act="preveal" data-v="${i}" style="cursor:pointer;color:var(--ink2)">${blankLine(ln, lvl)}</div>` : `<div>${esc(ln)}</div>`)).join('') + `</div>` +
+  const prose = ['文言文', '现代文'].includes(x.kind) || /[。！？].{14,}/.test((x.text || [])[0] || '');   // 文章按段落左对齐，诗词逐行居中
+  if (x.text) h += `<div class="${prose ? 'prose-text' : ''}" style="font-family:var(--serif);font-size:19px;line-height:2;margin:16px 0 6px">` + x.text.map((ln, i) => (segAt[i] != null ? `<div class="small faint" style="font-family:var(--sans);margin-top:${i ? 10 : 0}px">第 ${segAt[i] + 1} 段${segDone(x, segAt[i]) ? ' ✓' : ''}</div>` : '') + (mode === 'blank' && !(L.reveal||{})[i] ? `<div data-act="preveal" data-v="${i}" style="cursor:pointer;color:var(--ink2)">${blankLine(ln, lvl)}</div>` : `<div>${esc(ln)}</div>`)).join('') + `</div>` +
     `<div class="row" style="justify-content:center"><button class="btn sm" data-act="sayzh">${SPK} ${x.audio ? '听标准朗读' : '朗读'}</button><button class="btn sm primary" data-act="rcheck" data-v="voice">${MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} ${sg.length ? '整篇背' : '背给我听'}</button><button class="btn sm" data-act="rcheck" data-v="type">${sg.length ? '整篇默写' : '打字默写'}</button></div>${mode==='blank' ? '<p class="small faint" style="margin:6px 0 0">点一行看原文</p>' : ''}`;
   else h += `<p class="small muted" style="margin:14px 0">这篇只收了篇目，原文看课本。</p>`;
   const rr = DB.recite[x.id] || {};
