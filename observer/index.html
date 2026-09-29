@@ -1242,7 +1242,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     const wq = LIB.words ? wordQueue().length : 0;
     const wDone = Object.values(DB.words).filter(s => (s.hist||[]).some(x => x.d === today())).length;
     const wLeft = wordsLeftTonight();
-    const learning = LIB.recite ? LIB.recite.items.filter(x => rState(x.id) === 'learning').length : 0;
+    const learning = LIB.recite ? LIB.recite.items.filter(x => ['learning','upd'].includes(rStateX(x))).length : 0;
     const rToday = Object.values(DB.recite).some(r => (r.hist||[]).some(x => x.d === today())), rDue = reciteDue().length;
     const wordsOk = LIB.done && (!LIB.words || wLeft === 0);
     const allDone = filled >= subs.length && left === 0 && wordsOk && !rDue;
@@ -2612,17 +2612,39 @@ function markWord(w, ok){
   else { s.box = 0; s.done = false; s.tries = s.triesD === t ? (s.tries || 0) + 1 : 1; s.triesD = t; s.due = s.tries >= 2 ? addD(t, 1) : t; }   // 当晚再考一次，第二次还没想起来就明天
   s.u = now(); DB.words[k] = s; save();
 }
-const RST = [['','没背'],['learning','在背'],['can','会背了'],['dict','默写全对'],['rv-ok','复习还会'],['rv-no','复习忘了'],['voice','语音检验'],['type','默写检验']];
+const RST = [['','没背'],['learning','在背'],['can','会背了'],['dict','默写全对'],['upd','内容有更新'],['rv-ok','复习还会'],['rv-no','复习忘了'],['voice','语音检验'],['type','默写检验']];
 const rState = id => (DB.recite[id] || {}).st || '';
 const RBOX = [3, 7, 21];                   // 会背之后隔 3、7、21 天回来检查，第 3 次还会就算记牢
-function setRecite(id, st){ const r = DB.recite[id] || {hist:[]}; r.st = st; r.hist = (r.hist||[]).concat([{d:today(), st}]).slice(-20);
-  if (st === 'can' || st === 'dict') { if (r.box == null || r.box < 0) { r.box = 0; r.due = addD(today(), RBOX[0]); } } else { r.box = -1; r.due = null; }
+function setRecite(id, st){ const r = DB.recite[id] || {hist:[]}, it = LIB.recite && LIB.recite.items.find(i => i.id === id), stale = !!it && (r.rev || 1) < recRev(it);
+  r.st = st; r.hist = (r.hist||[]).concat([{d:today(), st}]).slice(-20);
+  if (st === 'can' || st === 'dict') { if (r.box == null || r.box < 0 || stale) { r.box = 0; r.due = addD(today(), RBOX[0]); r.solid = false; } if (it) r.rev = recRev(it); } else { r.box = -1; r.due = null; }
   r.u = now(); DB.recite[id] = r; save(); }
 function reviewRecite(id, ok){ const r = DB.recite[id]; if (!r) return; const t = today(); r.hist = (r.hist||[]).concat([{d:t, st: ok ? 'rv-ok' : 'rv-no'}]).slice(-20);
   if (ok) { r.box = (r.box || 0) + 1; r.due = r.box >= RBOX.length ? null : addD(t, RBOX[r.box]); if (r.box >= RBOX.length) r.solid = true; }
   else { r.box = Math.max(0, (r.box || 0) - 1); r.due = addD(t, 1); r.solid = false; }   // 忘了只退一格、明天再背；重学很快
   r.u = now(); save(); }
 const reciteDue = () => (LIB.recite ? LIB.recite.items : []).filter(x => { const r = DB.recite[x.id]; return r && r.due && r.due <= today(); });
+// 长篇分段背：全文超过 160 字才切，按字数均分成 2–5 段，段内不拆句。返回 [[起行, 止行), ...]，短篇返回 []
+function recSegs(x){
+  const t = x && x.mode !== 'title' && x.text || [], len = t.map(l => (l.match(/[一-鿿]/g) || []).length), T = len.reduce((a, b) => a + b, 0);
+  if (T <= 160 || t.length < 4) return [];
+  const n = Math.min(5, Math.max(2, Math.round(T / 100)), t.length), out = []; let a = 0, acc = 0;
+  for (let i = 0; i < t.length; i++) { acc += len[i];
+    if (out.length < n - 1 && acc >= T * (out.length + 1) / n && t.length - i - 1 >= n - out.length - 1) { out.push([a, i + 1]); a = i + 1; } }
+  out.push([a, t.length]); return out;
+}
+const recRev = x => (x && x.rev) || 1;
+// 篇目内容改过（课本核对后改成全文 / 改了字）且上次「会背」是按旧内容记的 → 提醒再背一遍，历史不清零
+const recStale = x => { const r = DB.recite[x.id]; return !!r && ['can','dict'].includes(r.st) && (r.rev || 1) < recRev(x); };
+const rStateX = x => recStale(x) ? 'upd' : rState(x.id);
+const segDone = (x, k) => { const r = DB.recite[x.id]; return !!(r && r.segs && r.segRev === recRev(x) && r.segs[k]); };
+// 按日期估计课本进度：秋季 9/1、春季 3/1 开学，一学期 6 个单元约 3 周一个；只用来排序和标「最近要背」
+function curUnit(term){
+  if (term !== termKey(today())) return 0;
+  const t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7);
+  const start = term.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : y + '-03-01';
+  return Math.min(6, Math.max(1, Math.floor(dayDiff(start, t) / 21) + 1));
+}
 
 /* 体育：深圳中考 50 分 = 现场 36（三类各选一项，百分制平均 × 0.36）+ 过程性评价 14。评分表来自市教育局 2026 年文件（data/pe.json） */
 const PE_DEF = {1: 'run1000', 2: 'rope1', 3: 'basket'};
@@ -2887,7 +2909,7 @@ function vLearn(){
   if (!LIB.tried || (LIB.words === null && LIB.recite === null && LIB.books === null && !LIB.done)) { LIB.done = true; }
   // 一屏方块：名称 + 一行现状，点进去再看说明和打印
   const W = uniqWords(), mastered = W.filter(w => (wState(w)||{}).done).length, wq = wordsLeftTonight();
-  const RI = LIB.recite ? LIB.recite.items : [], tk = termKey(today()), cur = RI.filter(x => x.term === tk), can = cur.filter(x => ['can','dict'].includes(rState(x.id))).length;
+  const RI = LIB.recite ? LIB.recite.items : [], tk = termKey(today()), cur = RI.filter(x => x.term === tk), can = cur.filter(x => ['can','dict'].includes(rStateX(x))).length;
   const sr = DB.speakRecs, last = sr[sr.length - 1], est = LIB.pe ? peEstimate() : {field: null};
   const ex = extraTask(today()), rDueN = LIB.recite ? reciteDue().length : 0;
   const due = {card: wq > 0, recite: rDueN > 0, speak: ex && ex.v === 'speak' && !ex.done, pe: ex && ex.v === 'pe' && !ex.done};
@@ -2951,12 +2973,16 @@ function vRecite(){
   let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">语文背诵</h2></div>
     <div class="row" style="margin:12px 0 10px">` + terms.map(t => `<button class="chip ${L.term===t?'on':''}" data-act="rterm" data-v="${t}">${esc(termName(t))}</button>`).join('') + `</div>`;
   h += `<div class="card"><div class="row"><b>${list.length} 篇</b><span class="spacer"></span><span class="small muted">打印：</span><button class="btn sm" data-act="rprint" data-v="full">原文</button><button class="btn sm" data-act="rprint" data-v="blank">默写版</button></div></div>`;
-  const kinds = [...new Set(list.map(x => x.kind || ''))];
-  for (const k of kinds) {
-    if (k) h += `<h3 style="margin:14px 0 6px">${esc(k)}</h3>`;
-    h += `<div class="card" style="padding:4px 0">` + list.filter(x => (x.kind||'') === k).map(x => { const st = rState(x.id);
-      return `<div class="row" data-act="rpoem" data-v="${esc(x.id)}" style="padding:11px 16px;border-bottom:1px solid var(--line);cursor:pointer;flex-wrap:nowrap"><div style="flex:1;min-width:0"><b>${esc(x.title)}</b><div class="small muted">${[esc([x.dynasty, x.author].filter(Boolean).join(' · ')), x.mode === 'excerpt' ? '<span class="faint">重点句</span>' : x.mode === 'title' || !x.text ? '<span class="faint">只有篇目</span>' : '', x.checked === false ? '<span class="faint">未逐字校对</span>' : ''].filter(Boolean).join(' · ')}</div></div>
-        ${(DB.recite[x.id] || {}).due && DB.recite[x.id].due <= today() ? '<span class="pill amber" style="margin-right:4px">该复习</span>' : ''}<span class="pill ${st==='dict'?'good':st==='can'?'accent':st==='learning'?'amber':''}">${RST.find(r=>r[0]===st)[1]}</span></div>`; }).join('') + `</div>`;
+  // 有单元号的学期按课本单元排（课外古诗词跟在所在单元后）；按日期估的当前单元及之前、还没背下来的标「最近要背」
+  const byUnit = list.every(x => x.u), cu = curUnit(L.term), UN = ['','一','二','三','四','五','六'];
+  const groups = byUnit ? [...new Set(list.map(x => x.u))].sort((a, b) => a - b).map(u => [u, `第${UN[u]}单元`, list.filter(x => x.u === u)])
+    : [...new Set(list.map(x => x.kind || ''))].map(k => [0, k, list.filter(x => (x.kind||'') === k)]);
+  if (byUnit && cu) h += `<p class="small muted" style="margin:10px 4px 0">按日期估计现在大约学到第${UN[cu]}单元（以老师进度为准）。</p>`;
+  for (const [u, k, items] of groups) {
+    if (k) h += `<h3 style="margin:14px 0 6px">${esc(k)}${u && u === cu ? ' <span class="pill accent" style="font-weight:400">最近在学</span>' : ''}</h3>`;
+    h += `<div class="card" style="padding:4px 0">` + items.map(x => { const st = rStateX(x), soon = u && cu && u <= cu && !['can','dict'].includes(st) && x.text && x.mode !== 'title', ns = recSegs(x).length;
+      return `<div class="row" data-act="rpoem" data-v="${esc(x.id)}" style="padding:11px 16px;border-bottom:1px solid var(--line);cursor:pointer;flex-wrap:nowrap"><div style="flex:1;min-width:0"><b>${esc(x.title)}</b><div class="small muted">${[esc([x.dynasty, x.author].filter(Boolean).join(' · ')), x.mode === 'excerpt' ? '<span class="faint">重点句</span>' : x.mode === 'title' || !x.text ? '<span class="faint">只有篇目</span>' : '', x.checked === false ? '<span class="faint">未逐字校对</span>' : '', ns ? `<span class="faint">分 ${ns} 段背</span>` : ''].filter(Boolean).join(' · ')}</div></div>
+        ${soon ? '<span class="pill accent" style="margin-right:4px">最近要背</span>' : ''}${st !== 'upd' && (DB.recite[x.id] || {}).due && DB.recite[x.id].due <= today() ? '<span class="pill amber" style="margin-right:4px">该复习</span>' : ''}<span class="pill ${st==='dict'?'good':st==='can'?'accent':st==='learning'||st==='upd'?'amber':''}">${RST.find(r=>r[0]===st)[1]}</span></div>`; }).join('') + `</div>`;
   }
   if (LIB.recite && LIB.recite.source) h += `<p class="small faint">篇目来源：${esc(LIB.recite.source)}</p>`;
   return h;
@@ -3022,37 +3048,49 @@ async function recStop(){
 }
 async function finishCheck(){
   const R = state.rcheck, x = LIB.recite.items.find(i => i.id === R.id); await loadPY();
-  const strict = R.mode === 'type', res = alignText(x.text, R.said || '', strict);
+  const sg = recSegs(x), si = R.seg != null && sg[R.seg] ? R.seg : null;
+  const strict = R.mode === 'type', res = alignText(si == null ? x.text : x.text.slice(sg[si][0], sg[si][1]), R.said || '', strict);
   R.res = res; R.phase = 'result';
-  const pctv = Math.round(res.score * 100), r = DB.recite[x.id] || {hist: []}, cur = r.st || '';
-  r.hist = (r.hist || []).concat([{d: today(), st: strict ? 'type' : 'voice', score: pctv}]).slice(-20); r.u = now(); DB.recite[x.id] = r;
-  const dueNow = r.due && r.due <= today();
+  const pctv = Math.round(res.score * 100), r = DB.recite[x.id] || {hist: []}, cur = r.st || '', eff = rStateX(x);
+  r.hist = (r.hist || []).concat([Object.assign({d: today(), st: strict ? 'type' : 'voice', score: pctv}, si == null ? {} : {seg: si})]).slice(-20); r.u = now(); DB.recite[x.id] = r;
+  const dueNow = eff !== 'upd' && r.due && r.due <= today();   // 复习可以只抽一段背
   if (dueNow && pctv >= 90) reviewRecite(x.id, true); else if (dueNow && pctv < 70) reviewRecite(x.id, false);
-  if (strict && pctv >= 98) setRecite(x.id, 'dict'); else if (!strict && pctv >= 90 && !['can','dict'].includes(DB.recite[x.id].st || '')) setRecite(x.id, 'can'); else if (!cur) setRecite(x.id, 'learning'); else save();
+  if (si != null) {
+    const ok = strict ? pctv >= 98 : pctv >= 90; R.segOk = ok;
+    if (ok) { if (r.segRev !== recRev(x)) { r.segs = {}; r.segRev = recRev(x); } r.segs[si] = strict || r.segs[si] === 'dict' ? 'dict' : 'can'; }
+    const all = sg.every((_, k) => segDone(x, k)), allDict = all && sg.every((_, k) => r.segs[k] === 'dict');
+    if (allDict && eff !== 'dict') { R.allDone = true; setRecite(x.id, 'dict'); }
+    else if (all && !['can','dict'].includes(eff)) { R.allDone = true; setRecite(x.id, 'can'); }
+    else if (!cur) setRecite(x.id, 'learning'); else save();
+  }
+  else if (strict && pctv >= 98) setRecite(x.id, 'dict'); else if (!strict && pctv >= 90 && !['can','dict'].includes(eff)) setRecite(x.id, 'can'); else if (!cur) setRecite(x.id, 'learning'); else save();
   render();
 }
 function vReciteCheck(){
   const R = state.rcheck, x = LIB.recite.items.find(i => i.id === R.id); if (!x) return '';
-  let h = `<div class="wiz" role="dialog" aria-label="背诵检验"><div class="wiz-top"><div style="flex:1;font-weight:600">${R.mode === 'type' ? '打字默写检验' : R.mode === 'dict' ? '键盘话筒背诵检验' : '背一遍检验'} · ${esc(x.title)}</div><button class="wiz-x" data-act="rcclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  const sg = recSegs(x), si = R.seg != null && sg[R.seg] ? R.seg : null, lines = si == null ? x.text : x.text.slice(sg[si][0], sg[si][1]);
+  const segL = si == null ? '' : ` · 第 ${si + 1}/${sg.length} 段`, cue = si == null ? '' : lines[0].replace(/[，。；：？！、“”]/g, '').slice(0, 4);
+  let h = `<div class="wiz" role="dialog" aria-label="背诵检验"><div class="wiz-top"><div style="flex:1;font-weight:600">${R.mode === 'type' ? '打字默写检验' : R.mode === 'dict' ? '键盘话筒背诵检验' : '背一遍检验'} · ${esc(x.title)}${segL}</div><button class="wiz-x" data-act="rcclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
   if (x.mode === 'excerpt') h += `<p class="small faint">这篇只收了默写常考的重点句，检验的也是这些句子。</p>`;
   if (R.phase === 'result') {
     const p = Math.round(R.res.score * 100), good = R.mode === 'type' ? p >= 98 : p >= 90;
     h += `<div style="text-align:center;margin:10px 0 14px"><div style="font-family:var(--mono);font-size:44px;font-weight:700;color:${good ? 'var(--good)' : 'var(--amber)'}">${p}%</div>
-      <div class="muted">${good ? (R.mode === 'type' ? '默写全对，记为「默写全对」' : '背下来了，记为「会背了」') : `背出了 ${R.res.got}/${R.res.total} 个字，标出来的是漏了或错了的`}</div></div>
-      <div class="card" style="font-family:var(--serif);font-size:18px;line-height:2;text-align:center">${markedLines(x.text, R.res.miss)}</div>
+      <div class="muted">${!good ? `背出了 ${R.res.got}/${R.res.total} 个字，标出来的是漏了或错了的` : si != null ? (R.allDone ? `这一段过了！${sg.length} 段全部背下来，整篇记为「${R.mode === 'type' ? '默写全对' : '会背了'}」` : `这一段过了（已过 ${sg.filter((_, k) => segDone(x, k)).length}/${sg.length} 段）`) : (R.mode === 'type' ? '默写全对，记为「默写全对」' : '背下来了，记为「会背了」')}</div></div>
+      <div class="card" style="font-family:var(--serif);font-size:18px;line-height:2;text-align:center">${markedLines(lines, R.res.miss)}</div>
       ${R.said ? `<details><summary class="small faint">识别到的内容</summary><p class="small muted">${esc(R.said)}</p></details>` : ''}${R.err ? `<div class="signal">${esc(R.err)}</div>` : ''}`;
-    h += `</div><div class="wiz-foot"><button class="btn" data-act="rcagain">再来一遍</button><button class="btn primary" data-act="rcclose">好了</button></div></div>`;
+    const nx = si == null || !good ? -1 : sg.findIndex((_, k) => k !== si && !segDone(x, k));
+    h += `</div><div class="wiz-foot"><button class="btn" data-act="rcagain">再来一遍</button>${nx >= 0 ? `<button class="btn primary" data-act="rcseg" data-v="${nx}">背第 ${nx + 1} 段</button>` : `<button class="btn primary" data-act="rcclose">好了</button>`}</div></div>`;
     return h;
   }
   if (R.mode === 'dict') {   // 免费：iPad 键盘自带听写，按拼音宽松对照，和语音检验同一标准
-    h += `<p class="muted">不看原文。点一下下面的框，再点键盘上的 <b>🎤 话筒键</b>，从题目开始背；背完点「对答案」。</p><p class="small faint">这是 iPad 自带的听写，免费。键盘上没有话筒键的话，去「设置 → 通用 → 键盘」打开「启用听写」。同音字按对算。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="点这里，再点键盘上的话筒">${esc(R.said||'')}</textarea>`;
+    h += `<p class="muted">不看原文。点一下下面的框，再点键盘上的 <b>🎤 话筒键</b>，${si == null ? '从题目开始背' : `背第 ${si + 1} 段（开头是「${esc(cue)}」）`}；背完点「对答案」。</p><p class="small faint">这是 iPad 自带的听写，免费。键盘上没有话筒键的话，去「设置 → 通用 → 键盘」打开「启用听写」。同音字按对算。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="点这里，再点键盘上的话筒">${esc(R.said||'')}</textarea>`;
     return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
   }
   if (R.mode === 'type') {
-    h += `<p class="muted">不看原文，把整篇默写出来（标点可以不打）。写完点「对答案」。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="从第一句开始写">${esc(R.said||'')}</textarea>`;
+    h += `<p class="muted">不看原文，${si == null ? '把整篇默写出来' : `把第 ${si + 1} 段默写出来（开头是「${esc(cue)}」）`}（标点可以不打）。写完点「对答案」。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="从第一句开始写">${esc(R.said||'')}</textarea>`;
     return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
   }
-  h += `<div style="text-align:center;margin-top:30px"><div class="small faint">不看原文，从题目开始背</div><div style="font-family:var(--serif);font-size:24px;font-weight:700;margin:10px 0">${esc(x.title)}</div><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>`;
+  h += `<div style="text-align:center;margin-top:30px"><div class="small faint">${si == null ? '不看原文，从题目开始背' : `不看原文，背第 ${si + 1} 段，开头是「${esc(cue)}」`}</div><div style="font-family:var(--serif);font-size:24px;font-weight:700;margin:10px 0">${esc(x.title)}</div><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>`;
   if (R.phase === 'rec') h += `<div style="margin:30px auto 10px;width:110px;height:110px;border-radius:50%;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center" class="mic rec">${MIC.replace('<svg','<svg style="width:44px;height:44px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…背完点下面「背完了」</div>`;
   else if (R.phase === 'busy') h += `<div class="muted" style="margin-top:40px">正在对照原文…</div>`;
   else h += `<button class="btn primary" style="margin-top:30px;min-height:64px;font-size:19px;padding:0 30px" data-act="rcstart">${MIC.replace('<svg','<svg style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-4px"')} 开始背</button><p class="small faint" style="margin-top:12px">${aiReady() && !asrPaused() ? '用智谱语音识别（付费，0.06 元/分钟）' : '用设备自带的语音识别（免费）'}</p><button class="btn sm" style="margin-top:4px" data-act="rcdict">识别不了？用键盘话筒背（免费）</button>`;
@@ -3068,17 +3106,21 @@ function blankLine(line, lvl){
 function vPoem(){
   const L = state.learn, x = (LIB.recite ? LIB.recite.items : []).find(i => i.id === L.poem);
   if (!x) { L.view = 'recite'; return vRecite(); }
-  const st = rState(x.id), mode = L.pmode || 'full';
+  const st = rStateX(x), mode = L.pmode || 'full', sg = recSegs(x), segAt = Object.fromEntries(sg.map(([a], k) => [a, k]));
   const lvl = L.lvl || 1;
   let h = `<div class="row">${backBtn('recite', '篇目')}<span class="spacer"></span>${x.text ? `<div class="seg sm"><button data-act="pmode" data-v="full" class="${mode==='full'?'on':''}">原文</button><button data-act="pmode" data-v="blank" class="${mode==='blank'?'on':''}">挖空练习</button></div>` : ''}</div>`;
   if (x.text && mode === 'blank') h += `<div class="row" style="margin-top:8px;justify-content:flex-end"><span class="small faint">难度</span><div class="seg sm">` + [[1,'提示多'],[2,'提示少'],[3,'全默']].map(([k,n]) => `<button data-act="plvl" data-v="${k}" class="${lvl===k?'on':''}">${n}</button>`).join('') + `</div></div>`;
   h += `<div class="card" style="margin-top:12px;text-align:center"><h2 style="margin:6px 0 2px">${esc(x.title)}</h2><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>
     ${x.mode === 'excerpt' ? '<div class="pill amber" style="display:inline-block;margin-top:8px">默写常考重点句 · 全文看课本</div>' : ''}${x.checked === false ? '<div class="small faint" style="margin-top:6px">这篇还没逐字校对，背之前对照课本看一眼</div>' : ''}`;
-  if (x.text) h += `<div style="font-family:var(--serif);font-size:19px;line-height:2;margin:16px 0 6px">` + x.text.map((ln, i) => mode === 'blank' && !(L.reveal||{})[i] ? `<div data-act="preveal" data-v="${i}" style="cursor:pointer;color:var(--ink2)">${blankLine(ln, lvl)}</div>` : `<div>${esc(ln)}</div>`).join('') + `</div>` +
-    `<div class="row" style="justify-content:center"><button class="btn sm" data-act="sayzh">${SPK} ${x.audio ? '听标准朗读' : '朗读'}</button><button class="btn sm primary" data-act="rcheck" data-v="voice">${MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} 背给我听</button><button class="btn sm" data-act="rcheck" data-v="type">打字默写</button></div>${mode==='blank' ? '<p class="small faint" style="margin:6px 0 0">点一行看原文</p>' : ''}`;
+  if (x.text) h += `<div style="font-family:var(--serif);font-size:19px;line-height:2;margin:16px 0 6px">` + x.text.map((ln, i) => (segAt[i] != null ? `<div class="small faint" style="font-family:var(--sans);margin-top:${i ? 10 : 0}px">第 ${segAt[i] + 1} 段${segDone(x, segAt[i]) ? ' ✓' : ''}</div>` : '') + (mode === 'blank' && !(L.reveal||{})[i] ? `<div data-act="preveal" data-v="${i}" style="cursor:pointer;color:var(--ink2)">${blankLine(ln, lvl)}</div>` : `<div>${esc(ln)}</div>`)).join('') + `</div>` +
+    `<div class="row" style="justify-content:center"><button class="btn sm" data-act="sayzh">${SPK} ${x.audio ? '听标准朗读' : '朗读'}</button><button class="btn sm primary" data-act="rcheck" data-v="voice">${MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} ${sg.length ? '整篇背' : '背给我听'}</button><button class="btn sm" data-act="rcheck" data-v="type">${sg.length ? '整篇默写' : '打字默写'}</button></div>${mode==='blank' ? '<p class="small faint" style="margin:6px 0 0">点一行看原文</p>' : ''}`;
   else h += `<p class="small muted" style="margin:14px 0">这篇只收了篇目，原文看课本。</p>`;
   const rr = DB.recite[x.id] || {};
-  if (rr.due && rr.due <= today()) h += `</div><div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>今天该复习这篇了</h3><p class="small muted" style="margin:0 0 8px">点「背一遍检验」，不看原文背一遍：90% 以上算还记得，隔更久再查；低于 70% 就改回「在背」。</p>`;
+  if (st === 'upd') h += `</div><div class="card" style="background:var(--amber-bg);border-color:transparent"><h3>这篇内容按课本更新了</h3><p class="small muted" style="margin:0">对照教育部电子课本核对过，${x.mode === 'full' ? '现在收的是课本要求背诵的全文' : '改了个别字'}。以前「会背了」是按旧内容记的，再背一遍新版本；以前的记录都还在。</p>`;
+  if (sg.length && x.text) h += `</div><div class="card"><div class="row"><h3 style="margin:0">分段背</h3><span class="spacer"></span><span class="small muted">过了 ${sg.filter((_, k) => segDone(x, k)).length}/${sg.length} 段</span></div><p class="small muted" style="margin:4px 0 8px">一段一段背，每段背对九成就打勾，${sg.length} 段都过了整篇记「会背了」。</p>` +
+    sg.map(([a], k) => `<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">第 ${k + 1} 段 <span class="small faint">「${esc(x.text[a].replace(/[，。；：？！、“”]/g, '').slice(0, 4))}…」</span></span>${segDone(x, k) ? '<span class="pill good">✓</span>' : ''}<button class="btn sm" data-act="rcheck" data-v="voice" data-s="${k}">背这段</button><button class="btn sm ghost" data-act="rcheck" data-v="type" data-s="${k}">默写</button></div>`).join('');
+  const rvSeg = sg.length ? ((rr.hist || []).length % sg.length) : -1;
+  if (st !== 'upd' && rr.due && rr.due <= today()) h += `</div><div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>今天该复习这篇了</h3><p class="small muted" style="margin:0 0 8px">${rvSeg >= 0 ? `长篇不用整篇背，抽一段就行：<b>第 ${rvSeg + 1} 段</b>。` : ''}不看原文背一遍：90% 以上算还记得，隔更久再查；低于 70% 就改回「在背」。</p>${rvSeg >= 0 ? `<button class="btn sm primary" data-act="rcheck" data-v="voice" data-s="${rvSeg}">背第 ${rvSeg + 1} 段</button>` : ''}`;
   h += `</div><div class="small muted" style="margin:0 4px 10px">现在：<b>${(RST.find(r => r[0] === st) || ['', '没背'])[1]}</b>${rr.solid ? ' <span class="pill good">已经记牢</span>' : rr.due ? ' · 下次复习 ' + mdShort(rr.due) : ''} · 背给我听，背对九成就自动记「会背了」</div><div>`;
   const hist = (DB.recite[x.id] || {}).hist || [];
   if (hist.length) h += `<p class="small faint" style="margin:10px 0 0">记录：${hist.slice(-5).map(e => mdShort(e.d) + ' ' + (e.score != null ? (e.st === 'type' ? '默写 ' : '背诵 ') + e.score + '%' : (RST.find(r=>r[0]===e.st)||['',''])[1])).join(' → ')}</p>`;
@@ -3446,12 +3488,13 @@ const ACT = {
   tuclose: () => { state.tutor = null; render(); },
   tuimgx: () => { state.tutor.img = null; render(); },
   tuadd: () => { const r = state.tutor.result; touchDay(today()); DB.items.push({id: uid('i'), d: today(), sid: r.sid, type: r.type, sub: r.sub || '', conf: null, tag: r.tag || '', q: true, box: 0, due: addD(today(), BOXES[0]), hist: [], done: false, u: now(), from: 'ai'}); save(); toast('记进错题本了，2 天后重做'); state.tutor = null; render(); },
-  rcheck: el => { try { window.__poemAudio && window.__poemAudio.pause(); } catch(e) {} state.rcheck = {id: state.learn.poem, mode: el.dataset.v, phase: 'ready', said: ''}; loadPY(); render(); },
+  rcheck: el => { try { window.__poemAudio && window.__poemAudio.pause(); } catch(e) {} state.rcheck = {id: state.learn.poem, mode: el.dataset.v, phase: 'ready', said: '', seg: el.dataset.s != null && el.dataset.s !== '' ? +el.dataset.s : null}; loadPY(); render(); },
   rcstart: () => loadPY().then(recStart),
   rcstop: () => recStop(),
   rcdict: () => { state.rcheck = {id: state.rcheck.id, mode: 'dict', phase: 'ready', said: ''}; render(); },
   rctype: () => { state.rcheck.said = $('#rc-type').value; state.rcheck.phase = 'busy'; finishCheck(); },
-  rcagain: () => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: ''}; render(); },
+  rcagain: () => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: '', seg: state.rcheck.seg}; render(); },
+  rcseg: el => { state.rcheck = {id: state.rcheck.id, mode: state.rcheck.mode, phase: 'ready', said: '', seg: +el.dataset.v}; render(); },
   rcclose: () => { if (REC) { REC.on = false; try { REC.sr && REC.sr.stop(); REC.mr && REC.mr.state === 'recording' && REC.mr.stop(); REC.stream && REC.stream.getTracks().forEach(t => t.stop()); } catch(e) {} REC = null; } state.rcheck = null; render(); },
   aisave: async () => { const k = $('#ai-key').value.trim(); if (!k) return toast('请粘贴密钥'); AI = {key: k, model: $('#ai-model').value}; saveAI(); state.aiEdit = false; toast('测试中…');
     try { await aiChat([{role:'user', content:'回复「好」'}], {max_tokens: 10, thinking:{type:'disabled'}}); toast('可以用了'); } catch(e) { toast('测试失败：' + e.message); } render(); },
