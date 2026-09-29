@@ -360,8 +360,9 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 <div id="toast"></div>
 <script src="vendor/ts-fsrs-5.4.2.umd.js"></script>
 <script>
+'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v56';
+const APP_V = 'v57';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -378,7 +379,6 @@ function logErr(msg, src, line, col, stack){
 }
 window.addEventListener('error', ev => { if (ev && ev.message) logErr(ev.message, ev.filename, ev.lineno, ev.colno, ev.error && ev.error.stack); });
 window.addEventListener('unhandledrejection', ev => { const r = ev && ev.reason; logErr('Promise: ' + ((r && r.message) || r), '', 0, 0, r && r.stack); });
-'use strict';
 /* ================= 常量 ================= */
 const ET = [{k:'calc',n:'计算·书写',s:'执行'},{k:'concept',n:'概念·理解',s:'理解'},{k:'read',n:'审题·表达',s:'审题'}];
 const ET_COLOR = {calc:'#c0822a',concept:'#8a5a9e',read:'#2f8a8a'};
@@ -1143,6 +1143,22 @@ async function ghPush(text, sha){
 /* 通用：按字段取新（字段时间 fu[f]，没有就用整条 u），hist 取并集 */
 // perField：周/月表的写入给每个字段记 fu 时间，按字段合并；背诵/单词/错题本/AI 档案/假期只更新整条的 u，
 // 按字段比会因为合并后留下的空 fu 把本机新改动当成 0 时间（审查发现），所以整条取较新的一方，hist 两边取并集
+// 名著：总页数等取较新一方；页码按日期合并、「说一句」按内容并集——两台设备各记一部分都保留（审查发现整条取新会丢）
+function mergeReads(x, y){
+  const yn = (y.u || 0) > (x.u || 0), a = yn ? x : y, b = yn ? y : x, out = JSON.parse(JSON.stringify(b));
+  out.log = Object.assign({}, a.log || {}, b.log || {});
+  const seen = new Map(); for (const e of (a.sums || []).concat(b.sums || [])) { const k = e.d + '|' + e.text, old = seen.get(k); seen.set(k, old && old.fb && !e.fb ? old : e); }
+  out.sums = [...seen.values()].sort((p, q) => p.d < q.d ? -1 : p.d > q.d ? 1 : 0).slice(-60); out.u = Math.max(x.u || 0, y.u || 0);
+  const J = JSON.stringify; return {v: out, l: J(out.log) !== J(y.log || {}) || out.sums.length !== (y.sums || []).length, r: J(out.log) !== J(x.log || {}) || out.sums.length !== (x.sums || []).length};
+}
+// 假期作业：清单以较新一方为准（删掉的作业不复活），每天做了几份按日期合并
+function mergeHol(x, y){
+  const yn = (y.u || 0) > (x.u || 0), a = yn ? x : y, b = yn ? y : x, out = JSON.parse(JSON.stringify(b));
+  const A = new Map((a.tasks || []).map(t => [t.id, t]));
+  out.tasks = (out.tasks || []).map(t => { const o = A.get(t.id); if (o) t.done = Object.assign({}, o.done || {}, t.done || {}); return t; });
+  out.u = Math.max(x.u || 0, y.u || 0);
+  const J = JSON.stringify; return {v: out, l: J(out) !== J(y), r: J(out) !== J(x)};
+}
 function mergeRec(x, y, perField){
   const clone = o => JSON.parse(JSON.stringify(o));
   let out, l = false, r = false;
@@ -1215,7 +1231,7 @@ function mergeDB(L, R){
     const a = L[k]||{}, b = R[k]||{}; M[k] = M[k] || {};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
-      if (x && y) { const m = k === 'days' ? mergeDay(x, y) : mergeRec(x, y, k === 'weeks' || k === 'months'); M[k][key] = m.v; lN = lN || m.l; rN = rN || m.r; continue; }
+      if (x && y) { const m = k === 'days' ? mergeDay(x, y) : k === 'reads' ? mergeReads(x, y) : k === 'hol' ? mergeHol(x, y) : mergeRec(x, y, k === 'weeks' || k === 'months'); M[k][key] = m.v; lN = lN || m.l; rN = rN || m.r; continue; }
       if (x && (!y || (x.u||0) > (y.u||0))) lN = true;
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
@@ -1414,7 +1430,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     if (allDone) { const old = allItems().filter(it => it.done && !it.skipped && it.d >= addD(d, -33) && it.d <= addD(d, -27) && (it.tag || it.stem));
       if (old.length) { const it = old[(P(d).getDate()) % old.length];
         h += `<div class="card" style="background:var(--good-bg);border-color:transparent"><div class="small faint">一个月前的今天</div><div style="margin-top:4px">${md(it.d)}你在<b>${esc(it.tag || (it.stem || '').slice(0, 18))}</b>上出过错，现在已经会了 ✓</div></div>`; } }
-    if (isRest(d) && !dayCnt(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + installBanner(); }
+    if (isRest(d) && !dayCnt(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + holidayCard(d) + installBanner(); }   // 假期里请了休息也能勾假期作业
     let slOpen0 = state.slistOpen; if (slOpen0 == null) { try { slOpen0 = localStorage.getItem('observer:slOpen') === '1'; } catch(e) { slOpen0 = false; } }
     const T = [
       holMode ? {t: '假期作业', s: hH.out[d] ? '今天出去玩' : (() => { const R = hH.tasks.map(t => [((t.done || {})[d] || 0), holQuota(hH, t, d)]); return `${R.reduce((a, [k, q]) => a + Math.min(k, q), 0)}/${R.reduce((a, [, q]) => a + q, 0)} 份`; })(), done: holMet, act: 'holgo', v: '', go: '做今天的假期作业'} : {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
@@ -1423,7 +1439,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       {t: '语文背诵', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
     // 清单保持精简：一天最多一行可选加练，原有加练优先；没有时才放「读名著」（开始读了才出现，没开始的从学习页进）
     const ex = extraTask(d); if (ex) T.push(ex);
-    else { const RP = readPlan(d); if (RP.cur && !holMode) T.push({t: '名著阅读', s: RP.done ? '今天读过' : `今天 ${RP.q} 页 · 可选`, done: RP.done, opt: true, act: 'golearn', v: 'read', go: ''}); }
+    else { const RP = readPlan(d); if (RP.cur && !RP.past && !holMode) T.push({t: '名著阅读', s: RP.done ? '今天读过' : `今天 ${RP.q} 页 · 可选`, done: RP.done, opt: true, act: 'golearn', v: 'read', go: ''}); }
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
     { const seen = (() => { try { return localStorage.getItem('observer:praiseSeen') || ''; } catch(e) { return ''; } })();
@@ -2821,6 +2837,7 @@ function autoFresh(t){
   return out;
 }
 function wordQueue0(){
+  if (!LIB.words) return [];   // 词库还没加载完 / 加载失败
   const t = today(), L = state.learn || (state.learn = {view:'home', book:null, unit:null});
   const due = uniqWords().filter(w => { const s = wState(w); return s && !s.done && s.due <= t; }).sort((a, b) => (wState(a).u || 0) - (wState(b).u || 0));   // 刚答错的排到后面，隔几张再考
   const newToday = Object.values(DB.words).filter(s => s.first === t).length;
@@ -3171,7 +3188,7 @@ const READ_BOOKS = {'7a': [['朝花夕拾', '鲁迅'], ['西游记', '吴承恩'
   '8a': [['红星照耀中国', '埃德加·斯诺'], ['红岩', '罗广斌 杨益言']], '8b': [['经典常谈', '朱自清'], ['昆虫记', '法布尔']], '9a': [['简·爱', '夏洛蒂·勃朗特'], ['唐诗三百首', '蘅塘退士 编']]};
 function readRec(tk, i){ const id = tk + '-' + i; return (DB.reads || {})[id] || {id, total: 0, log: {}, sums: []}; }
 function saveRead(r){ DB.reads = DB.reads || {}; r.u = now(); DB.reads[r.id] = r; save(); }
-const readAt = (r, pred) => Math.max(0, ...Object.entries(r.log || {}).filter(([d]) => pred(d)).map(([, v]) => +v || 0));
+const readAt = (r, pred) => { const ks = Object.keys(r.log || {}).filter(pred).sort(); return ks.length ? (+r.log[ks[ks.length - 1]] || 0) : 0; };   // 取最近一次记的页码，填错了可以改小
 function readDeadline(t){ const e = examDate(t, 'end'); if (e) return addD(e, -1);
   const y = +t.slice(0, 4), m = +t.slice(5, 7); return termKey(t).endsWith('a') ? (m >= 8 ? y + 1 : y) + '-01-20' : y + '-07-05'; }
 function readPlan(t){
@@ -3179,12 +3196,13 @@ function readPlan(t){
   const recs = (READ_BOOKS[tk] || []).map(([title, author], i) => { const r = readRec(tk, i), before = Math.min(r.total || 0, readAt(r, d => d < t)), nowp = Math.min(r.total || 1e9, readAt(r, () => true));
     return {title, author, i, r, before, nowp, left: r.total ? Math.max(0, r.total - before) : 0}; });
   const cur = recs.find(o => o.r.total && o.nowp < o.r.total) || null, allLeft = recs.reduce((a, o) => a + o.left, 0);
-  const q = cur ? Math.min(cur.r.total - cur.before, Math.ceil(allLeft / days)) : 0;
-  return {tk, dl, days, recs, cur, q, done: !!cur && cur.nowp - cur.before >= q, started: recs.some(o => o.r.total)};
+  const past = t > dl, q = cur && !past ? Math.min(cur.r.total - cur.before, Math.ceil(allLeft / days)) : 0;   // 过了计划读完的日期（寒暑假前后）不再按天压量
+  const readToday = recs.reduce((a, o) => a + Math.max(0, o.nowp - o.before), 0);   // 今天读完一本又开始下一本，也算读过
+  return {tk, dl, days, recs, cur, q, past, done: !!cur && readToday >= q, started: recs.some(o => o.r.total)};
 }
 // 落后：从开始读那天起按天均匀应读的页数 − 实际读的页数，超过 3 天的量才算
 function readBehind(t){
-  const P = readPlan(t), R = P.recs.filter(o => o.r.total); if (!R.length) return 0;
+  const P = readPlan(t), R = P.recs.filter(o => o.r.total); if (!R.length || P.past) return 0;
   const s0 = R.map(o => o.r.at || Object.keys(o.r.log || {}).sort()[0] || t).sort()[0], span = Math.max(1, dayDiff(s0, P.dl) + 1), past = Math.max(0, dayDiff(s0, t));
   const tot = R.reduce((a, o) => a + o.r.total, 0), done = R.reduce((a, o) => a + o.before, 0), lag = tot * past / span - done;
   return lag >= 3 * tot / span && lag >= 10 ? Math.round(lag) : 0;
@@ -3196,7 +3214,7 @@ async function readFb(id, k){
   const r = DB.reads[id], S = r && r.sums[k]; if (!S || !aiReady()) return; const [tk, i] = id.split('-'), b = (READ_BOOKS[tk] || [])[+i]; if (!b) return;
   try { const out = await aiChat([{role: 'system', content: `你是初中语文老师，学生在读课本规定的名著《${b[0]}》（${b[1]}）。他读完一部分后用自己的话说了内容。只回一句，不超过 60 字：先具体说他抓住了什么，再用提问的方式点出一个可能漏掉的关键人物或情节，不直接讲答案、不打分。不确定书里的情节时，只肯定他说的并问一个问题，不要编造情节。不用「错」「差」这类词。`},
       {role: 'user', content: `读到：${S.ch || '（没写章节）'}\n他说：${S.text}`}]);
-    const R2 = DB.reads[id]; if (R2 && R2.sums[k]) { R2.sums[k].fb = (out || '').trim().slice(0, 120); R2.u = now(); save(); render(); } } catch(e) {}
+    const R2 = DB.reads[id], j = R2 ? R2.sums.findIndex(x => x.d === S.d && x.text === S.text) : -1; if (j >= 0) { R2.sums[j].fb = (out || '').trim().slice(0, 120); R2.u = now(); save(); render(); } } catch(e) {}
 }
 function vRead(){
   const t = today(), P = readPlan(t), D = state.rd || (state.rd = {});
@@ -3208,7 +3226,7 @@ function vRead(){
     h += `<div class="card"><div class="row"><h3 style="margin:0">《${esc(o.title)}》</h3><span class="small muted">${esc(o.author)}</span><span class="spacer"></span>${r.total && o.nowp >= r.total ? '<span class="pill good">读完了</span>' : isCur ? '<span class="pill accent">正在读</span>' : ''}</div>`;
     if (!r.total) { h += `<p class="small muted" style="margin:8px 0">翻到最后一页，这本书一共多少页？</p><div class="row" style="flex-wrap:nowrap"><input id="rd-total-${o.i}" data-in="rd" data-f="total" data-v="${o.i}" class="wiz-in" type="number" inputmode="numeric" min="10" max="2000" style="flex:1;min-width:0" placeholder="总页数" value="${esc(D['total' + o.i] || '')}"><button class="btn sm primary" data-act="rdtotal" data-v="${o.i}">开始读</button></div></div>`; continue; }
     const pct = Math.round(100 * Math.min(o.nowp, r.total) / r.total);
-    h += `<div style="height:10px;background:var(--surface2);border-radius:5px;margin:10px 0 4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:5px"></div></div><div class="small muted">读到第 ${o.nowp} 页 / 共 ${r.total} 页${isCur ? (P.done ? ' · 今天的份读完了 ✓' : ` · 今天读到第 ${Math.min(r.total, o.before + P.q)} 页就够了`) : ''}</div>`;
+    h += `<div style="height:10px;background:var(--surface2);border-radius:5px;margin:10px 0 4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:5px"></div></div><div class="small muted">读到第 ${o.nowp} 页 / 共 ${r.total} 页${isCur && !P.past ? (P.done ? ' · 今天的份读完了 ✓' : ` · 今天读到第 ${Math.min(r.total, o.before + P.q)} 页就够了`) : ''}</div>`;
     if (o.nowp < r.total) h += `<div class="row" style="margin-top:8px;flex-wrap:nowrap"><input id="rd-page-${o.i}" data-in="rd" data-f="page" data-v="${o.i}" class="wiz-in" type="number" inputmode="numeric" style="flex:1;min-width:0" placeholder="读到第几页" value="${esc(D['page' + o.i] || '')}"><button class="btn sm primary" data-act="rdpage" data-v="${o.i}">记下</button></div>`;
     h += `<details style="margin-top:10px" ${D['open' + o.i] ? 'open' : ''} data-rdopen="${o.i}"><summary class="small" style="color:var(--accent)">读完一章，用一两句话说说讲了什么</summary>
       <input id="rd-ch-${o.i}" data-in="rd" data-f="ch" data-v="${o.i}" class="wiz-in" style="margin-top:8px" placeholder="第几章 / 篇名（比如《藤野先生》）" value="${esc(D['ch' + o.i] || '')}">
@@ -3576,7 +3594,7 @@ function whatsNew(who){
   if (seen >= WHATS_NEW.v) return '';
   if (Object.keys(DB.days).filter(dayHasData).length < 3) { try { localStorage.setItem('observer:new-' + who, WHATS_NEW.v); } catch(e) {} return ''; }
   const list = `<ul style="margin:4px 0 8px;padding-left:20px">${WHATS_NEW[who].map(x => `<li style="margin:3px 0">${x}</li>`).join('')}</ul><button class="btn sm" data-act="newseen" data-v="${who}">知道了</button>`;
-  if (who === 'parent') return `<details data-keep="pnew" ${(state.keep || {}).pnew ? 'open' : ''} class="card" style=""background:var(--accent-bg);border-color:transparent"><summary>最近有 ${WHATS_NEW.parent.length} 项更新 ›</summary>${list}</details>`;   // 家长页顶部只留一行
+  if (who === 'parent') return `<details data-keep="pnew" ${(state.keep || {}).pnew ? 'open' : ''} class="card" style="background:var(--accent-bg);border-color:transparent"><summary>最近有 ${WHATS_NEW.parent.length} 项更新 ›</summary>${list}</details>`;   // 家长页顶部只留一行
   return `<div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>这次更新了什么</h3>${list}</div>`;
 }
 function attentionCard(){ const A = attentionItems(); if (!A.length) return '';
@@ -3837,7 +3855,7 @@ const ACT = {
   wbook: el => { state.learn.book = el.dataset.v; state.learn.unit = null; render(); },
   wunit: el => { state.learn.unit = el.dataset.v || null; render(); },
   say: el => speak(el.dataset.v, 'en-US'),
-  wflip: () => { const sp = $('#w-spell'); state.learn.typed = sp ? sp.value : ''; const q0 = wordQueue()[0], s0 = q0 && wState(q0); if (s0 && (s0.box || 0) >= 2 && !state.learn.typed.trim()) { toast('这个词已经记住两轮了，这一轮要拼出来'); if (sp) sp.focus(); return; } state.learn.flip = true; render(); const q = wordQueue(); if (q[0]) speak(q[0].w, 'en-US'); },
+  wflip: () => { const sp = $('#w-spell'); state.learn.typed = sp ? sp.value : ''; const q0 = wordQueue()[0], s0 = q0 && wState(q0); if (s0 && (s0.box || 0) >= 2 && !q0.u && !state.learn.typed.trim()) { toast('这个词已经记住两轮了，这一轮要拼出来'); if (sp) sp.focus(); return; } state.learn.flip = true; render(); const q = wordQueue(); if (q[0]) speak(q[0].w, 'en-US'); },
   wmark: el => { const q = wordQueue(); if (q[0]) { const sp = $('#w-spell'), ty = ((sp ? sp.value : '') || state.learn.typed || '').trim().toLowerCase(); markWord(q[0], el.dataset.v === '1', !!ty && ty === q[0].w.toLowerCase()); } state.learn.flip = false; state.learn.typed = ''; render(); },
   wknown: () => { const q = wordQueue(); const w = q[0]; if (!w) return; const sp = $('#w-spell'), ty = (sp ? sp.value : '').trim().toLowerCase(); if (ty !== w.w.toLowerCase()) { toast(ty ? '拼得不对，先当新词背' : '先在上面拼一下，拼对了才算早就会了'); if (sp) sp.focus(); return; } const t = today(); DB.words[wordKey(w)] = {box: WBOX.length, done: true, due: null, first: t, hist: [{d: t, ok: true, known: true}], u: now()}; save(); state.learn.typed = ''; render(); },
   wprint: el => printWords(el.dataset.v),
@@ -4014,7 +4032,8 @@ const ACT = {
     redoItem(k, el.dataset.ok === '1'); },
   hintgo: () => { hintGo(); },
   copytxt: el => { const ta = $('#copy-' + el.dataset.v); if (!ta) return; const txt = ta.value;
-    const fallback = () => { try { ta.style.position = 'static'; ta.select(); document.execCommand('copy'); ta.style.position = 'absolute'; toast('已复制，去微信 / 飞书粘贴'); } catch(e) { toast('复制不了，长按上面的文字手动复制'); } };
+    const fallback = () => { let ok = false; try { ta.removeAttribute('readonly'); ta.style.position = 'static'; ta.focus(); ta.select(); ta.setSelectionRange(0, 1e6); ok = document.execCommand('copy'); } catch(e) {} ta.setAttribute('readonly', ''); ta.style.position = 'absolute'; ta.blur();
+      toast(ok ? '已复制，去微信 / 飞书粘贴' : '复制不了，长按上面的文字手动复制'); };   // iOS 上只读文本框选不中，execCommand 失败时不能谎报已复制
     try { navigator.clipboard.writeText(txt).then(() => toast('已复制，去微信 / 飞书粘贴'), fallback); } catch(e) { fallback(); } },
   errclear: () => { try { localStorage.removeItem(ERRLOG_K); } catch(e) {} render(); },
   holgo: () => { const c = $('#holcard'); if (c) c.scrollIntoView({behavior: 'smooth', block: 'start'}); },
