@@ -550,7 +550,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v70';
+const APP_V = 'v71';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -853,7 +853,10 @@ function diagCard(){
   let E = []; try { E = JSON.parse(localStorage.getItem(ERRLOG_K) || '[]'); } catch(e) {}
   const sum = `每日观察 ${APP_V} · ${md(from)}–${md(t)}：` + (used.length ? used.map(x => `${x.n} ${x.days} 天`).join('、') : '都没用') + (unused.length ? `；没用过：${unused.map(x => x.n).join('、')}` : '');
   const errTxt = E.map(e => `${e.at} ${e.v} [${e.view}] ${e.m} @${e.w}${e.s ? ' ← ' + e.s : ''}${e.n > 1 ? ' ×' + e.n : ''}`).join('\n');
-  return `<div class="card"><h3>给开发看的</h3>
+  if (!state.storEst && navigator.storage && navigator.storage.estimate) { state.storEst = {}; navigator.storage.estimate().then(e => { state.storEst = e || {}; if (state.pv === 'setup') render(); }).catch(() => {}); }
+  const mb = state.storEst && state.storEst.usage ? Math.round(state.storEst.usage / 1048576) : null;
+  const stor = `<p class="small muted" style="margin:0 0 8px">照片 ${DB.photos.length} 张${mb != null ? `，这个网站在本机一共占约 ${mb}MB（含照片和朗读音频）` : ''}。批改满 30 天的作业照片会自动删掉本机那份，全对的页不上传。</p>`;
+  return `<div class="card"><h3>给开发看的</h3>` + stor + `
     <details data-keep="diagU" ${(state.keep || {}).diagU ? 'open' : ''}><summary>这两周用了哪些功能</summary><div style="margin-top:8px">${used.map(x => `<div class="row" style="padding:3px 0"><span style="flex:1">${x.n}</span><span class="small muted">${x.days} 天</span></div>`).join('')}${unused.length ? `<p class="small faint" style="margin:8px 0 0">没用过：${unused.map(x => x.n).join('、')}</p>` : ''}
       <button class="btn sm" style="margin-top:8px" data-act="copytxt" data-v="usage">复制这段发给开发</button><textarea id="copy-usage" readonly style="position:absolute;left:-9999px">${esc(sum)}</textarea></div></details>
     <details data-keep="diagE" ${(state.keep || {}).diagE ? 'open' : ''} style="margin-top:8px"><summary>${E.length ? `最近有 <b>${E.reduce((a, e) => a + (e.n || 1), 0)}</b> 个问题` : '最近没有出错 ✓'}</summary>${E.length ? `<pre class="small" style="white-space:pre-wrap;word-break:break-all;margin:8px 0">${esc(errTxt)}</pre><textarea id="copy-err" readonly style="position:absolute;left:-9999px">${esc(errTxt)}</textarea><div class="row"><button class="btn sm" data-act="copytxt" data-v="err">复制发给开发</button><button class="btn sm ghost" data-act="errclear">清空</button></div>` : '<p class="small faint" style="margin:6px 0 0">按钮点了没反应、页面空白时，这里会记下原因。</p>'}</details>
@@ -1788,12 +1791,27 @@ async function qpClassify(id){
 const CAM = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 const PKIND = [['homework','批改作业'],['error','错题'],['exam','试卷']];
 const photoURL = {};
-async function compressImage(file){
-  const img = await new Promise((res, rej) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = u; });
-  const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+async function compressImage(file, max, q){
+  const img = await new Promise((res, rej) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => { URL.revokeObjectURL(u); res(im); }; im.onerror = rej; im.src = u; });
+  const k = Math.min(1, (max || 1600) / Math.max(img.naturalWidth, img.naturalHeight));
   const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  return await new Promise(res => c.toBlob(res, 'image/jpeg', 0.82));
+  return await new Promise(res => c.toBlob(res, 'image/jpeg', q || 0.82));
+}
+/* 作业照片的存储：批改时用 1600 像素原图（AI 看得清），批完存档缩到 1000 像素；全对的页不上传（没有再看的必要）；
+   批改满 30 天的作业照片删掉本机那份（传过的要看时自动从云端取回） */
+const photoUploadable = p => p.kind !== 'homework' ? true : p.grade ? gradeItems(p.id).length > 0 : !aiReady();
+async function shrinkPhoto(pid){
+  const p = DB.photos.find(x => x.id === pid); if (!p || p.small || p.up) return;
+  try { const blob = await IDB.get('photo:' + pid); if (!blob) return; const sm = await compressImage(blob, 1000, 0.72);
+    if (sm && sm.size < blob.size) { await IDB.set('photo:' + pid, sm); if (photoURL[pid]) { URL.revokeObjectURL(photoURL[pid]); delete photoURL[pid]; } p.size = sm.size; }
+    p.small = true; p.u = now(); save(); } catch(e) {}
+}
+async function cleanOldPhotos(){
+  const t = today(); let n = 0;
+  for (const p of DB.photos) if (p.kind === 'homework' && p.grade && p.grade.at && dayDiff(p.grade.at, t) > 30 && (p.up || !photoUploadable(p))) {
+    try { if (await IDB.get('photo:' + p.id)) { await IDB.del('photo:' + p.id); if (photoURL[p.id]) { URL.revokeObjectURL(photoURL[p.id]); delete photoURL[p.id]; } n++; } } catch(e) {} }
+  return n;
 }
 async function addPhotos(files){
   const ps = state.photo; let n = 0; const newIds = [];
@@ -1818,7 +1836,7 @@ async function encryptBytes(bytes, pass){
 const ghFileURL = path => `https://api.github.com/repos/${SYNC.repo.trim()}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
 async function uploadPhotos(){
   let n = 0;
-  for (const p of DB.photos.filter(x => !x.up)) {
+  for (const p of DB.photos.filter(x => !x.up && photoUploadable(x))) {
     try {
       const blob = await IDB.get('photo:' + p.id); if (!blob) continue;
       const env = await encryptBytes(new Uint8Array(await blob.arrayBuffer()), SYNC.pass);
@@ -1826,7 +1844,7 @@ async function uploadPhotos(){
       if (r.ok || r.status === 422) { p.up = true; p.u = now(); n++; } else SYNC.photoErr = '有照片没传上去（GitHub 返回 ' + r.status + '），下次同步再试';
     } catch(e) { SYNC.photoErr = '有照片没传上去，下次同步再试'; }
   }
-  if (!DB.photos.some(x => !x.up)) SYNC.photoErr = '';
+  if (!DB.photos.some(x => !x.up && photoUploadable(x))) SYNC.photoErr = '';
   if (n) { DB.u = now(); pendingLocal = true; flush(); syncAgain = true; }   // 把「已上传」标记马上同步出去
   return n;
 }
@@ -1843,7 +1861,7 @@ async function photoSrc(p){
 function hydratePhotos(){ document.querySelectorAll('img[data-pid]').forEach(async img => { const p = DB.photos.find(x => x.id === img.dataset.pid); if (!p) return; const u = await photoSrc(p); if (u) img.src = u; else img.alt = '在别的设备上'; }); }
 const photoDone = p => EXT.filter(x => x.photoId === p.id).length + DB.items.filter(x => x.photoId === p.id).length;
 const gradeItems = pid => DB.items.filter(i => i.photoId === pid && i.src === '拍照批改');
-function photoStatus(p){ const n = photoDone(p); if (p.grade) { const w = gradeItems(p.id).length; return w ? `已批改 · 错 ${w}` : '已批改 · 全对'; } return n ? `已识别 ${n} 道` : p.kind === 'error' && aiReady() ? '还没识别' : p.kind === 'homework' && aiReady() ? '还没批改' : p.up ? '已上传' : syncReady() ? '待上传' : '只在本机'; }
+function photoStatus(p){ const n = photoDone(p); if (p.grade) { const w = gradeItems(p.id).length; return w ? `已批改 · 错 ${w}` : '已批改 · 全对 · 只在本机'; } return n ? `已识别 ${n} 道` : p.kind === 'error' && aiReady() ? '还没识别' : p.kind === 'homework' && aiReady() ? '还没批改' : p.up ? '已上传' : syncReady() ? '待上传' : '只在本机'; }
 /* 拍照识别错题：智谱视觉模型读题 + 按本科分类体系归类；结果先给孩子/家长确认，确认后进重做 */
 const blobToDataURL = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
 function parseJSONObj(t){
@@ -4277,7 +4295,7 @@ const ACT = {
       const had = new Set(DB.items.filter(i => i.photoId === pid).map(gk));
       for (const x of mine) if (gradeWrong(x) && x.stem.trim() && !had.has(gk(x))) { const id = uid('i'); iids.push(id); had.add(gk(x));
         DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), no: x.no || undefined, conf: null, photoId: pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
-      if (p && mine.length) { const c = gradeSum({list: mine}); p.grade = {n: mine.length, wrong: c.wrong, disp: ((p.grade || {}).disp || 0) + mine.filter(x => x.disp).length, at: today()}; delete p.tcmp; delete p.tless; p.u = now(); touchDay(d); } }
+      if (p && mine.length) { shrinkPhoto(pid); const c = gradeSum({list: mine}); p.grade = {n: mine.length, wrong: c.wrong, disp: ((p.grade || {}).disp || 0) + mine.filter(x => x.disp).length, at: today()}; delete p.tcmp; delete p.tless; p.u = now(); touchDay(d); } }
     touchDay(d0); save();
     if (!iids.length) { state.grade = null; render(); toast(G.list.some(gradeWrong) ? '这些错题之前已经加过了' : '这页都对了 ✓'); return; }
     G.saved = true; G.iids = iids; G.vdone = {}; render(); },
@@ -4657,6 +4675,7 @@ function seedDemo(){
   await load();
   await loadExt();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e) {}
+  if (!DEMO) setTimeout(() => cleanOldPhotos().catch(() => {}), 4000);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || (location.hostname === 'localhost' && /[?&]sw=1/.test(location.search)))) navigator.serviceWorker.register('sw.js').catch(()=>{});
   render();
   if (loadedFrom === 'legacy') { pendingLocal = true; flush(); }
