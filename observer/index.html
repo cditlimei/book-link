@@ -474,6 +474,15 @@ a{color:var(--accent);text-decoration:none}
 .prose-text>div{text-indent:2em}
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
 
+/* iPad 横屏：今天页两栏、学习方块 4 列（窄屏不受影响，顺序不变） */
+@media (min-width:1000px){
+  body.wide main,body.wide .topin{max-width:1180px;padding-left:28px;padding-right:28px}
+  .tgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:0 28px;align-items:start}
+  .tcol{min-width:0}
+  .tgrid>.tcol:last-child{padding-top:6px}
+  body.wide .tiles{grid-template-columns:repeat(4,1fr)}
+}
+
 </style>
 </head>
 <body>
@@ -486,7 +495,7 @@ a{color:var(--accent);text-decoration:none}
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v61';
+const APP_V = 'v62';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1467,6 +1476,7 @@ function render(){
   const exKey = el => el.id || ['ex', el.dataset.ex, el.dataset.s, el.dataset.t || ''].join(':');
   const exSnap = state.examEdit && $('.examform') ? {id: state.examEdit, v: [...document.querySelectorAll('.examform input, .examform textarea')].map(el => [exKey(el), el.value])} : null;
   $('#main').innerHTML = v();
+  { const L = state.learn || {}; document.body.classList.toggle('wide', state.tab === 'today' || (state.tab === 'learn' && (!L.view || L.view === 'home'))); }   // iPad 横屏：这几页放宽，阅读类页面保持窄栏
   peSnap.forEach((v, k) => { const e = document.getElementById('pe-in-' + (k + 1)); if (e && v && !e.value) e.value = v; });
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
@@ -1512,7 +1522,21 @@ function banners(){
 
   return h;
 }
-const PEN_SEEN = new Set();
+const PEN_SEEN = new Set(); let PEN_READY = false;   // 打开 app 时已经完成的项不重播，只画新完成的
+// 笔划声：网页音频现场合成一声很短的「沙」，不加载文件；家长在设置里打开，默认关
+let PEN_AC = null;
+function penSound(){
+  if (!DB.settings.penSound) return;
+  try { PEN_AC = PEN_AC || new (window.AudioContext || window.webkitAudioContext)(); const ac = PEN_AC; if (ac.state === 'suspended') ac.resume();
+    const n = Math.floor(ac.sampleRate * 0.22), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) { const t = i / n; d[i] = (Math.random() * 2 - 1) * Math.pow(Math.sin(Math.PI * t), 1.5) * (1 - t * 0.4); }
+    const src = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = buf; bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.9; g.gain.value = 0.09;
+    src.connect(bp); bp.connect(g); g.connect(ac.destination); src.start(); } catch(e) {}
+}
+// iPad 上提示可以用 Apple Pencil「随手写」直接在输入框里手写（系统自带，标准输入框默认支持）
+const IPAD = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const pencilTip = align => IPAD ? `<p class="small faint" style="margin:6px 0 0${align ? ';text-align:' + align : ''}">有 Apple Pencil 的话，可以直接在框里手写</p>` : '';
 function vToday(){
   const d = state.date, isToday = d === today();
   const dd = dayObj(d) || {subj:{}};
@@ -1571,8 +1595,8 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise && !seen.split('|').includes(x + DB.days[x].praise));
       if (pd) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
     h += notes;
-    const freshOf = x => { const k = d + '|' + x.t; if (!x.done || PEN_SEEN.has(k)) return ''; PEN_SEEN.add(k); return 'fresh'; };   // 红笔对勾只在刚完成时画一次
-    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done ' + freshOf(x) : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
+    const freshOf = x => { const k = d + '|' + x.t; if (!x.done || PEN_SEEN.has(k)) return ''; PEN_SEEN.add(k); if (!PEN_READY) return ''; setTimeout(penSound, 60); return 'fresh'; };   // 红笔对勾只在刚完成时画一次
+    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done ' + freshOf(x) : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div><!--RCOL-->` + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
       <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">②</span><span class="t">重做</span><span class="s">${left ? left + ' 道' : dn ? '做完了' : '今天没有'}</span></button>
@@ -1611,6 +1635,8 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
   if (tp.length) h += `<div class="card"><div class="row"><h3 style="margin:0">${isToday ? '今天' : '这天'}的照片</h3><span class="spacer"></span><button class="btn sm" data-act="photoopen">${CAM} 再拍</button></div><div style="margin-top:10px">${photoStrip(tp)}</div></div>`;
   if (more) h += `<details class="more" ${state.moreOpen ? 'open' : ''}><summary data-act="moretog">还可以做的 ${nMore} 件事（可选）</summary>${more}</details>`;
   if (isToday) h += installBanner();
+  if (isToday) PEN_READY = true;
+  if (h.includes('<!--RCOL-->')) { const i = h.indexOf('<!--RCOL-->'); h = `<div class="tgrid"><div class="tcol">${h.slice(0, i)}</div><div class="tcol">${h.slice(i + 11)}</div></div>`; }   // iPad 横屏两栏：左 = 日期/主按钮/清单，右 = 假期/工具/其余
   return h;
 }
 const PLAY = '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>', PAUSE = '<svg viewBox="0 0 16 16"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>';
@@ -1665,7 +1691,7 @@ function vQuick(){
   return `<div class="wiz" role="dialog" aria-label="记一个问题"><div class="wiz-top"><div style="flex:1;font-weight:600">记一个问题 · ${md(state.date)}</div><button class="wiz-x" data-act="qpclose" aria-label="关闭">×</button></div><div class="wiz-body">
     <div class="wiz-q" style="font-size:21px;margin-top:4px">哪一科？</div><div class="row">` + subs.map(x => `<button class="chip ${Q.sid === x.id ? 'on' : ''}" style="min-height:44px;font-size:16px" data-act="qpsubj" data-v="${x.id}"><span class="dot" style="background:${x.color};margin-right:5px"></span>${esc(x.name)}</button>`).join('') + `</div>
     <div class="wiz-q" style="font-size:21px;margin-top:20px">遇到什么问题？</div>
-    <div class="withmic"><textarea id="qp-text" data-in="qptext" class="wiz-in" style="min-height:150px" placeholder="说一句就行，比如：&#10;去括号后面的项忘了变号&#10;第 3 题不知道用哪个公式&#10;作文不知道怎么开头">${esc(Q.text || '')}</textarea>${micBtn('qp-text')}</div>
+    <div class="withmic"><textarea id="qp-text" data-in="qptext" class="wiz-in" style="min-height:150px" placeholder="说一句就行，比如：&#10;去括号后面的项忘了变号&#10;第 3 题不知道用哪个公式&#10;作文不知道怎么开头">${esc(Q.text || '')}</textarea>${micBtn('qp-text')}</div>${pencilTip()}
     <button class="btn primary" style="width:100%;min-height:52px;font-size:18px;margin-top:12px" data-act="qpsave">保存</button>
     <p class="small faint" style="margin-top:8px">不用选是计算还是概念问题，${aiReady() ? 'AI' : 'app'} 会自动归类。会进「重做」，隔几天再考一次。</p></div></div>`;
 }
@@ -3395,7 +3421,7 @@ function vWordCard(){
   h += `<div class="card" style="margin-top:12px;text-align:center;padding:28px 16px">
     <div class="small faint">${s ? '复习 · 第 ' + ((s.hist||[]).length + 1) + ' 次' : '新词'}${w.unit ? ' · ' + esc(w.unit) : ''}</div>
     <div style="font-size:26px;font-weight:700;margin:14px 0 4px">${(() => { const m = shortCn(w.cn).match(/^((?:[a-z]+\.\s*)+)?(.*)$/); return (m[1] ? `<span style="font-size:15px;font-weight:500;color:var(--ink3);margin-right:6px">${esc(m[1].trim())}</span>` : '') + esc(m[2]); })()}</div>
-    ${!flip ? `<input type="text" id="w-spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${mustSpell ? '这一轮要拼出来' : '拼一下（可选）'}" value="${esc(L.typed||'')}" style="max-width:260px;margin:12px auto 0;display:block;text-align:center;font-family:Georgia,serif;font-size:20px">` : ''}
+    ${!flip ? `<input type="text" id="w-spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${mustSpell ? '这一轮要拼出来' : '拼一下（可选）'}" value="${esc(L.typed||'')}" style="max-width:260px;margin:12px auto 0;display:block;text-align:center;font-family:Georgia,serif;font-size:20px">${pencilTip('center')}` : ''}
     ${flip ? `<div style="font-size:34px;font-weight:700;margin:22px 0 4px;font-family:Georgia,serif">${esc(w.w)}</div><div class="muted">${esc(w.p || '')}</div>
       ${L.typed ? (L.typed.trim().toLowerCase() === w.w.toLowerCase() ? '<div class="pill good" style="display:inline-block;margin-top:8px">拼对了</div>' : `<div class="small" style="margin-top:8px;color:var(--amber)">你拼的是：${esc(L.typed)}</div>`) : ''}
       ${w.cn && w.cn !== shortCn(w.cn) ? `<div class="small faint" style="margin-top:6px">${esc(w.cn)}</div>` : ''}${w.book === termBook(today()) ? `<div class="small" style="margin-top:4px;color:var(--accent)">课本 ${esc(w.unit)}${w.u ? ' · 只要求认识，不用会拼' : ''}</div>` : ''}
@@ -3528,7 +3554,7 @@ function vReciteCheck(){
     return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
   }
   if (R.mode === 'type') {
-    h += `<p class="muted">不看原文，${si == null ? '把整篇默写出来' : `把第 ${si + 1} 段默写出来（开头是「${esc(cue)}」）`}（标点可以不打）。写完点「对答案」。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="从第一句开始写">${esc(R.said||'')}</textarea>`;
+    h += `<p class="muted">不看原文，${si == null ? '把整篇默写出来' : `把第 ${si + 1} 段默写出来（开头是「${esc(cue)}」）`}（标点可以不打）。写完点「对答案」。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="从第一句开始写">${esc(R.said||'')}</textarea>${pencilTip()}`;
     return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
   }
   h += `<div style="text-align:center;margin-top:30px"><div class="small faint">${si == null ? '不看原文，从题目开始背' : `不看原文，背第 ${si + 1} 段，开头是「${esc(cue)}」`}</div><div style="font-family:var(--serif);font-size:24px;font-weight:700;margin:10px 0">${esc(x.title)}</div><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>`;
@@ -3768,6 +3794,7 @@ function vMe(part){
   const s = DB.settings;
   h += examCard();
   h += `<div class="card"><h3>设置</h3>
+    <label class="f">完成一项时的笔划声</label><div class="seg"><button data-act="pensnd" data-v="0" class="${s.penSound ? '' : 'on'}">关</button><button data-act="pensnd" data-v="1" class="${s.penSound ? 'on' : ''}">开</button></div>
     <div class="grid2"><div><label class="f">孩子的称呼</label><input type="text" data-in="set" data-f="child" value="${esc(s.child)}"></div>
     <div><label class="f">七年级入学年份</label><input type="number" data-in="set" data-f="startYear" value="${s.startYear}"></div></div>
     <details style="margin-top:12px"><summary class="small" style="color:var(--accent)">科目（现在显示 ${subjects(today()).length} 科，按学段自动增减，一般不用改）</summary>
@@ -4158,6 +4185,7 @@ const ACT = {
     if (el.dataset.ok !== '1') { const it = allItems().find(x => x.id === k); if (it && hintOffer(it)) { state.hint = {id: k, phase: 'ask'}; render(); return; } }   // 先问要不要提示
     redoItem(k, el.dataset.ok === '1'); },
   hintgo: () => { hintGo(); },
+  pensnd: el => { setSetting('penSound', el.dataset.v === '1'); save(); render(); if (DB.settings.penSound) penSound(); },
   copytxt: el => { const ta = $('#copy-' + el.dataset.v); if (!ta) return; const txt = ta.value;
     const fallback = () => { let ok = false; try { ta.removeAttribute('readonly'); ta.style.position = 'static'; ta.focus(); ta.select(); ta.setSelectionRange(0, 1e6); ok = document.execCommand('copy'); } catch(e) {} ta.setAttribute('readonly', ''); ta.style.position = 'absolute'; ta.blur();
       toast(ok ? '已复制，去微信 / 飞书粘贴' : '复制不了，长按上面的文字手动复制'); };   // iOS 上只读文本框选不中，execCommand 失败时不能谎报已复制
