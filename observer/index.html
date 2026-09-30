@@ -254,7 +254,7 @@ td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-
 .exgrid .fulli{display:none;width:70px} .exgrid.showfull .fulli{display:block} .exgrid.showfull .fullt{display:none}
 .exgrid.showfull .srow{grid-template-columns:52px 1fr 70px}
 .lossbox label{display:inline-flex;align-items:center;gap:3px;font-size:13px} .lossbox input{width:54px;padding:4px 6px}
-.stickysave{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 8px);background:var(--surface);padding:10px 0 4px;margin-top:14px;z-index:5}
+.stickysave{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom));background:var(--surface);padding:12px 0 12px;margin-top:14px;z-index:5;box-shadow:0 -10px 14px -10px rgba(0,0,0,.12)}
 .examform .loss{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;padding:0 0 8px 64px}
 .examform .loss label{font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:4px}
 .examform .loss input{width:52px;padding:5px 6px;font-size:14px}
@@ -486,7 +486,7 @@ a{color:var(--accent);text-decoration:none}
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v60';
+const APP_V = 'v61';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
