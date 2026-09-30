@@ -386,6 +386,7 @@ h3{font-family:var(--sans);font-size:17px;font-weight:600;margin:0 0 8px}
 .seg{border:0;background:var(--surface2);border-radius:12px;padding:2px}
 .seg button{border:0;border-radius:10px}
 .seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+@media (prefers-color-scheme:dark){.seg button.on{background:var(--accent-bg);color:var(--accent);box-shadow:0 0 0 1px var(--line)}}
 .pill{font-weight:500;padding:3px 9px}
 input[type=text],input[type=number],input[type=date],input[type=password],textarea,select{border:1px solid transparent;background:var(--surface2);border-radius:12px}
 input:focus,textarea:focus,select:focus{border-color:var(--accent);background:var(--surface)}
@@ -412,7 +413,8 @@ a{color:var(--accent);text-decoration:none}
 .todo-r .t{font-weight:600}
 .todo-r .s{font-size:15px}
 .todo-r .chev{font-size:22px;color:var(--ink3);opacity:.7}
-.todo-r .ck{width:36px;height:36px;border-radius:10px;border:0;position:relative;background:var(--surface2);font-size:17px}
+.todo-r .ck{width:36px;height:36px;border-radius:10px;border:0;position:relative;background:var(--surface2);font-size:17px;--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round'><circle cx='12' cy='12' r='3.2'/></svg>")}
+.todo-r[data-act=mixstart] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 7h4l10 10h4M3 17h4l3-3M14 10l3-3h4M18 4l3 3-3 3M18 14l3 3-3 3'/></svg>")}
 .todo-r .ck::after{content:'';position:absolute;inset:7px;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat;background:var(--icc,var(--ink2))}
 .todo-r.done .ck{background:transparent !important;color:transparent;font-size:0}
 .todo-r.done .ck::before{content:'';position:absolute;inset:2px;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'><path d='M3.5 13.2c2 1.2 3.9 3 5.4 5.6C11.6 12.6 15.8 7.6 21 3.8'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'><path d='M3.5 13.2c2 1.2 3.9 3 5.4 5.6C11.6 12.6 15.8 7.6 21 3.8'/></svg>") center/contain no-repeat;background:var(--pen)}
@@ -466,13 +468,13 @@ a{color:var(--accent);text-decoration:none}
 
 /* 重做卡：去掉左侧色条，按钮圆润 */
 .redo{border-left:0}
-.redo.sure{box-shadow:0 0 0 1.5px var(--amber-bg) inset,var(--shadow)}
+.redo.sure{box-shadow:0 0 0 1.5px var(--amber) inset,var(--shadow)}
 .redo .q{font-family:var(--sans);font-size:19px;font-weight:600;line-height:1.5}
 .redo .btn{min-height:46px;padding:10px 20px;border-radius:14px}
 /* 课文：长篇左对齐首行缩进，诗词逐行居中 */
 .prose-text{text-align:left !important}
 .prose-text>div{text-indent:2em}
-@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition:none !important}}
 
 /* iPad 横屏：今天页两栏、学习方块 4 列（窄屏不受影响，顺序不变） */
 @media (min-width:1000px){
@@ -495,7 +497,7 @@ a{color:var(--accent);text-decoration:none}
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v63';
+const APP_V = 'v64';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1297,6 +1299,7 @@ function mergeHol(x, y){
   const yn = (y.u || 0) > (x.u || 0), a = yn ? x : y, b = yn ? y : x, out = JSON.parse(JSON.stringify(b));
   const A = new Map((a.tasks || []).map(t => [t.id, t]));
   out.tasks = (out.tasks || []).map(t => { const o = A.get(t.id); if (o) t.done = Object.assign({}, o.done || {}, t.done || {}); return t; });
+  if (out.none && !out.tasks.length && (a.tasks || []).length) { out.tasks = JSON.parse(JSON.stringify(a.tasks)); delete out.none; }   // 这边点了「没有假期作业」，那边其实录了清单：清单优先
   out.u = Math.max(x.u || 0, y.u || 0);
   const J = JSON.stringify; return {v: out, l: J(out) !== J(y), r: J(out) !== J(x)};
 }
@@ -1484,7 +1487,7 @@ function render(){
   const exKey = el => el.id || ['ex', el.dataset.ex, el.dataset.s, el.dataset.t || ''].join(':');
   const exSnap = state.examEdit && $('.examform') ? {id: state.examEdit, v: [...document.querySelectorAll('.examform input, .examform textarea')].map(el => [exKey(el), el.value])} : null;
   $('#main').innerHTML = v();
-  { const L = state.learn || {}; document.body.classList.toggle('wide', state.tab === 'today' || (state.tab === 'learn' && (!L.view || L.view === 'home'))); }   // iPad 横屏：这几页放宽，阅读类页面保持窄栏
+  { const L = state.learn || {}; document.body.classList.toggle('wide', (state.tab === 'today' && !!$('#main .tgrid')) || (state.tab === 'learn' && (!L.view || L.view === 'home'))); }   // iPad 横屏：这几页放宽，阅读类页面保持窄栏
   peSnap.forEach((v, k) => { const e = document.getElementById('pe-in-' + (k + 1)); if (e && v && !e.value) e.value = v; });
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
@@ -1530,18 +1533,22 @@ function banners(){
 
   return h;
 }
-const PEN_SEEN = new Set(); let PEN_READY = false;   // 打开 app 时已经完成的项不重播，只画新完成的
+const PEN_SEEN = new Set(); let PEN_READY = false, PEN_DAY = '';   // 打开 app 时已经完成的项不重播，只画新完成的
 // 笔划声：网页音频现场合成一声很短的「沙」，不加载文件；家长在设置里打开，默认关
 let PEN_AC = null;
 function penSound(){
   if (!DB.settings.penSound) return;
-  try { PEN_AC = PEN_AC || new (window.AudioContext || window.webkitAudioContext)(); const ac = PEN_AC; if (ac.state === 'suspended') ac.resume();
+  try { PEN_AC = PEN_AC || new (window.AudioContext || window.webkitAudioContext)(); const ac = PEN_AC; if (ac.state !== 'running') ac.resume();
     const n = Math.floor(ac.sampleRate * 0.22), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < n; i++) { const t = i / n; d[i] = (Math.random() * 2 - 1) * Math.pow(Math.sin(Math.PI * t), 1.5) * (1 - t * 0.4); }
     const src = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
     src.buffer = buf; bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.9; g.gain.value = 0.09;
     src.connect(bp); bp.connect(g); g.connect(ac.destination); src.start(); } catch(e) {}
 }
+// iOS 只在用户手势里放行音频：第一次触摸时建好并解锁，之后渲染里触发的声音才放得出来
+document.addEventListener('pointerdown', () => {
+  try { if (!DB.settings.penSound) return; PEN_AC = PEN_AC || new (window.AudioContext || window.webkitAudioContext)(); if (PEN_AC.state !== 'running') PEN_AC.resume();
+    const s = PEN_AC.createBufferSource(); s.buffer = PEN_AC.createBuffer(1, 1, 22050); s.connect(PEN_AC.destination); s.start(); } catch(e) {} }, true);
 // iPad 上提示可以用 Apple Pencil「随手写」直接在输入框里手写（系统自带，标准输入框默认支持）
 const IPAD = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const pencilTip = align => IPAD ? `<p class="small faint" style="margin:6px 0 0${align ? ';text-align:' + align : ''}">有 Apple Pencil 的话，可以直接在框里手写</p>` : '';
@@ -1578,7 +1585,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     // 假期（录了清单）：平时的「记作业」变可选，今晚完成看假期作业今日份
     const hH = holAt(d), holMode = !!(hH && hH.tasks.length), holMet = holMode && (!!hH.out[d] || hH.tasks.every(t => ((t.done || {})[d] || 0) >= holQuota(hH, t, d)));
     const holPend = isToday && !!hH && !hH.tasks.length && !hH.none;   // 放假了还没录假期作业：先录，别带他去记平常作业
-    const allDone = (holMode ? holMet : filled >= subs.length) && left === 0 && wordsOk && !rDue;
+    const allDone = (holMode ? holMet : !holPend && filled >= subs.length) && left === 0 && wordsOk && !rDue;
     if (!dayCnt(d) && !isRest(d) && autoFreeze(addD(d, -1)) && streak() > 1) h += `<div class="tip">昨天没记，自动用了一次请假。<b>今天记一下，就是连续 ${streak() + 1} 天</b>。</div>`;
     if (heavyNight() && !late && !allDone) h += `<div class="tip">今天作业写了 ${homeworkMin(d)} 分钟，已经超过 90 分钟。今晚<b>重做只排 1 道、单词只背 8 个</b>，早点休息。</div>`;
     if (late && !allDone && !isRest(d)) h += `<div class="tip">快 22 点了，<b>今天到此为止</b>，没做完的明天再说。睡够比多做几道题更管用。</div>`;
@@ -1605,7 +1612,8 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise && !seen.split('|').includes(x + DB.days[x].praise));
       if (pd) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
     h += notes;
-    const freshOf = x => { const k = d + '|' + x.t; if (!x.done || PEN_SEEN.has(k)) return ''; PEN_SEEN.add(k); if (!PEN_READY) return ''; setTimeout(penSound, 60); return 'fresh'; };   // 红笔对勾只在刚完成时画一次
+    const penOvl = !!(state.wiz || state.holE || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.photo || state.voice);   // 被覆盖层挡着时先不画，关掉后再画
+    const freshOf = x => { const k = d + '|' + x.t; if (!x.done || PEN_SEEN.has(k) || (penOvl && PEN_READY && PEN_DAY === d)) return ''; PEN_SEEN.add(k); if (!PEN_READY || PEN_DAY !== d) return ''; setTimeout(penSound, 60); return 'fresh'; };   // 红笔对勾只在刚完成时画一次
     h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done ' + freshOf(x) : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div><!--RCOL-->` + holAfterCard(d) + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
@@ -1645,7 +1653,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
   if (tp.length) h += `<div class="card"><div class="row"><h3 style="margin:0">${isToday ? '今天' : '这天'}的照片</h3><span class="spacer"></span><button class="btn sm" data-act="photoopen">${CAM} 再拍</button></div><div style="margin-top:10px">${photoStrip(tp)}</div></div>`;
   if (more) h += `<details class="more" ${state.moreOpen ? 'open' : ''}><summary data-act="moretog">还可以做的 ${nMore} 件事（可选）</summary>${more}</details>`;
   if (isToday) h += installBanner();
-  if (isToday) PEN_READY = true;
+  if (isToday && LIB.done) { PEN_READY = true; PEN_DAY = d; }   // 词库加载完、同一天里才算「刚完成」；跨零点后的第一次渲染静默登记
   if (h.includes('<!--RCOL-->')) { const i = h.indexOf('<!--RCOL-->'); h = `<div class="tgrid"><div class="tcol">${h.slice(0, i)}</div><div class="tcol">${h.slice(i + 11)}</div></div>`; }   // iPad 横屏两栏：左 = 日期/主按钮/清单，右 = 假期/工具/其余
   return h;
 }
@@ -3747,7 +3755,7 @@ function attentionItems(){
       if (B.length) A.unshift(['假期作业落下了', B.map(o => `${holTaskName(o.t)}少做了约 ${Math.round(o.lag)} 份`).join('；') + '。已经自动平摊到后面几天，不用补一大堆；问问他是不是哪项太难。']);
       if (t === h.to) { const L = holLeftList(h); if (L.length) A.unshift(['明天开学', L.map(o => `${holTaskName(o.t)}还差 ${o.left} 份`).join('；') + '。']); } } }
   { const h = holList().find(x => x.tasks.length && t > x.to && dayDiff(x.to, t) <= 7 && holLeftList(x).length);
-    if (h) A[dayDiff(h.to, t) <= 3 ? 'unshift' : 'push']([`${h.name}作业没做完就开学了`, holLeftList(h).map(o => `${holTaskName(o.t)}剩 ${o.left} 份`).join('；') + '。下个假期录清单时，可以让他头几天多做一点，别都压到最后。']); }
+    if (h) A[dayDiff(h.to, t) <= 3 ? 'unshift' : 'push']([`${h.name}作业没做完就开学了`, holLeftList(h).map(o => `${holTaskName(o.t)}剩 ${o.left} 份`).join('；') + (h.after === 'drop' ? '（他说不用交了）' : '') + '。下个假期录清单时，可以让他头几天多做一点，别都压到最后。']); }
   return A.slice(0, 3);
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
@@ -4099,7 +4107,7 @@ const ACT = {
   holoutday: el => { holRead(); const E = state.holE, x = el.dataset.v; if (E.out[x]) delete E.out[x]; else E.out[x] = true; render(); },
   holnone: el => { const h = holList().find(x => x.id === el.dataset.v); if (!h) return; saveHol(Object.assign({}, h, {none: true})); toast('好的，照平常记'); render(); },
   holafter: el => { const h = holList().find(x => x.id === el.dataset.h); if (!h) return; const r = JSON.parse(JSON.stringify(h));
-    if (el.dataset.v === 'done') r.tasks.forEach(t => { const left = t.n - holDone(t, () => true); if (left > 0) { t.done = t.done || {}; t.done[r.to] = (t.done[r.to] || 0) + left; } });
+    if (el.dataset.v === 'done') r.tasks.forEach(t => { const left = t.n - holDone(t, () => true); if (left > 0) { t.done = t.done || {}; t.done.after = (t.done.after || 0) + left; } });   // 记在「收假后补记」名下，不算进哪一天，连续天数不被倒改
     r.after = el.dataset.v; saveHol(r); toast(el.dataset.v === 'done' ? '补记好了' : '好的，收起了'); render(); },
   holclose: () => { state.holE = null; render(); },
   holsave: () => { holRead(); const E = state.holE; if (E.from > E.to) { toast('放假日期前后颠倒了'); return; }
