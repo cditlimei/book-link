@@ -549,7 +549,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v67';
+const APP_V = 'v68';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1795,8 +1795,9 @@ async function addPhotos(files){
     } catch(e) { toast('有一张照片读不出来'); }
   }
   touchDay(state.date); save(); state.photo = null; render();
-  if (n && ps.kind === 'error' && aiReady() && !DEMO) { recogPhoto(DB.photos[DB.photos.length - 1].id); return; }
-  if (n && ps.kind === 'homework' && aiReady() && !DEMO) { gradePhoto(DB.photos[DB.photos.length - 1].id); return; }
+  const newIds = DB.photos.slice(-n).map(x => x.id);
+  if (n && ps.kind === 'error' && aiReady() && !DEMO) { recogPhoto(newIds); return; }
+  if (n && ps.kind === 'homework' && aiReady() && !DEMO) { gradePhoto(newIds); return; }
   toast(n ? `存了 ${n} 张` + (syncReady() ? '，稍后自动加密上传' : '（没开同步，只存在这台设备）') : '没有存上');
 }
 const photoPath = p => `photos/${p.d}/${p.sid || 'x'}-${p.kind}-${p.id}.enc`;
@@ -1867,10 +1868,21 @@ function parseJSONList(t){
   t = String(t || '').replace(/```(json)?/g, '').trim(); const a = t.indexOf('['), b = t.lastIndexOf(']');
   if (a < 0 || b < a) return null; try { const v = JSON.parse(t.slice(a, b + 1)); return Array.isArray(v) ? v : null; } catch(e) { return null; }
 }
-async function recogPhoto(pid){
+// 一次选了几张就逐张识别，合到一张确认单（每道题记着来自哪张照片）
+async function recogPhoto(pids){
+  pids = [].concat(pids).filter(id => DB.photos.some(x => x.id === id)); if (!pids.length) return;
+  const R = state.precog = {pid: pids[0], pids, sid: DB.photos.find(x => x.id === pids[0]).sid, busy: true, list: [], err: ''}; render();
+  const errs = [];
+  for (let k = 0; k < pids.length; k++) {
+    const before = R.list.length; await recogOne(pids[k], R); if (state.precog !== R) return;
+    R.list.slice(before).forEach(x => { x.pid = pids[k]; }); if (R.err) { errs.push((pids.length > 1 ? `第 ${k + 1} 张` : '') + R.err); R.err = ''; }
+  }
+  R.err = R.list.length ? errs.filter(e => !/没在照片里找到题目/.test(e)).join('；') : (errs.join('；') || '没在照片里找到题目。换个角度、拍近一点再试。');
+  R.busy = false; render();
+}
+async function recogOne(pid, R){
   const p = DB.photos.find(x => x.id === pid); if (!p) return;
   const sid = p.sid, sb = subjById(sid), tx = taxOf(sid);
-  const R = state.precog = {pid, sid, busy: true, list: [], err: ''}; render();
   try {
     const blob = await IDB.get('photo:' + pid); if (!blob) throw new Error('照片不在这台设备上');
     const cats = ET.map(t => `${t.k}=${typeNameS(sid, t.k)}` + (tx ? `（细分：${tx[t.k].subs.map(a => a[0] + '=' + a[1]).join('，')}）` : '')).join('\n');
@@ -1883,45 +1895,72 @@ ${cats}
     const list = parseJSONList(out);
     if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
     const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
-    R.list = list.slice(0, 12).map(x => ({stem: String(x.stem || '').slice(0, 300), type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), why: String(x.why || '').slice(0, 80), keep: true, conf: null}));
-    if (!R.list.length) R.err = '没在照片里找到题目。换个角度、拍近一点再试。';
+    R.list = R.list.concat(list.slice(0, 12).map(x => ({stem: String(x.stem || '').slice(0, 300), type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), why: String(x.why || '').slice(0, 80), keep: true, conf: null})));
+    if (!list.length) R.err = '没在照片里找到题目。换个角度、拍近一点再试。';
   } catch(e) { if (state.precog !== R) return; R.err = '识别失败：' + e.message; }
-  if (state.precog !== R) return; R.busy = false; render();
 }
 /* 拍照批改作业：逐题判对错（开思考模式，先自己做一遍再对照）；错题只给一句提示不给答案，进重做并各出一道同类题。
    拿不准的让孩子自己选，AI 判错了可以纠正（记在照片上，家长设置页能看到被纠正几次） */
 const GV = {ok: ['✓', '对'], wrong: ['✗', '错'], unsure: ['？', '拿不准'], subj: ['—', '主观题不批改']};
-async function gradePhoto(pid){
-  const p = DB.photos.find(x => x.id === pid); if (!p) return;
-  const sid = p.sid, sb = subjById(sid), tx = taxOf(sid);
-  const G = state.grade = {pid, sid, busy: true, list: [], err: '', saved: false}; render();
-  try {
-    const blob = await IDB.get('photo:' + pid); if (!blob) throw new Error('照片不在这台设备上');
-    const cats = ET.map(t => `${t.k}=${typeNameS(sid, t.k)}` + (tx ? `（细分：${tx[t.k].subs.map(a => a[0] + '=' + a[1]).join('，')}）` : '')).join('\n');
-    const sys = `你是经验丰富的初中${sb.name}老师，批改学生这一页作业。逐题做三件事：读出题目和学生写的答案；自己独立把题做一遍；再对照学生的答案判断对错。
+// 一次选了几页就逐页批，结果合成一张单；每题记是哪一页（p/page），保存时各页分别记统计
+async function gradePhoto(pids){
+  pids = [].concat(pids).filter(id => DB.photos.some(x => x.id === id)); if (!pids.length) return;
+  const p0 = DB.photos.find(x => x.id === pids[0]), sid = p0.sid;
+  const G = state.grade = {pid: pids[0], pids, sid, busy: true, list: [], err: '', saved: false, at: 0, stage: ''}; render();
+  const errs = [];
+  for (let k = 0; k < pids.length; k++) {
+    G.at = k + 1; G.stage = '批改'; if (state.grade === G) render();
+    try { const L = await gradeOne(pids[k], sid, G); if (state.grade !== G) return; L.forEach(x => { x.pid = pids[k]; x.page = k + 1; }); G.list = G.list.concat(L); }
+    catch(e) { if (state.grade !== G) return; errs.push((pids.length > 1 ? `第 ${k + 1} 页` : '') + '批改失败：' + e.message); }
+  }
+  if (state.grade !== G) return;
+  G.err = errs.join('；'); if (!G.list.length && !G.err) G.err = '没在照片里找到题目。换个角度、拍近一点再试。';
+  G.busy = false; render();
+}
+// 提示里带出了正确答案就换掉：长答案按包含判断；一两个字的短答案（3、A）只在「= 3」「是 A」「答案 3」这类说法里算漏
+const gNorm = t => String(t || '').replace(/\s+/g, '').replace(/＝/g, '=').replace(/[，,。．]/g, '').toLowerCase();
+function hintLeaks(hint, key){
+  const h = gNorm(hint), ks = [gNorm(key)]; const m = ks[0].match(/=(.+)$/); if (m) ks.push(m[1]);
+  return ks.some(k => k && (k.length > 2 ? h.includes(k) : new RegExp('(=|是|为|选|答案|结果)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9.])').test(h)));
+}
+const HINT_SAFE = '对照课本例题，再检查这一步。';
+async function gradeOne(pid, sid, G){
+  const sb = subjById(sid), tx = taxOf(sid);
+  const blob = await IDB.get('photo:' + pid); if (!blob) throw new Error('照片不在这台设备上');
+  const cats = ET.map(t => `${t.k}=${typeNameS(sid, t.k)}` + (tx ? `（细分：${tx[t.k].subs.map(a => a[0] + '=' + a[1]).join('，')}）` : '')).join('\n');
+  const sys = `你是经验丰富的初中${sb.name}老师，批改学生这一页作业。逐题做三件事：读出题目和学生写的答案；自己独立把题做一遍；再对照学生的答案判断对错。
 v 只能是：ok（对）、wrong（错，包括没写）、unsure（字看不清、题目不完整、或你没有把握）、subj（作文、阅读感悟、开放题等主观题，不判）。没有把握一律 unsure，不要硬判。
+key 写这题的正确答案（只写结果，主观题留空）。
 错题的 hint 写一句提示，指出该回去检查哪一步或哪个概念，绝对不能写出正确答案、正确结果或完整过程；没写的题 hint 写「这题还没写」。其他情况 hint 为空。
 错题按下面分类（type 必须是 calc / concept / read 之一，sub 用细分里的英文 key，拿不准就空着）：
 ${cats}
-只输出 JSON 数组，不要别的文字：[{"no":"题号","stem":"题目原文，太长精简到 120 字内，公式用普通文字","ans":"学生写的答案，照抄，看不清的字写？","v":"ok","hint":"","type":"calc","sub":"","tag":"知识点，10 字内"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
-    const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '批改这页' + sb.name + '作业'}]}], {temperature: 0.1, thinking: {type: 'enabled'}, _to: 180000});
-    if (state.grade !== G) return;
-    const list = parseJSONList(out); if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
-    const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
-    G.list = list.slice(0, 30).map(x => ({no: String(x.no || '').slice(0, 8), stem: String(x.stem || '').slice(0, 300), ans: String(x.ans || '').slice(0, 200), v: GV[x.v] ? x.v : 'unsure', hint: String(x.hint || '').slice(0, 120),
-      type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), pick: null, fixed: false, disp: false}));
-    if (!G.list.length) G.err = '没在照片里找到题目。换个角度、拍近一点再试。';
-  } catch(e) { if (state.grade !== G) return; G.err = '批改失败：' + e.message; }
-  if (state.grade !== G) return; G.busy = false; render();
+只输出 JSON 数组，不要别的文字：[{"no":"题号","stem":"题目原文，太长精简到 120 字内，公式用普通文字","ans":"学生写的答案，照抄，看不清的字写？","v":"ok","key":"","hint":"","type":"calc","sub":"","tag":"知识点，10 字内"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
+  const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '批改这页' + sb.name + '作业'}]}], {temperature: 0.1, thinking: {type: 'enabled'}, _to: 180000});
+  const list = parseJSONList(out); if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
+  const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
+  const L = list.slice(0, 30).map(x => ({no: String(x.no || '').slice(0, 8), stem: String(x.stem || '').slice(0, 300), ans: String(x.ans || '').slice(0, 200), v: GV[x.v] ? x.v : 'unsure', hint: String(x.hint || '').slice(0, 120), key: String(x.key || '').slice(0, 80),
+    type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), pick: null, fixed: false, disp: false}));
+  // 判错的再复核一次（只用文字重做这一道）：两次都错才算错，结论不一样改成「拿不准」让孩子自己选
+  const W = L.filter(x => x.v === 'wrong' && x.ans.trim() && !/还没写/.test(x.hint));
+  if (W.length) { G.stage = '复核'; if (state.grade === G) render(); }
+  for (let i = 0; i < W.length; i += 3) await Promise.all(W.slice(i, i + 3).map(async x => {
+    try { const j = parseJSONObj(await aiChat([{role: 'system', content: `你是初中${sb.name}老师。先自己独立把这道题做一遍，再判断学生的答案对不对。只输出 JSON：{"ok":true 或 false，没有把握写 null,"key":"正确答案，只写结果"}`},
+        {role: 'user', content: `题目：${x.stem}\n学生的答案：${x.ans}`}], {temperature: 0.1, thinking: {type: 'enabled'}, _to: 120000}));
+      if (!j || j.ok !== false) { x.v = 'unsure'; x.rev = true; }
+      if (j && j.key && !x.key) x.key = String(j.key).slice(0, 80);
+    } catch(e) { /* 复核失败就按第一遍的结论 */ }
+  }));
+  L.forEach(x => { if (x.hint && x.key && hintLeaks(x.hint, x.key)) x.hint = HINT_SAFE; if (x.v === 'wrong' && !x.hint) x.hint = HINT_SAFE; delete x.key; });   // 正确答案只用来拦提示，不显示、不保存
+  return L;
 }
-// 最终算错的题：AI 判错且没被纠正，或拿不准时孩子自己选了「错」
 const gradeWrong = x => (x.v === 'wrong' && !x.disp) || (x.v === 'unsure' && x.pick === 'wrong');
 function gradeSum(G){ const c = {ok: 0, wrong: 0, unsure: 0, subj: 0}; G.list.forEach(x => { c[gradeWrong(x) ? 'wrong' : x.v === 'unsure' ? (x.pick ? 'ok' : 'unsure') : x.disp ? 'ok' : x.v]++; }); return c; }
 function vGrade(){
   const G = state.grade, sb = subjById(G.sid);
   let h = `<div class="wiz" role="dialog" aria-label="批改作业"><div class="wiz-top"><div style="flex:1;font-weight:600">批改作业 · ${esc(sb.name)}</div><button class="wiz-x" data-act="gclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
-  if (G.busy) return h + `<div style="text-align:center;margin-top:60px"><div class="wiz-q">AI 正在批改…</div><p class="muted">它会先自己把题做一遍再对照，一般 20 到 60 秒</p></div></div></div>`;
-  if (G.err) return h + `<div class="signal">${esc(G.err)}</div></div><div class="wiz-foot"><button class="btn primary" data-act="gretry">再批一次</button></div></div>`;
+  if (G.busy) return h + `<div style="text-align:center;margin-top:60px"><div class="wiz-q">${G.stage === '复核' ? 'AI 正在复核判错的题…' : 'AI 正在批改…'}</div><p class="muted">${(G.pids || []).length > 1 ? `第 ${G.at}/${G.pids.length} 页 · ` : ''}它会先自己把题做一遍再对照，一般 20 到 60 秒</p></div></div></div>`;
+  if (G.err && !G.list.length) return h + `<div class="signal">${esc(G.err)}</div></div><div class="wiz-foot"><button class="btn primary" data-act="gretry">再批一次</button></div></div>`;
+  if (G.err) h += `<div class="signal">${esc(G.err)}（其他页已经批好了，失败的那页之后点照片能再批）</div>`;
   if (G.saved) {
     const its = (G.iids || []).map(findItem).filter(Boolean);
     h += `<div class="wiz-q" style="font-size:22px;margin-top:6px">${its.length} 道错题进了「重做」</div><p class="small muted" style="margin:-8px 0 12px">每道做一道同类题：考同一个地方，换了数字。两次还不对，可以看这道同类题的讲解。</p>` +
@@ -1933,10 +1972,10 @@ function vGrade(){
   G.list.forEach((x, k) => {
     const st = gradeWrong(x) ? 'wrong' : x.disp || (x.v === 'unsure' && x.pick === 'ok') ? 'ok' : x.v;
     h += `<div class="card gq gq-${st}" style="padding:12px 14px"><div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="gv">${GV[st][0]}</span><div style="flex:1;min-width:0">
-      <div>${x.no ? `<b>${esc(x.no)}</b> ` : ''}${esc(x.stem)}</div>${x.ans ? `<div class="small muted" style="margin-top:4px">你的答案：${esc(x.ans)}</div>` : ''}`;
+      <div>${(G.pids || []).length > 1 ? `<span class="small faint">第 ${x.page} 页 · </span>` : ''}${x.no ? `<b>${esc(x.no)}</b> ` : ''}${esc(x.stem)}</div>${x.ans ? `<div class="small muted" style="margin-top:4px">你的答案：${esc(x.ans)}</div>` : ''}`;
     if (x.v === 'wrong' && !x.disp) h += `${x.hint ? `<div class="signal" style="margin:8px 0 0"><span class="k">提示</span>${esc(x.hint)}</div>` : ''}<div class="row" style="margin-top:8px"><button class="btn sm ${x.fixed ? 'good' : 'primary'}" data-act="gfix" data-v="${k}">${x.fixed ? '✓ 改好了' : '改好了'}</button><button class="btn sm ghost" data-act="gdisp" data-v="${k}">AI 判错了</button></div>`;
     else if (x.disp) h += `<div class="small muted" style="margin-top:6px">已按「对」算 <button class="btn sm ghost" data-act="gdisp" data-v="${k}">撤回</button></div>`;
-    else if (x.v === 'unsure') h += `<div class="row" style="margin-top:8px"><span class="small faint">AI 看不准，你自己判断：</span><div class="seg sm"><button data-act="gpick" data-v="${k}" data-c="ok" class="${x.pick === 'ok' ? 'on' : ''}">对</button><button data-act="gpick" data-v="${k}" data-c="wrong" class="${x.pick === 'wrong' ? 'on' : ''}">错</button></div></div>`;
+    else if (x.v === 'unsure') h += `<div class="row" style="margin-top:8px"><span class="small faint">${x.rev ? 'AI 两次结论不一样，你自己判断：' : 'AI 看不准，你自己判断：'}</span><div class="seg sm"><button data-act="gpick" data-v="${k}" data-c="ok" class="${x.pick === 'ok' ? 'on' : ''}">对</button><button data-act="gpick" data-v="${k}" data-c="wrong" class="${x.pick === 'wrong' ? 'on' : ''}">错</button></div></div>`;
     else if (x.v === 'subj') h += `<div class="small faint" style="margin-top:6px">主观题不批改，交给老师</div>`;
     h += `</div></div></div>`; });
   const foot = open ? `<button class="btn primary" disabled>还有 ${open} 道拿不准，先选对错</button>` : `<button class="btn primary" data-act="gsave">${c.wrong ? `错的 ${c.wrong} 道加入重做` : '都对了，收好'}</button>`;
@@ -4182,18 +4221,19 @@ const ACT = {
     r.none = false; if (!r.intr) r.intr = 'none'; save(); toast(`记 ${r.min} 分钟`); render(); },
   photoopen: () => { state.photo = {kind: aiReady() ? 'homework' : 'error', sid: state.openSubj || null}; render(); },
   gphoto: el => { state.pview = null; gradePhoto(el.dataset.v); },
-  gretry: () => gradePhoto(state.grade.pid),
+  gretry: () => gradePhoto(state.grade.pids || [state.grade.pid]),
   gfix: el => { const x = state.grade.list[+el.dataset.v]; x.fixed = !x.fixed; render(); },
   gdisp: el => { const x = state.grade.list[+el.dataset.v]; x.disp = !x.disp; render(); },
   gpick: el => { const x = state.grade.list[+el.dataset.v]; x.pick = x.pick === el.dataset.c ? null : el.dataset.c; render(); },
   gclose: () => { const G = state.grade; if (G && !G.busy && !G.saved && G.list.some(gradeWrong) && !confirm('错题还没加入重做，确定关掉？（照片留着，之后点照片能再批）')) return; state.grade = null; render(); },
   gdone: () => { state.grade = null; render(); },
-  gsave: () => { const G = state.grade, p = DB.photos.find(x => x.id === G.pid), d = p ? p.d : state.date, iids = [];
-    const had = new Set(DB.items.filter(i => i.photoId === G.pid).map(i => (i.stem || '').trim()));
-    for (const x of G.list) if (gradeWrong(x) && x.stem.trim() && !had.has(x.stem.trim())) { const id = uid('i'); iids.push(id);
-      DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: null, photoId: G.pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
-    if (p) { const c = gradeSum(G); p.grade = {n: G.list.length, wrong: c.wrong, disp: G.list.filter(x => x.disp).length, at: today()}; p.u = now(); }
-    touchDay(d); save();
+  gsave: () => { const G = state.grade, iids = []; let d0 = state.date;
+    for (const pid of (G.pids || [G.pid])) { const p = DB.photos.find(x => x.id === pid), d = p ? p.d : state.date, mine = G.list.filter(x => (x.pid || G.pid) === pid); d0 = d;
+      const had = new Set(DB.items.filter(i => i.photoId === pid).map(i => (i.stem || '').trim()));
+      for (const x of mine) if (gradeWrong(x) && x.stem.trim() && !had.has(x.stem.trim())) { const id = uid('i'); iids.push(id); had.add(x.stem.trim());
+        DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: null, photoId: pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
+      if (p && mine.length) { const c = gradeSum({list: mine}); p.grade = {n: mine.length, wrong: c.wrong, disp: mine.filter(x => x.disp).length, at: today()}; p.u = now(); touchDay(d); } }
+    touchDay(d0); save();
     if (!iids.length) { state.grade = null; render(); toast(G.list.some(gradeWrong) ? '这些错题之前已经加过了' : '这页都对了 ✓'); return; }
     G.saved = true; G.iids = iids; G.vdone = {}; render(); },
   gvar: el => { state.variant = {iid: el.dataset.v, from: 'grade'}; varGen(); },
@@ -4275,14 +4315,15 @@ const ACT = {
   hintoff: el => { const o = Object.assign({}, DB.settings.hintOff || {}); o[el.dataset.v] = true; setSetting('hintOff', o); save(); render(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
   rgclose: () => { if (state.precog && state.precog.list.some(x => x.keep) && !confirm('还没加入重做，确定关掉？（照片留着，之后点照片能再识别）')) return; state.precog = null; render(); },
-  rgretry: () => recogPhoto(state.precog.pid),
+  rgretry: () => recogPhoto(state.precog.pids || [state.precog.pid]),
   rgkeep: el => { const x = state.precog.list[+el.dataset.v]; x.keep = !x.keep; render(); },
   rgtype: el => { const x = state.precog.list[+el.dataset.v]; if (x.type !== el.dataset.t) { x.type = el.dataset.t; x.sub = ''; } render(); },
   rgsub: el => { const x = state.precog.list[+el.dataset.v]; x.sub = x.sub === el.dataset.s ? '' : el.dataset.s; render(); },
   rgconf: el => { const x = state.precog.list[+el.dataset.v]; x.conf = x.conf === el.dataset.c ? null : el.dataset.c; render(); },
-  rgsave: () => { const R = state.precog, p = DB.photos.find(x => x.id === R.pid), d = p ? p.d : state.date; let n = 0;
-    const had = new Set(DB.items.filter(i => i.photoId === R.pid).map(i => (i.stem || '').trim()));
-    for (const x of R.list) if (x.keep && x.stem.trim() && !had.has(x.stem.trim())) { DB.items.push({id: uid('i'), d, sid: R.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: x.conf, photoId: R.pid, src: '拍照识别', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); n++; }
+  rgsave: () => { const R = state.precog; let n = 0, d = state.date;
+    for (const x of R.list) { const pid = x.pid || R.pid, p = DB.photos.find(y => y.id === pid); d = p ? p.d : state.date;
+      const had = new Set(DB.items.filter(i => i.photoId === pid).map(i => (i.stem || '').trim()));
+      if (x.keep && x.stem.trim() && !had.has(x.stem.trim())) { DB.items.push({id: uid('i'), d, sid: R.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: x.conf, photoId: pid, src: '拍照识别', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); n++; touchDay(d); } }
     touchDay(d); save(); state.precog = null; render(); toast(`加入了 ${n} 道，${BOXES[0]} 天后出现在「重做」`); },
   photoview: el => { state.pview = el.dataset.v; render(); },
   pviewclose: () => { state.pview = null; render(); },
