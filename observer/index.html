@@ -485,6 +485,7 @@ a{color:var(--accent);text-decoration:none}
 .todo-r.next{background:var(--accent-bg)}
 .spdone{color:var(--pen);font-weight:700;margin-right:6px}
 .btn:disabled{opacity:.45;box-shadow:none;cursor:default}
+.pvlist{width:100%;max-width:640px;overflow:auto;max-height:36%;flex:none}
 .gq .gv{flex:none;width:28px;font-size:20px;font-weight:700;line-height:1.3;color:var(--ink3)}
 .gq-ok .gv{color:var(--pen)} .gq-wrong .gv{color:var(--pen)}
 .gq-wrong{box-shadow:0 0 0 1.5px var(--pen) inset,var(--shadow)}
@@ -549,7 +550,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v68';
+const APP_V = 'v69';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1675,7 +1676,15 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
   }
   let more = '', nMore = 0; const h0 = h; h = '';
   const yd = addD(d, -1), ydd = DB.days[yd];
-  if (isToday && ydd && !ydd.errAsked && Object.values(ydd.subj || {}).some(r => !r.none && r.min > 0)) {
+  const ygp = isToday ? DB.photos.filter(p => p.d === yd && p.grade && !p.tcmp) : [];
+  if (ygp.length && !(ydd || {}).errAsked) {   // 昨天用 AI 批改过：问老师批的和 AI 一样吗（攒数据看批改靠不靠谱）
+    const by = {}; ygp.forEach(p => { const k = subjById(p.sid).name || ''; by[k] = by[k] || [0, 0]; by[k][0]++; by[k][1] += p.grade.wrong || 0; });
+    const wr = DB.items.filter(i => i.src === '拍照批改' && ygp.some(p => p.id === i.photoId));
+    h += `<div class="card" id="tcmp"><h3>老师批的和 AI 一样吗？</h3><p class="small muted" style="margin:0 0 8px">昨天 AI 批改了${Object.entries(by).map(([n, [k, w]]) => ` ${esc(n)} ${k} 页（错 ${w} 道）`).join('、')}。老师批改发回来后对一下：</p>` +
+      (state.tcmpLess ? `<div class="small muted" style="margin:0 0 6px">点掉老师判对的（AI 冤枉的）：</div>` + wr.map(i => `<div class="row" style="padding:6px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><span style="flex:1;min-width:0">${esc((i.stem || '').slice(0, 50))}</span><button class="btn sm ${(state.tcmpX || {})[i.id] ? 'good' : ''}" data-act="tcmpx" data-v="${i.id}">${(state.tcmpX || {})[i.id] ? '✓ 其实对了' : '其实对了'}</button></div>`).join('') +
+        `<div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="tcmp" data-v="less">好了</button><button class="btn sm ghost" data-act="tcmpback">返回</button></div>`
+      : `<div class="row"><button class="btn sm primary" data-act="tcmp" data-v="same">一样</button><button class="btn sm" data-act="tcmp" data-v="more">老师还批了别的错题</button>${wr.length ? `<button class="btn sm" data-act="tcmpless">AI 判错了几道</button>` : ''}</div>`) + `</div>`;
+  } else if (isToday && ydd && !ydd.errAsked && Object.values(ydd.subj || {}).some(r => !r.none && r.min > 0)) {
     const hw = subjects(yd).filter(s => { const r = ydd.subj[s.id]; return r && !r.none && r.min > 0; });
     h += `<div class="card"><h3>昨天的作业批改回来了吗？</h3><p class="small muted" style="margin:0 0 8px">老师批改后才知道哪题没做对的话，现在补记到昨天（${esc(hw.map(s => s.name).join('、'))}）。</p>
       <div class="row"><button class="btn sm primary" data-act="erryd">补记到昨天</button><button class="btn sm ghost" data-act="erryno">都记好了 / 都对了</button></div></div>`;
@@ -1988,8 +1997,10 @@ async function varSol(){
   catch(e) { if (state.variant !== V) return; V.err = '讲解失败：' + e.message; }
   V.solBusy = false; render();
 }
-function gradeStat(){ const from = addD(today(), -30), P = DB.photos.filter(p => p.grade && p.d >= from);
-  return P.length ? `近 30 天 AI 批改了 ${P.length} 页，孩子纠正「AI 判错了」${P.reduce((a, p) => a + (p.grade.disp || 0), 0)} 次。纠正多的话告诉开发，调一下批改方式。` : ''; }
+function gradeStat(){ const from = addD(today(), -30), P = DB.photos.filter(p => p.grade && p.d >= from), C = P.filter(p => p.tcmp);
+  if (!P.length) return '';
+  return `近 30 天 AI 批改了 ${P.length} 页，孩子当场纠正「AI 判错了」${P.reduce((a, p) => a + (p.grade.disp || 0), 0)} 次` +
+    (C.length ? `；和老师对照过 ${C.length} 页，一致 ${C.filter(p => p.tcmp === 'same').length} 页（老师多批出错题 ${C.filter(p => p.tcmp === 'more').length} 页，AI 冤枉 ${C.reduce((a, p) => a + (p.tless || 0), 0)} 道）` : '') + '。不一致多的话告诉开发，调一下批改方式。'; }
 /* 同类题：换数字换情境、考同一个易错点，防止重做原题变成背答案。判对错只给提示，不给答案 */
 const findItem = id => DB.items.find(x => x.id === id) || EXT.find(x => x.id === id);
 async function varGen(){
@@ -2122,10 +2133,12 @@ function photoStrip(ps){
   return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px">` + ps.map(p => `<div><img data-pid="${p.id}" data-act="photoview" data-v="${p.id}" alt="" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--surface2);display:block;cursor:pointer">
     <div class="small" style="margin-top:3px;line-height:1.3">${esc(subjById(p.sid).name||'')} · ${PKIND.find(k=>k[0]===p.kind)[1]}<br><span class="faint">${photoStatus(p)}</span></div></div>`).join('') + `</div>`;
 }
+function pviewItems(p){ const its = DB.items.filter(i => i.photoId === p.id && !i.done); if (!its.length) return '';
+  return `<div class="pvlist"><div class="small" style="color:#aaa;margin-bottom:4px">从这页记下的错题</div>` + its.map(i => `<div class="row" style="padding:6px 0;border-top:1px solid #333;flex-wrap:nowrap"><span style="flex:1;min-width:0;color:#eee">${esc((i.stem || i.tag || '').slice(0, 60))}</span>${aiReady() && (i.stem || i.tag) ? `<button class="btn sm" data-act="pvar" data-v="${i.id}">做同类题</button>` : ''}</div>`).join('') + `</div>`; }
 function vPhotoView(){
   const p = DB.photos.find(x => x.id === state.pview); if (!p) { state.pview = null; return ''; }
   return `<div class="wiz tall" style="background:#000"><div class="wiz-top"><div style="flex:1;color:#ddd">${esc(subjById(p.sid).name||'')} · ${PKIND.find(k=>k[0]===p.kind)[1]} · ${md(p.d)} · ${photoStatus(p)}</div><button class="wiz-x" data-act="pviewclose" aria-label="关闭">×</button></div>
-    <div class="wiz-body" style="display:flex;align-items:center;justify-content:center"><img data-pid="${p.id}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>
+    <div class="wiz-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px"><img data-pid="${p.id}" alt="" style="max-width:100%;min-height:0;flex:1 1 auto;max-height:${DB.items.some(i => i.photoId === p.id) ? '60%' : '100%'};object-fit:contain">${pviewItems(p)}</div>
     <div class="wiz-foot"><button class="btn danger" data-act="photodel" data-v="${p.id}">删除这张</button>${p.kind === 'homework' && aiReady() ? `<button class="btn primary" data-act="gphoto" data-v="${p.id}">${p.grade ? '再批一次' : '用 AI 批改'}</button>` : ''}${p.kind === 'error' && aiReady() ? `<button class="btn primary" data-act="rgphoto" data-v="${p.id}">${photoDone(p) ? '再识别一次' : '用 AI 识别错题'}</button>` : ''}<button class="btn" data-act="pviewclose">关闭</button></div></div>`;
 }
 function vPhotoSheet(){
@@ -3892,6 +3905,9 @@ function todayGlance(){
   if (probs.length || stuck.length) h += `<div class="small" style="margin-top:8px;color:var(--ink2)">他记下的问题：</div>` +
     probs.map(it => `<div style="margin:3px 0">· <b>${esc(subjById(it.sid).name)}</b> ${esc((it.stem || it.tag).slice(0, 60))}</div>`).join('') +
     stuck.filter(([s, r]) => !probs.some(it => it.sid === s.id && (it.stem || '').startsWith(r.stuck.slice(0, 8)))).map(([s, r]) => `<div style="margin:3px 0">· <b>${esc(s.name)}</b> ${esc(r.stuck.slice(0, 60))}</div>`).join('');
+  { const gp = DB.photos.filter(p => p.d === d && p.grade); if (gp.length) { const by = {}; gp.forEach(p => { const k = subjById(p.sid).name || ''; by[k] = (by[k] || 0) + 1; });
+      const wr = DB.items.filter(i => i.src === '拍照批改' && gp.some(p => p.id === i.photoId)), vd = wr.filter(i => (i.vh || []).some(x => x.d === d && x.ok)).length;
+      h += `<p style="margin:8px 0 0">今天 AI 批改了${Object.entries(by).map(([n, k]) => ` ${esc(n)} ${k} 页`).join('、')}，错 <b>${gp.reduce((a, p) => a + (p.grade.wrong || 0), 0)}</b> 道${wr.length ? '，已进重做' : ''}${vd ? `，同类题做对 ${vd} 道` : ''}。</p>`; } }
   const pr = dd.praise;
   h += `<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><span class="small faint">${pr ? '已经点过赞：「' + esc(pr) + '」' : '给他点个赞：'}</span>` + (pr ? '<a href="#" class="small faint" data-act="praiseundo">撤回</a>' : PRAISE.map((x, k) => `<button class="chip" data-act="praise" data-v="${k}">${esc(x)}</button>`).join('')) + `</div>`;
   return h + `</div>`;
@@ -4181,6 +4197,15 @@ const ACT = {
   planskip: () => { const w = DB.weeks[addD(monOf(today()), -7)]; w.auto.skip = true; w.u = now(); (w.fu = w.fu || {}).auto = w.u; save(); render(); },
   welcomed: () => { lsSet('observer:welcomed', true); render(); },
   erryd: () => { const yd = addD(today(), -1); setDayField(yd, 'errAsked', 1); save(); state.date = yd; const r = DB.days[yd].subj; state.openSubj = (subjects(yd).find(s => r[s.id] && !r[s.id].none && r[s.id].min > 0) || {}).id || null; render(); window.scrollTo(0, 0); toast('点开科目，点「+」补记'); },
+  tcmpless: () => { state.tcmpLess = true; state.tcmpX = {}; render(); },
+  tcmpback: () => { state.tcmpLess = false; render(); },
+  tcmpx: el => { const X = state.tcmpX = state.tcmpX || {}; X[el.dataset.v] = !X[el.dataset.v]; render(); },
+  tcmp: el => { const yd = addD(today(), -1), v = el.dataset.v, P = DB.photos.filter(p => p.d === yd && p.grade && !p.tcmp), X = state.tcmpX || {}; let rm = 0;
+    if (v === 'less') for (const id in X) if (X[id]) { const it = DB.items.find(i => i.id === id); if (it) { const p = P.find(q => q.id === it.photoId); if (p) p.tless = (p.tless || 0) + 1; delRec('items', id); rm++; } }
+    P.forEach(p => { p.tcmp = v === 'less' && !(p.tless > 0) ? 'same' : v; p.u = now(); });
+    state.tcmpLess = false; state.tcmpX = null; setDayField(yd, 'errAsked', 1); save();
+    if (v === 'more') { ACT.erryd(); if (P[0]) { state.openSubj = P[0].sid; render(); } return; }
+    render(); toast(v === 'less' ? (rm ? `去掉了 ${rm} 道，已记下 AI 判错` : '没有去掉的') : '好的，记下了'); },
   erryno: () => { setDayField(addD(today(), -1), 'errAsked', 1); save(); render(); },
   adopt: el => { const f = (state._fs || [])[+el.dataset.v]; if (!f) return; const t = f.t.replace(/<[^>]+>/g, ''); const m = t.match(/可以问：「[^」]+」|开头先放[^。]+|回到课本[^。]+|试试「[^」]+」[^。]*|先看睡眠[^。]*|建议[^。]+/);
     const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.adjust = m ? m[0] : t.slice(0, 60); w.u = now(); (w.fu = w.fu || {}).adjust = w.u; save(); toast('已写进「下周只调一件事」'); render(); },
@@ -4326,6 +4351,7 @@ const ACT = {
       if (x.keep && x.stem.trim() && !had.has(x.stem.trim())) { DB.items.push({id: uid('i'), d, sid: R.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: x.conf, photoId: pid, src: '拍照识别', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); n++; touchDay(d); } }
     touchDay(d); save(); state.precog = null; render(); toast(`加入了 ${n} 道，${BOXES[0]} 天后出现在「重做」`); },
   photoview: el => { state.pview = el.dataset.v; render(); },
+  pvar: el => { state.pview = null; state.variant = {iid: el.dataset.v, from: 'grade'}; varGen(); },
   pviewclose: () => { state.pview = null; render(); },
   photodel: el => { if (!confirm('删除这张照片？（已上传到私有仓库的那份会留着）')) return; IDB.del('photo:' + el.dataset.v); delRec('photos', el.dataset.v); state.pview = null; save(); render(); },
   setsub: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.sub = it.sub === el.dataset.s ? '' : el.dataset.s; it.u = now(); save(); render(); },
