@@ -436,7 +436,7 @@ a{color:var(--accent);text-decoration:none}
 .todo-r[data-v=card] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 18l4.5-12L12 18M4.7 14h5.6'/><circle cx='17' cy='15' r='3'/><path d='M20 12v6'/></svg>");background:#efe9f7;--icc:#6a4c9c}
 .todo-r[data-v=recite] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z'/><path d='M5 17a3 3 0 0 1 3-3h11'/></svg>");background:#e2f1e8;--icc:#2e7a57}
 .todo-r[data-v=read] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z'/><path d='M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z'/></svg>");background:#e1f0ef;--icc:#2a7270}
-.todo-r[data-act=holgo] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/></svg>");background:#fdeee3;--icc:#b5582a}
+.todo-r[data-act=holgo] .ck,.todo-r[data-act=holedit] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/></svg>");background:#fdeee3;--icc:#b5582a}
 .todo-r[data-v=speak] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5 11a7 7 0 0 0 14 0M12 18v3'/></svg>");background:#f8e8ee;--icc:#a1476a}
 .todo-r[data-v=pe] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12h4l3-8 4 16 3-8h4'/></svg>");background:#fbe9e7;--icc:#a4443a}
 .tile[data-v=card]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 18l4.5-12L12 18M4.7 14h5.6'/><circle cx='17' cy='15' r='3'/><path d='M20 12v6'/></svg>");--ict:#efe9f7;--icc:#6a4c9c}
@@ -452,7 +452,7 @@ a{color:var(--accent);text-decoration:none}
 .todo-r[data-v=card]:not(.done) .ck{background:#2c2440;--icc:#c1a8ee}
 .todo-r[data-v=recite]:not(.done) .ck{background:#18301f;--icc:#7ccfa5}
 .todo-r[data-v=read]:not(.done) .ck{background:#15302f;--icc:#79cfcb}
-.todo-r[data-act=holgo]:not(.done) .ck{background:#3a2517;--icc:#f2a377}
+.todo-r[data-act=holgo]:not(.done) .ck,.todo-r[data-act=holedit]:not(.done) .ck{background:#3a2517;--icc:#f2a377}
 .todo-r[data-v=speak]:not(.done) .ck{background:#3a1f2a;--icc:#eea3c0}
 .todo-r[data-v=pe]:not(.done) .ck{background:#3a1f1c;--icc:#f0a098}
 .tile[data-v=card]{--ict:#2c2440;--icc:#c1a8ee}
@@ -495,7 +495,7 @@ a{color:var(--accent);text-decoration:none}
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v62';
+const APP_V = 'v63';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -901,7 +901,8 @@ function holidayCard(d){
   if (!h) return '';
   const nth = dayDiff(h.from, d) + 1, total = range(h.from, h.to).length;
   let c = `<div class="card" id="holcard"><div class="row"><h3 style="margin:0">${esc(h.name)}第 ${nth}/${total} 天 · 假期作业</h3><span class="spacer"></span><button class="btn sm ghost" data-act="holedit" data-v="${h.id}">改清单</button></div>`;
-  if (!h.tasks.length) c += `<p class="small muted" style="margin:6px 0 8px">还没录假期作业。</p><button class="btn sm primary" data-act="holedit" data-v="${h.id}">录假期作业</button>`;
+  if (!h.tasks.length && h.none) c += `<p class="small muted" style="margin:6px 0 0">这个假期没有假期作业，照平常记就行。</p>`;
+  else if (!h.tasks.length) c += `<p class="small muted" style="margin:6px 0 8px">还没录假期作业。</p><div class="row"><button class="btn sm primary" data-act="holedit" data-v="${h.id}">录假期作业</button><button class="btn sm ghost" data-act="holnone" data-v="${h.id}">没有假期作业</button></div>`;
   else if (h.out[d]) c += `<p class="muted" style="margin:6px 0 8px">今天出去玩，不派作业，连续天数不会断。</p><button class="btn sm ghost" data-act="holout" data-v="0">今天不出去了</button>`;
   else {
     const rows = h.tasks.map(t => ({t, q: holQuota(h, t, d), k: (t.done || {})[d] || 0})).filter(o => o.q > 0 || o.k > 0);
@@ -917,6 +918,13 @@ function holidayCard(d){
     c += `<div class="card" style="background:var(--amber-bg);border-color:transparent"><h3>明天开学</h3>` + (L.length || rd || ed ? `<ul style="margin:6px 0 0;padding-left:20px">${L.map(o => `<li>${esc(holTaskName(o.t))}还差 ${o.left} 份</li>`).join('')}${ed ? `<li>到期的错题 ${ed} 道</li>` : ''}${rd ? `<li>该复习的背诵 ${rd} 篇</li>` : ''}</ul>` : `<p class="muted" style="margin:6px 0 0">假期作业都做完了，也没有到期的复习。收拾好书包就行。</p>`) + `</div>`;
   }
   return c;
+}
+// 收假后头两天：还剩没做完的假期作业，问一句「其实做完了 / 不用交了」，答了就收起
+const holAfter = d => holList().find(h => h.tasks.length && !h.after && d > h.to && dayDiff(h.to, d) <= 2 && holLeftList(h).length) || null;
+function holAfterCard(d){
+  const h = holAfter(d); if (!h || d !== today()) return '';
+  return `<div class="card" style="background:var(--amber-bg);border-color:transparent"><h3>${esc(h.name)}作业还剩</h3><ul style="margin:6px 0 8px;padding-left:20px">${holLeftList(h).map(o => `<li>${esc(holTaskName(o.t))} ${o.left} 份</li>`).join('')}</ul>
+    <div class="row"><button class="btn sm primary" data-act="holafter" data-v="done" data-h="${h.id}">其实做完了（补记）</button><button class="btn sm ghost" data-act="holafter" data-v="drop" data-h="${h.id}">不用交了</button></div></div>`;
 }
 function dayHasData(d){
   if (itemsOn(d).length) return true;
@@ -1569,6 +1577,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     const wordsOk = LIB.done && (!LIB.words || wLeft === 0);
     // 假期（录了清单）：平时的「记作业」变可选，今晚完成看假期作业今日份
     const hH = holAt(d), holMode = !!(hH && hH.tasks.length), holMet = holMode && (!!hH.out[d] || hH.tasks.every(t => ((t.done || {})[d] || 0) >= holQuota(hH, t, d)));
+    const holPend = isToday && !!hH && !hH.tasks.length && !hH.none;   // 放假了还没录假期作业：先录，别带他去记平常作业
     const allDone = (holMode ? holMet : filled >= subs.length) && left === 0 && wordsOk && !rDue;
     if (!dayCnt(d) && !isRest(d) && autoFreeze(addD(d, -1)) && streak() > 1) h += `<div class="tip">昨天没记，自动用了一次请假。<b>今天记一下，就是连续 ${streak() + 1} 天</b>。</div>`;
     if (heavyNight() && !late && !allDone) h += `<div class="tip">今天作业写了 ${homeworkMin(d)} 分钟，已经超过 90 分钟。今晚<b>重做只排 1 道、单词只背 8 个</b>，早点休息。</div>`;
@@ -1582,7 +1591,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     if (isRest(d) && !dayCnt(d)) { h += `<div class="card" style="text-align:center"><div style="font-family:var(--serif);font-size:20px;font-weight:700">今天休息</div><div class="small muted" style="margin:4px 0 10px">连续天数不会断。好好休息，明天接着来。</div><button class="btn sm ghost" data-act="rest" data-v="0">不休息了</button></div>`; return h + holidayCard(d) + installBanner(); }   // 假期里请了休息也能勾假期作业
     let slOpen0 = state.slistOpen; if (slOpen0 == null) { try { slOpen0 = localStorage.getItem('observer:slOpen') === '1'; } catch(e) { slOpen0 = false; } }
     const T = [
-      holMode ? {t: '假期作业', s: hH.out[d] ? '今天出去玩' : (() => { const R = hH.tasks.map(t => [((t.done || {})[d] || 0), holQuota(hH, t, d)]); return `${R.reduce((a, [k, q]) => a + Math.min(k, q), 0)}/${R.reduce((a, [, q]) => a + q, 0)} 份`; })(), done: holMet, act: 'holgo', v: '', go: '做今天的假期作业'} : {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
+      holMode ? {t: '假期作业', s: hH.out[d] ? '今天出去玩' : (() => { const R = hH.tasks.map(t => [((t.done || {})[d] || 0), holQuota(hH, t, d)]); return `${R.reduce((a, [k, q]) => a + Math.min(k, q), 0)}/${R.reduce((a, [, q]) => a + q, 0)} 份`; })(), done: holMet, act: 'holgo', v: '', go: '做今天的假期作业'} : holPend ? {t: '假期作业', s: '还没录', done: false, act: 'holedit', v: hH.id, go: '先录假期作业（1 分钟）'} : {t: '记作业', s: `${filled}/${subs.length} 科`, done: filled >= subs.length, act: filled < subs.length ? 'wizstart' : 'slopen', v: 'slist', go: filled ? `接着记作业（还有 ${subs.length - filled} 科）` : '记今天的作业'},
       {t: '重做', s: left ? left + ' 道' : dn ? '做完了' : '今天没有', done: left === 0, act: 'tab', v: 'errors', go: `重做 ${left} 道`},
       {t: '背单词', s: !LIB.done ? '…' : !LIB.words ? '词库没加载到' : wLeft ? wLeft + ' 个' : wDone ? '背完了' : '今天没有', done: wordsOk, opt: !LIB.done, act: 'golearn', v: 'card', go: `背 ${wLeft} 个单词`},
       {t: '语文背诵', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
@@ -1591,12 +1600,13 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     else { const RP = readPlan(d); if (RP.cur && !RP.past && !holMode) T.push({t: '名著阅读', s: RP.done ? '今天读过' : `今天 ${RP.q} 页 · 可选`, done: RP.done, opt: true, act: 'golearn', v: 'read', go: ''}); }
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
+    if (holPend) h += `<div style="text-align:center;margin:-4px 0 10px"><button class="btn sm ghost" data-act="holnone" data-v="${hH.id}">没有假期作业</button></div>`;
     { const seen = (() => { try { return localStorage.getItem('observer:praiseSeen') || ''; } catch(e) { return ''; } })();
       const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise && !seen.split('|').includes(x + DB.days[x].praise));
       if (pd) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
     h += notes;
     const freshOf = x => { const k = d + '|' + x.t; if (!x.done || PEN_SEEN.has(k)) return ''; PEN_SEEN.add(k); if (!PEN_READY) return ''; setTimeout(penSound, 60); return 'fresh'; };   // 红笔对勾只在刚完成时画一次
-    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done ' + freshOf(x) : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div><!--RCOL-->` + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
+    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done ' + freshOf(x) : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div><!--RCOL-->` + holAfterCard(d) + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
       <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">②</span><span class="t">重做</span><span class="s">${left ? left + ' 道' : dn ? '做完了' : '今天没有'}</span></button>
@@ -3736,6 +3746,8 @@ function attentionItems(){
   { const h = holAt(t); if (h) { const B = holBehind(h, t);
       if (B.length) A.unshift(['假期作业落下了', B.map(o => `${holTaskName(o.t)}少做了约 ${Math.round(o.lag)} 份`).join('；') + '。已经自动平摊到后面几天，不用补一大堆；问问他是不是哪项太难。']);
       if (t === h.to) { const L = holLeftList(h); if (L.length) A.unshift(['明天开学', L.map(o => `${holTaskName(o.t)}还差 ${o.left} 份`).join('；') + '。']); } } }
+  { const h = holList().find(x => x.tasks.length && t > x.to && dayDiff(x.to, t) <= 7 && holLeftList(x).length);
+    if (h) A[dayDiff(h.to, t) <= 3 ? 'unshift' : 'push']([`${h.name}作业没做完就开学了`, holLeftList(h).map(o => `${holTaskName(o.t)}剩 ${o.left} 份`).join('；') + '。下个假期录清单时，可以让他头几天多做一点，别都压到最后。']); }
   return A.slice(0, 3);
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
@@ -4085,10 +4097,14 @@ const ACT = {
   holadd: () => { holRead(); const E = state.holE; E.tasks.push({id: uid('ht'), sid: (E.tasks[E.tasks.length - 1] || {}).sid || '', what: '', n: 1, done: {}, at: today()}); render(); setTimeout(() => { const w = $('#hw-' + (E.tasks.length - 1)); w && w.focus(); }, 50); },
   holdel: el => { holRead(); state.holE.tasks.splice(+el.dataset.v, 1); render(); },
   holoutday: el => { holRead(); const E = state.holE, x = el.dataset.v; if (E.out[x]) delete E.out[x]; else E.out[x] = true; render(); },
+  holnone: el => { const h = holList().find(x => x.id === el.dataset.v); if (!h) return; saveHol(Object.assign({}, h, {none: true})); toast('好的，照平常记'); render(); },
+  holafter: el => { const h = holList().find(x => x.id === el.dataset.h); if (!h) return; const r = JSON.parse(JSON.stringify(h));
+    if (el.dataset.v === 'done') r.tasks.forEach(t => { const left = t.n - holDone(t, () => true); if (left > 0) { t.done = t.done || {}; t.done[r.to] = (t.done[r.to] || 0) + left; } });
+    r.after = el.dataset.v; saveHol(r); toast(el.dataset.v === 'done' ? '补记好了' : '好的，收起了'); render(); },
   holclose: () => { state.holE = null; render(); },
   holsave: () => { holRead(); const E = state.holE; if (E.from > E.to) { toast('放假日期前后颠倒了'); return; }
     const old = ((holList().find(h => h.id === E.id) || {}).tasks || []);
-    E.tasks = E.tasks.map(t => t.what || !Object.keys(t.done || {}).length ? t : Object.assign(t, {what: (old.find(o => o.id === t.id) || {}).what || '（没写名字）'})).filter(t => t.what); saveHol(E); state.holE = null; toast(E.tasks.length ? `存好了：${E.tasks.length} 项，放假后每天自动分` : '清单已清空'); render(); },
+    E.tasks = E.tasks.map(t => t.what || !Object.keys(t.done || {}).length ? t : Object.assign(t, {what: (old.find(o => o.id === t.id) || {}).what || '（没写名字）'})).filter(t => t.what); if (E.tasks.length) delete E.none; saveHol(E); state.holE = null; toast(E.tasks.length ? `存好了：${E.tasks.length} 项，放假后每天自动分` : '清单已清空'); render(); },
   holdo: el => { const h = holAt(today()); if (!h) return; const t = h.tasks.find(x => x.id === el.dataset.v); if (!t) return; const d = today(); t.done = t.done || {};
     t.done[d] = Math.max(0, (t.done[d] || 0) + (+el.dataset.n)); if (!t.done[d]) delete t.done[d]; saveHol(h); render(); },
   holout: el => { const h = holAt(today()); if (!h) return; if (el.dataset.v === '1') h.out[today()] = true; else delete h.out[today()]; saveHol(h); render(); },
