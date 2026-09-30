@@ -484,6 +484,10 @@ a{color:var(--accent);text-decoration:none}
 .samego{flex:none;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:12px;background:var(--accent);color:var(--surface);font-weight:600;font-size:15px}
 .todo-r.next{background:var(--accent-bg)}
 .spdone{color:var(--pen);font-weight:700;margin-right:6px}
+.btn:disabled{opacity:.45;box-shadow:none;cursor:default}
+.gq .gv{flex:none;width:28px;font-size:20px;font-weight:700;line-height:1.3;color:var(--ink3)}
+.gq-ok .gv{color:var(--pen)} .gq-wrong .gv{color:var(--pen)}
+.gq-wrong{box-shadow:0 0 0 1.5px var(--pen) inset,var(--shadow)}
 @media (min-width:760px){.splist{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.splist>.card{margin-bottom:12px}}
 .fnotes{margin:-4px 2px 12px;font-size:13px;color:var(--ink2)}
 .fnotes>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -545,7 +549,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v66';
+const APP_V = 'v67';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1540,7 +1544,7 @@ function render(){
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.hint ? vHint() : state.variant ? vVariant() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.hint ? vHint() : state.variant ? vVariant() : state.grade ? vGrade() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
   document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor || state.holE || state.hint) ? 'hidden' : '';
   hydratePhotos(); updateBadge();
@@ -1660,7 +1664,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise && !seen.split('|').includes(x + DB.days[x].praise));
       if (pd) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
     h += notes;
-    const penOvl = !!(state.wiz || state.holE || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.photo || state.voice);   // 被覆盖层挡着时先不画，关掉后再画
+    const penOvl = !!(state.wiz || state.holE || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.grade || state.photo || state.voice);   // 被覆盖层挡着时先不画，关掉后再画
     const freshOf = x => { const k = d + '|' + x.t; if (!x.done || PEN_SEEN.has(k) || (penOvl && PEN_READY && PEN_DAY === d)) return ''; PEN_SEEN.add(k); if (!PEN_READY || PEN_DAY !== d) return ''; setTimeout(penSound, 60); return 'fresh'; };   // 红笔对勾只在刚完成时画一次
     h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done ' + freshOf(x) : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div><!--RCOL-->` + holAfterCard(d) + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
@@ -1773,7 +1777,7 @@ async function qpClassify(id){
 }
 /* ================= 拍照：本机压缩 → IndexedDB → 同步时加密上传私有仓库 photos/ ；识别在 Claude 对话里做 ================= */
 const CAM = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
-const PKIND = [['error','错题'],['homework','作业'],['exam','试卷']];
+const PKIND = [['homework','批改作业'],['error','错题'],['exam','试卷']];
 const photoURL = {};
 async function compressImage(file){
   const img = await new Promise((res, rej) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = u; });
@@ -1792,6 +1796,7 @@ async function addPhotos(files){
   }
   touchDay(state.date); save(); state.photo = null; render();
   if (n && ps.kind === 'error' && aiReady() && !DEMO) { recogPhoto(DB.photos[DB.photos.length - 1].id); return; }
+  if (n && ps.kind === 'homework' && aiReady() && !DEMO) { gradePhoto(DB.photos[DB.photos.length - 1].id); return; }
   toast(n ? `存了 ${n} 张` + (syncReady() ? '，稍后自动加密上传' : '（没开同步，只存在这台设备）') : '没有存上');
 }
 const photoPath = p => `photos/${p.d}/${p.sid || 'x'}-${p.kind}-${p.id}.enc`;
@@ -1828,7 +1833,7 @@ async function photoSrc(p){
 }
 function hydratePhotos(){ document.querySelectorAll('img[data-pid]').forEach(async img => { const p = DB.photos.find(x => x.id === img.dataset.pid); if (!p) return; const u = await photoSrc(p); if (u) img.src = u; else img.alt = '在别的设备上'; }); }
 const photoDone = p => EXT.filter(x => x.photoId === p.id).length + DB.items.filter(x => x.photoId === p.id).length;
-function photoStatus(p){ const n = photoDone(p); return n ? `已识别 ${n} 道` : p.kind === 'error' && aiReady() ? '还没识别' : p.up ? '已上传' : syncReady() ? '待上传' : '只在本机'; }
+function photoStatus(p){ const n = photoDone(p); if (p.grade) return p.grade.wrong ? `已批改 · 错 ${p.grade.wrong}` : '已批改 · 全对'; return n ? `已识别 ${n} 道` : p.kind === 'error' && aiReady() ? '还没识别' : p.kind === 'homework' && aiReady() ? '还没批改' : p.up ? '已上传' : syncReady() ? '待上传' : '只在本机'; }
 /* 拍照识别错题：智谱视觉模型读题 + 按本科分类体系归类；结果先给孩子/家长确认，确认后进重做 */
 const blobToDataURL = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
 function parseJSONObj(t){
@@ -1883,11 +1888,74 @@ ${cats}
   } catch(e) { if (state.precog !== R) return; R.err = '识别失败：' + e.message; }
   if (state.precog !== R) return; R.busy = false; render();
 }
+/* 拍照批改作业：逐题判对错（开思考模式，先自己做一遍再对照）；错题只给一句提示不给答案，进重做并各出一道同类题。
+   拿不准的让孩子自己选，AI 判错了可以纠正（记在照片上，家长设置页能看到被纠正几次） */
+const GV = {ok: ['✓', '对'], wrong: ['✗', '错'], unsure: ['？', '拿不准'], subj: ['—', '主观题不批改']};
+async function gradePhoto(pid){
+  const p = DB.photos.find(x => x.id === pid); if (!p) return;
+  const sid = p.sid, sb = subjById(sid), tx = taxOf(sid);
+  const G = state.grade = {pid, sid, busy: true, list: [], err: '', saved: false}; render();
+  try {
+    const blob = await IDB.get('photo:' + pid); if (!blob) throw new Error('照片不在这台设备上');
+    const cats = ET.map(t => `${t.k}=${typeNameS(sid, t.k)}` + (tx ? `（细分：${tx[t.k].subs.map(a => a[0] + '=' + a[1]).join('，')}）` : '')).join('\n');
+    const sys = `你是经验丰富的初中${sb.name}老师，批改学生这一页作业。逐题做三件事：读出题目和学生写的答案；自己独立把题做一遍；再对照学生的答案判断对错。
+v 只能是：ok（对）、wrong（错，包括没写）、unsure（字看不清、题目不完整、或你没有把握）、subj（作文、阅读感悟、开放题等主观题，不判）。没有把握一律 unsure，不要硬判。
+错题的 hint 写一句提示，指出该回去检查哪一步或哪个概念，绝对不能写出正确答案、正确结果或完整过程；没写的题 hint 写「这题还没写」。其他情况 hint 为空。
+错题按下面分类（type 必须是 calc / concept / read 之一，sub 用细分里的英文 key，拿不准就空着）：
+${cats}
+只输出 JSON 数组，不要别的文字：[{"no":"题号","stem":"题目原文，太长精简到 120 字内，公式用普通文字","ans":"学生写的答案，照抄，看不清的字写？","v":"ok","hint":"","type":"calc","sub":"","tag":"知识点，10 字内"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
+    const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '批改这页' + sb.name + '作业'}]}], {temperature: 0.1, thinking: {type: 'enabled'}, _to: 180000});
+    if (state.grade !== G) return;
+    const list = parseJSONList(out); if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
+    const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
+    G.list = list.slice(0, 30).map(x => ({no: String(x.no || '').slice(0, 8), stem: String(x.stem || '').slice(0, 300), ans: String(x.ans || '').slice(0, 200), v: GV[x.v] ? x.v : 'unsure', hint: String(x.hint || '').slice(0, 120),
+      type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), pick: null, fixed: false, disp: false}));
+    if (!G.list.length) G.err = '没在照片里找到题目。换个角度、拍近一点再试。';
+  } catch(e) { if (state.grade !== G) return; G.err = '批改失败：' + e.message; }
+  if (state.grade !== G) return; G.busy = false; render();
+}
+// 最终算错的题：AI 判错且没被纠正，或拿不准时孩子自己选了「错」
+const gradeWrong = x => (x.v === 'wrong' && !x.disp) || (x.v === 'unsure' && x.pick === 'wrong');
+function gradeSum(G){ const c = {ok: 0, wrong: 0, unsure: 0, subj: 0}; G.list.forEach(x => { c[gradeWrong(x) ? 'wrong' : x.v === 'unsure' ? (x.pick ? 'ok' : 'unsure') : x.disp ? 'ok' : x.v]++; }); return c; }
+function vGrade(){
+  const G = state.grade, sb = subjById(G.sid);
+  let h = `<div class="wiz" role="dialog" aria-label="批改作业"><div class="wiz-top"><div style="flex:1;font-weight:600">批改作业 · ${esc(sb.name)}</div><button class="wiz-x" data-act="gclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (G.busy) return h + `<div style="text-align:center;margin-top:60px"><div class="wiz-q">AI 正在批改…</div><p class="muted">它会先自己把题做一遍再对照，一般 20 到 60 秒</p></div></div></div>`;
+  if (G.err) return h + `<div class="signal">${esc(G.err)}</div></div><div class="wiz-foot"><button class="btn primary" data-act="gretry">再批一次</button></div></div>`;
+  if (G.saved) {
+    const its = (G.iids || []).map(findItem).filter(Boolean);
+    h += `<div class="wiz-q" style="font-size:22px;margin-top:6px">${its.length} 道错题进了「重做」</div><p class="small muted" style="margin:-8px 0 12px">每道做一道同类题：考同一个地方，换了数字。两次还不对，可以看这道同类题的讲解。</p>` +
+      its.map(it => `<div class="card" style="padding:12px 14px"><div class="row" style="flex-wrap:nowrap"><span style="flex:1;min-width:0">${(G.vdone || {})[it.id] ? '<span class="spdone">✓</span>' : ''}${esc((it.stem || '').slice(0, 60))}</span><button class="btn sm ${(G.vdone || {})[it.id] ? '' : 'primary'}" data-act="gvar" data-v="${it.id}">${(G.vdone || {})[it.id] ? '再做一道' : '做同类题'}</button></div></div>`).join('');
+    return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="gdone">好了</button></div></div>`;
+  }
+  const c = gradeSum(G), open = G.list.filter(x => x.v === 'unsure' && !x.pick).length;
+  h += `<p class="muted" style="margin:6px 0 12px">对 ${c.ok} · 错 ${c.wrong}${c.unsure ? ' · 拿不准 ' + c.unsure : ''}${c.subj ? ' · 主观题 ' + c.subj : ''}。${c.wrong ? '错的先看提示自己改，改完点「改好了」。' : ''}</p>`;
+  G.list.forEach((x, k) => {
+    const st = gradeWrong(x) ? 'wrong' : x.disp || (x.v === 'unsure' && x.pick === 'ok') ? 'ok' : x.v;
+    h += `<div class="card gq gq-${st}" style="padding:12px 14px"><div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="gv">${GV[st][0]}</span><div style="flex:1;min-width:0">
+      <div>${x.no ? `<b>${esc(x.no)}</b> ` : ''}${esc(x.stem)}</div>${x.ans ? `<div class="small muted" style="margin-top:4px">你的答案：${esc(x.ans)}</div>` : ''}`;
+    if (x.v === 'wrong' && !x.disp) h += `${x.hint ? `<div class="signal" style="margin:8px 0 0"><span class="k">提示</span>${esc(x.hint)}</div>` : ''}<div class="row" style="margin-top:8px"><button class="btn sm ${x.fixed ? 'good' : 'primary'}" data-act="gfix" data-v="${k}">${x.fixed ? '✓ 改好了' : '改好了'}</button><button class="btn sm ghost" data-act="gdisp" data-v="${k}">AI 判错了</button></div>`;
+    else if (x.disp) h += `<div class="small muted" style="margin-top:6px">已按「对」算 <button class="btn sm ghost" data-act="gdisp" data-v="${k}">撤回</button></div>`;
+    else if (x.v === 'unsure') h += `<div class="row" style="margin-top:8px"><span class="small faint">AI 看不准，你自己判断：</span><div class="seg sm"><button data-act="gpick" data-v="${k}" data-c="ok" class="${x.pick === 'ok' ? 'on' : ''}">对</button><button data-act="gpick" data-v="${k}" data-c="wrong" class="${x.pick === 'wrong' ? 'on' : ''}">错</button></div></div>`;
+    else if (x.v === 'subj') h += `<div class="small faint" style="margin-top:6px">主观题不批改，交给老师</div>`;
+    h += `</div></div></div>`; });
+  const foot = open ? `<button class="btn primary" disabled>还有 ${open} 道拿不准，先选对错</button>` : `<button class="btn primary" data-act="gsave">${c.wrong ? `错的 ${c.wrong} 道加入重做` : '都对了，收好'}</button>`;
+  return h + `</div><div class="wiz-foot">${foot}</div></div>`;
+}
+async function varSol(){
+  const V = state.variant, it = findItem(V.iid); if (!it || V.solBusy) return; const sb = subjById(it.sid), q = V.q; V.solBusy = true; render();
+  try { const t = (await aiChat([{role: 'system', content: `你是耐心的初中${sb.name}老师。给下面这道题写完整讲解：分步写，每步一句说清为什么这样做，最后写答案。七年级学生能看懂，公式用普通文字。`}, {role: 'user', content: '题目：' + q}], {temperature: 0.2})).trim();
+    if (state.variant !== V || V.q !== q) return; V.sol = t.slice(0, 1500) || '讲解没生成出来，再点一次试试'; }
+  catch(e) { if (state.variant !== V) return; V.err = '讲解失败：' + e.message; }
+  V.solBusy = false; render();
+}
+function gradeStat(){ const from = addD(today(), -30), P = DB.photos.filter(p => p.grade && p.d >= from);
+  return P.length ? `近 30 天 AI 批改了 ${P.length} 页，孩子纠正「AI 判错了」${P.reduce((a, p) => a + (p.grade.disp || 0), 0)} 次。纠正多的话告诉开发，调一下批改方式。` : ''; }
 /* 同类题：换数字换情境、考同一个易错点，防止重做原题变成背答案。判对错只给提示，不给答案 */
 const findItem = id => DB.items.find(x => x.id === id) || EXT.find(x => x.id === id);
 async function varGen(){
   const V = state.variant, it = findItem(V.iid); if (!it) return;
-  const sb = subjById(it.sid), gen = V.gen = (V.gen || 0) + 1; V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; V.logged = false; render();
+  const sb = subjById(it.sid), gen = V.gen = (V.gen || 0) + 1; V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; V.logged = false; V.sol = ''; render();
   try {
     V.q = (await aiChat([{role: 'system', content: `你是有经验的初中${sb.name}老师。根据学生做错的题，出一道「同类题」：考同一个知识点、同一个容易错的地方，但换数字或换情境，难度相当，七年级学生 5 分钟内能做完。只输出题目本身，不要答案、不要提示、不要解析。数学公式用普通文字写，比如 x^2、3/4。`},
       {role: 'user', content: `原题：${it.stem || '（没有原文）'}\n知识点：${it.tag || '—'}\n错因：${typeName(it)}${subName(it) ? ' · ' + subName(it) : ''}`}], {temperature: 0.7})).trim().slice(0, 600);
@@ -1923,7 +1991,9 @@ function vVariant(){
   if (V.busy) h += `<p class="muted">AI 正在看…</p>`;
   if (V.res) h += `<div class="signal ${V.res.ok ? 'good' : ''}" style="margin-top:12px"><span class="k">${V.res.ok ? '做对了' : '还不对'}</span>${esc(V.res.hint)}</div>`;
   let foot;
-  if (V.res && V.res.ok) foot = V.final ? `<button class="btn good" data-act="vardone" data-ok="1">过关，这道算掌握了</button>` : `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">算这道重做做对了</button>`;
+  if (V.res && !V.res.ok && V.tries >= 2 && !V.final) h += V.sol ? `<div class="card" style="margin-top:12px;white-space:pre-wrap;line-height:1.7"><div class="small faint" style="margin-bottom:4px">这道同类题的讲解</div>${esc(V.sol)}</div>` : `<button class="btn sm" style="margin-top:10px" data-act="varsol" ${V.solBusy ? 'disabled' : ''}>${V.solBusy ? 'AI 正在写讲解…' : '看这道同类题的讲解'}</button>`;
+  if (V.res && V.res.ok && V.from === 'grade') foot = `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">好了</button>`;
+  else if (V.res && V.res.ok) foot = V.final ? `<button class="btn good" data-act="vardone" data-ok="1">过关，这道算掌握了</button>` : `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">算这道重做做对了</button>`;
   else if (V.res) foot = `<button class="btn ghost" data-act="vardone" data-ok="0">还是不会</button><button class="btn primary" data-act="varcheck">改好了，再看看</button>`;
   else foot = `<button class="btn ghost" data-act="vargen">换一道</button><button class="btn primary" data-act="varcheck">对答案</button>`;
   if (V.busy) foot = foot.replace(/<button /g, '<button disabled ');
@@ -2017,14 +2087,14 @@ function vPhotoView(){
   const p = DB.photos.find(x => x.id === state.pview); if (!p) { state.pview = null; return ''; }
   return `<div class="wiz tall" style="background:#000"><div class="wiz-top"><div style="flex:1;color:#ddd">${esc(subjById(p.sid).name||'')} · ${PKIND.find(k=>k[0]===p.kind)[1]} · ${md(p.d)} · ${photoStatus(p)}</div><button class="wiz-x" data-act="pviewclose" aria-label="关闭">×</button></div>
     <div class="wiz-body" style="display:flex;align-items:center;justify-content:center"><img data-pid="${p.id}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>
-    <div class="wiz-foot"><button class="btn danger" data-act="photodel" data-v="${p.id}">删除这张</button>${p.kind === 'error' && aiReady() ? `<button class="btn primary" data-act="rgphoto" data-v="${p.id}">${photoDone(p) ? '再识别一次' : '用 AI 识别错题'}</button>` : ''}<button class="btn" data-act="pviewclose">关闭</button></div></div>`;
+    <div class="wiz-foot"><button class="btn danger" data-act="photodel" data-v="${p.id}">删除这张</button>${p.kind === 'homework' && aiReady() ? `<button class="btn primary" data-act="gphoto" data-v="${p.id}">${p.grade ? '再批一次' : '用 AI 批改'}</button>` : ''}${p.kind === 'error' && aiReady() ? `<button class="btn primary" data-act="rgphoto" data-v="${p.id}">${photoDone(p) ? '再识别一次' : '用 AI 识别错题'}</button>` : ''}<button class="btn" data-act="pviewclose">关闭</button></div></div>`;
 }
 function vPhotoSheet(){
   const ps = state.photo, subs = orderedSubjects(state.date);
   return `<div class="wiz" role="dialog" aria-label="拍照"><div class="wiz-top"><div style="flex:1;font-weight:600">拍照记录 · ${md(state.date)}</div><button class="wiz-x" data-act="photoclose" aria-label="关闭">×</button></div><div class="wiz-body">
     <div class="wiz-q" style="font-size:22px;margin-top:6px">拍的是什么？</div><div class="big">` + PKIND.map(([k,n]) => `<button class="${ps.kind===k?'on':''}" data-act="pkind" data-v="${k}">${n}</button>`).join('') + `</div>
     <div class="wiz-q" style="font-size:22px;margin-top:22px">哪一科？</div><div class="row">` + subs.map(s => `<button class="chip ${ps.sid===s.id?'on':''}" style="min-height:42px;font-size:16px" data-act="psubj" data-v="${s.id}"><span class="dot" style="background:${s.color};margin-right:5px"></span>${esc(s.name)}</button>`).join('') + `</div>
-    <p class="small faint" style="margin-top:18px">${ps.kind === 'error' ? (aiReady() ? '错题照片：只拍做错的题，一张可以拍多道，字小就拍近一点，别拍到名字。拍完 AI 会自动认题、分好类，你确认后进「重做」。' : '错题照片：只拍做错的题，一张可以拍多道。在「家长 → 设置」填了智谱密钥，拍完就能自动识别成错题。') : '照片会存起来，开了同步会加密上传。'}</p></div>
+    <p class="small faint" style="margin-top:18px">${ps.kind === 'homework' ? (aiReady() ? '批改作业：写完拍一页，拍平、拍清楚，别拍到名字。AI 逐题判对错，错的只给提示不给答案，改完每道再做一道同类题。' : '批改作业要先在「家长 → 设置」填智谱密钥（批改用的模型免费）。') : ps.kind === 'error' ? (aiReady() ? '错题照片：只拍做错的题，一张可以拍多道，字小就拍近一点，别拍到名字。拍完 AI 会自动认题、分好类，你确认后进「重做」。' : '错题照片：只拍做错的题，一张可以拍多道。在「家长 → 设置」填了智谱密钥，拍完就能自动识别成错题。') : '照片会存起来，开了同步会加密上传。'}</p></div>
     <div class="wiz-foot"><label class="btn primary" style="display:flex;align-items:center;justify-content:center;gap:8px;${ps.sid?'':'opacity:.45;pointer-events:none'}">${CAM} ${ps.sid ? '拍照 / 从相册选' : '先选科目'}<input type="file" accept="image/*" multiple id="photoin" style="display:none"></label></div></div>`;
 }
 
@@ -3813,9 +3883,9 @@ function attentionItems(){
   return A.slice(0, 3);
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
-const WHATS_NEW = {v: '2026-09-29b',
-  kid: ['「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。', '长的课文可以<b>一段一段背</b>了，每段过了打勾，全过了整篇算会。', '重做点「还是不会」时，可以<b>要一个提示</b>：只给提示，不给答案。'],
-  parent: ['名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。', '单词和背诵的复习按 FSRS 算法排（同样记得住、复习少两三成）；AI 在孩子卡住时主动给提示，周复盘看「提示后自己做对」。', '设置里可以填期中、期末日期：考前两周自动加回检，考前三天不加新单词。']};
+const WHATS_NEW = {v: '2026-09-30',
+  kid: ['拍照可以<b>批改作业</b>了：写完拍一页，错的只给提示，改完每道再做一道同类题。', '「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。', '长的课文可以<b>一段一段背</b>了，每段过了打勾，全过了整篇算会。'],
+  parent: ['拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题只给提示不给答案，自动进重做，每道再出一道同类题，两次不对才讲同类题。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。', '单词和背诵的复习按 FSRS 算法排（同样记得住、复习少两三成）；AI 在孩子卡住时主动给提示，周复盘看「提示后自己做对」。']};
 function whatsNew(who){
   let seen = ''; try { seen = localStorage.getItem('observer:new-' + who) || ''; } catch(e) { return ''; }
   if (seen >= WHATS_NEW.v) return '';
@@ -3917,7 +3987,7 @@ function guideCard(){
 }
 function aiCard(){
   if (aiReady() && !state.aiEdit) return `<div class="card"><h3>AI 学习教练 <span class="pill good">已开启</span></h3>
-    <p class="small muted" style="margin:0 0 8px">${(AI.model || 'glm-4.6v-flash') === 'glm-4.6v-flash' ? 'GLM-4.6V-Flash（免费）' : esc(AI.model)}${asrPaused() ? ' · 语音识别余额不足，暂时用设备自带识别' : ''}</p>
+    <p class="small muted" style="margin:0 0 8px">${(AI.model || 'glm-4.6v-flash') === 'glm-4.6v-flash' ? 'GLM-4.6V-Flash（免费）' : esc(AI.model)}${asrPaused() ? ' · 语音识别余额不足，暂时用设备自带识别' : ''}</p>${gradeStat() ? `<p class="small muted" style="margin:0 0 8px">${gradeStat()}</p>` : ''}
     <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [...new Set([10, 20, 30, 45, tutorLimit()])].sort((x, y) => x - y).map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分</button>`).join('') + `</div>
     <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="aitest">检查 AI 功能</a><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div>${aiTestHTML()}${memCard()}</div>`;
   return `<div class="card"><h3>AI 学习教练 · 语音识别 ${aiReady() ? '<span class="pill good">已开启</span>' : '<span class="pill">未开启</span>'}</h3>
@@ -3931,13 +4001,14 @@ function aiCard(){
 }
 async function aiChat(messages, opts, tries){
   tries = tries || 0; let r;
-  const ac = window.AbortController ? new AbortController() : null, to = ac && setTimeout(() => ac.abort(), 90000);
+  const tmo = (opts && opts._to) || 90000; if (opts && opts._to) { opts = Object.assign({}, opts); delete opts._to; }
+  const ac = window.AbortController ? new AbortController() : null, to = ac && setTimeout(() => ac.abort(), tmo);
   try { r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key, 'Content-Type':'application/json'}, signal: ac ? ac.signal : undefined,
     body: JSON.stringify(Object.assign({model: AI.model || 'glm-4.6v-flash', messages, stream:false}, opts || {}))}); clearTimeout(to); }
-  catch(e) { clearTimeout(to); if (e.name === 'AbortError') throw new Error('智谱 90 秒没回应，再试一次'); if (tries < 1) { await new Promise(res => setTimeout(res, 1500)); return aiChat(messages, opts, tries + 1); } throw new Error('连不上智谱，检查一下网络'); }
+  catch(e) { clearTimeout(to); if (e.name === 'AbortError') throw new Error(`智谱 ${Math.round(tmo / 1000)} 秒没回应，再试一次`); if (tries < 1) { await new Promise(res => setTimeout(res, 1500)); return aiChat(messages, Object.assign({}, opts, {_to: tmo}), tries + 1); } throw new Error('连不上智谱，检查一下网络'); }
   if (!r.ok) { const t = await r.text(); let code = '', why = ''; try { const j = JSON.parse(t); code = String((j.error && j.error.code) || ''); why = (j.error && j.error.message) || ''; } catch(e) {}
     // 免费模型并发满了（429）或服务端临时出错（5xx）：等一会儿自动重试；欠费（1113）不重试
-    if ((r.status === 429 && code !== '1113' && !/余额|欠费/.test(why)) || r.status >= 500) { if (tries < 2) { await new Promise(res => setTimeout(res, [2000, 5000][tries])); return aiChat(messages, opts, tries + 1); } throw new Error('智谱现在太忙（' + r.status + '），过一两分钟再试'); }
+    if ((r.status === 429 && code !== '1113' && !/余额|欠费/.test(why)) || r.status >= 500) { if (tries < 2) { await new Promise(res => setTimeout(res, [2000, 5000][tries])); return aiChat(messages, Object.assign({}, opts, {_to: tmo}), tries + 1); } throw new Error('智谱现在太忙（' + r.status + '），过一两分钟再试'); }
     throw new Error(r.status === 401 ? '密钥不对' : code === '1113' || /余额|欠费/.test(why) ? '智谱账户余额不足' : '模型返回 ' + r.status + ' ' + (why || t).slice(0, 80)); }
   const j = await r.json(); return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
 }
@@ -4109,7 +4180,24 @@ const ACT = {
     else if (n > 0 && n <= 600) { r.min = Math.round(n); }
     else return toast('填分钟数，或者填开始和结束时间');
     r.none = false; if (!r.intr) r.intr = 'none'; save(); toast(`记 ${r.min} 分钟`); render(); },
-  photoopen: () => { state.photo = {kind:'error', sid: state.openSubj || null}; render(); },
+  photoopen: () => { state.photo = {kind: aiReady() ? 'homework' : 'error', sid: state.openSubj || null}; render(); },
+  gphoto: el => { state.pview = null; gradePhoto(el.dataset.v); },
+  gretry: () => gradePhoto(state.grade.pid),
+  gfix: el => { const x = state.grade.list[+el.dataset.v]; x.fixed = !x.fixed; render(); },
+  gdisp: el => { const x = state.grade.list[+el.dataset.v]; x.disp = !x.disp; render(); },
+  gpick: el => { const x = state.grade.list[+el.dataset.v]; x.pick = x.pick === el.dataset.c ? null : el.dataset.c; render(); },
+  gclose: () => { const G = state.grade; if (G && !G.busy && !G.saved && G.list.some(gradeWrong) && !confirm('错题还没加入重做，确定关掉？（照片留着，之后点照片能再批）')) return; state.grade = null; render(); },
+  gdone: () => { state.grade = null; render(); },
+  gsave: () => { const G = state.grade, p = DB.photos.find(x => x.id === G.pid), d = p ? p.d : state.date, iids = [];
+    const had = new Set(DB.items.filter(i => i.photoId === G.pid).map(i => (i.stem || '').trim()));
+    for (const x of G.list) if (gradeWrong(x) && x.stem.trim() && !had.has(x.stem.trim())) { const id = uid('i'); iids.push(id);
+      DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: null, photoId: G.pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
+    if (p) { const c = gradeSum(G); p.grade = {n: G.list.length, wrong: c.wrong, disp: G.list.filter(x => x.disp).length, at: today()}; p.u = now(); }
+    touchDay(d); save();
+    if (!iids.length) { state.grade = null; render(); toast(G.list.some(gradeWrong) ? '这些错题之前已经加过了' : '这页都对了 ✓'); return; }
+    G.saved = true; G.iids = iids; G.vdone = {}; render(); },
+  gvar: el => { state.variant = {iid: el.dataset.v, from: 'grade'}; varGen(); },
+  varsol: () => varSol(),
   photoclose: () => { state.photo = null; render(); },
   pkind: el => { state.photo.kind = el.dataset.v; render(); },
   psubj: el => { state.photo.sid = el.dataset.v; render(); },
@@ -4123,6 +4211,7 @@ const ACT = {
   varcheck: () => { state.variant.err = ''; varCheck(); },
   varclose: () => { state.variant = null; render(); },
   vardone: el => { const V = state.variant, id = V.iid, ok = el.dataset.ok === '1'; state.variant = null;
+    if (V.from === 'grade') { if (ok && state.grade) (state.grade.vdone = state.grade.vdone || {})[id] = true; render(); return; }
     if (V.final) { if (ok) redoItem(id, true, true); else finalMiss(id); } else if (ok) redoItem(id, true, true); else render(); },
   varself: () => { const id = state.variant.iid; state.variant = null; finalMiss(id, true); },
   memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
@@ -4415,7 +4504,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.wiz)
 let lastToday = today();
 /* 跨过零点：切回前台、每分钟、点「今天」时都检查；正在记作业/记问题等弹窗里时先不切，免得记到一半落到新的一天 */
 function checkDay(){ const t = today(); if (t === lastToday) return false;
-  if (state.wiz || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.photo || state.voice || isTyping()) return false;
+  if (state.wiz || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.grade || state.photo || state.voice || isTyping()) return false;
   if (state.date === lastToday) state.date = t; if (state.week === monOf(lastToday)) state.week = monOf(t); if (state.month === mKey(lastToday)) state.month = mKey(t);
   lastToday = t; render(); return true; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDay(); });
