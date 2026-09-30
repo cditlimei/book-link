@@ -486,7 +486,7 @@ a{color:var(--accent);text-decoration:none}
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v59';
+const APP_V = 'v60';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1665,7 +1665,7 @@ function vQuick(){
   return `<div class="wiz" role="dialog" aria-label="记一个问题"><div class="wiz-top"><div style="flex:1;font-weight:600">记一个问题 · ${md(state.date)}</div><button class="wiz-x" data-act="qpclose" aria-label="关闭">×</button></div><div class="wiz-body">
     <div class="wiz-q" style="font-size:21px;margin-top:4px">哪一科？</div><div class="row">` + subs.map(x => `<button class="chip ${Q.sid === x.id ? 'on' : ''}" style="min-height:44px;font-size:16px" data-act="qpsubj" data-v="${x.id}"><span class="dot" style="background:${x.color};margin-right:5px"></span>${esc(x.name)}</button>`).join('') + `</div>
     <div class="wiz-q" style="font-size:21px;margin-top:20px">遇到什么问题？</div>
-    <div class="withmic"><textarea id="qp-text" data-in="qptext" class="wiz-in" style="min-height:110px" placeholder="说一句就行，比如：&#10;去括号后面的项忘了变号&#10;第 3 题不知道用哪个公式&#10;作文不知道怎么开头">${esc(Q.text || '')}</textarea>${micBtn('qp-text')}</div>
+    <div class="withmic"><textarea id="qp-text" data-in="qptext" class="wiz-in" style="min-height:150px" placeholder="说一句就行，比如：&#10;去括号后面的项忘了变号&#10;第 3 题不知道用哪个公式&#10;作文不知道怎么开头">${esc(Q.text || '')}</textarea>${micBtn('qp-text')}</div>
     <button class="btn primary" style="width:100%;min-height:52px;font-size:18px;margin-top:12px" data-act="qpsave">保存</button>
     <p class="small faint" style="margin-top:8px">不用选是计算还是概念问题，${aiReady() ? 'AI' : 'app'} 会自动归类。会进「重做」，隔几天再考一次。</p></div></div>`;
 }
@@ -2793,7 +2793,7 @@ function vTrends(){
   DB.exams.forEach(e => { const t = termOf(e.date, DB.settings.startYear); if (t.idx>=0 && t.idx<6) cnt[t.idx]++; });
   Object.keys(DB.days).forEach(d => { const t = termOf(d, DB.settings.startYear); if (t.idx>=0 && t.idx<6 && dayHasData(d)) dcnt[t.idx]++; });
   const y0 = DB.settings.startYear;
-  h += `<div class="card"><h3>初中三年</h3><div class="terms">` + TERM_N.map((n,i) => `<div class="${i===cur.idx?'now':i<cur.idx?'past':''}">${n}<b>${dcnt[i]||'·'}</b>${cnt[i]?cnt[i]+'次考试':'&nbsp;'}</div>`).join('') + `</div>
+  h += `<div class="card"><h3>初中三年</h3><div class="terms">` + TERM_N.map((n,i) => `<div class="${i===cur.idx?'now':i<cur.idx?'past':''}">${n}<b>${dcnt[i]||'·'}</b>${cnt[i]?cnt[i]+' 次考':'&nbsp;'}</div>`).join('') + `</div>
     <p class="small faint" style="margin:8px 0 10px">格子里的数字 = 记录天数</p>
     <div class="signal" style="margin-top:4px"><span class="k">别转学</span>名额分配占公办普高计划的一半，资格是<b>从初一第一学期起一直在同一所初中就读</b>，中途转学就没有了。</div>
     <div class="ms"><span class="when">每学期末</span><span>综合素质评价（学生自评、亲子共评、老师评语），省一级高中录取要「达标」</span></div>
@@ -3394,11 +3394,11 @@ function vWordCard(){
   const w = q[0], s = wState(w), flip = L.flip, mustSpell = !!s && (s.box || 0) >= 2 && !w.u, spellOk = (L.typed || '').trim().toLowerCase() === w.w.toLowerCase();
   h += `<div class="card" style="margin-top:12px;text-align:center;padding:28px 16px">
     <div class="small faint">${s ? '复习 · 第 ' + ((s.hist||[]).length + 1) + ' 次' : '新词'}${w.unit ? ' · ' + esc(w.unit) : ''}</div>
-    <div style="font-size:26px;font-weight:700;margin:14px 0 4px">${esc(shortCn(w.cn))}</div>
+    <div style="font-size:26px;font-weight:700;margin:14px 0 4px">${(() => { const m = shortCn(w.cn).match(/^((?:[a-z]+\.\s*)+)?(.*)$/); return (m[1] ? `<span style="font-size:15px;font-weight:500;color:var(--ink3);margin-right:6px">${esc(m[1].trim())}</span>` : '') + esc(m[2]); })()}</div>
     ${!flip ? `<input type="text" id="w-spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${mustSpell ? '这一轮要拼出来' : '拼一下（可选）'}" value="${esc(L.typed||'')}" style="max-width:260px;margin:12px auto 0;display:block;text-align:center;font-family:Georgia,serif;font-size:20px">` : ''}
     ${flip ? `<div style="font-size:34px;font-weight:700;margin:22px 0 4px;font-family:Georgia,serif">${esc(w.w)}</div><div class="muted">${esc(w.p || '')}</div>
       ${L.typed ? (L.typed.trim().toLowerCase() === w.w.toLowerCase() ? '<div class="pill good" style="display:inline-block;margin-top:8px">拼对了</div>' : `<div class="small" style="margin-top:8px;color:var(--amber)">你拼的是：${esc(L.typed)}</div>`) : ''}
-      <div class="small faint" style="margin-top:6px">${esc(w.cn || '')}</div>${w.book === termBook(today()) ? `<div class="small" style="margin-top:4px;color:var(--accent)">课本 ${esc(w.unit)}${w.u ? ' · 只要求认识，不用会拼' : ''}</div>` : ''}
+      ${w.cn && w.cn !== shortCn(w.cn) ? `<div class="small faint" style="margin-top:6px">${esc(w.cn)}</div>` : ''}${w.book === termBook(today()) ? `<div class="small" style="margin-top:4px;color:var(--accent)">课本 ${esc(w.unit)}${w.u ? ' · 只要求认识，不用会拼' : ''}</div>` : ''}
       <button class="btn sm" style="margin-top:10px" data-act="say" data-v="${esc(w.w)}">${SPK} 再听一遍</button>` : `<p class="small faint" style="margin-top:22px">${mustSpell ? '记住两轮了，这次要把它拼出来' : '先在心里想（或写在纸上）英文怎么说'}</p>`}</div>`;
   h += flip && mustSpell ? (spellOk ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">拼对了 ✓ 下一个</button></div>`
       : `<div class="row"><button class="btn" style="flex:2;min-height:52px" data-act="wmark" data-v="0">拼错了，过两天再考</button><button class="btn ghost" style="flex:1;min-height:52px" data-act="wmark" data-v="1">只是手滑</button></div>`)
