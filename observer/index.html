@@ -550,7 +550,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v69';
+const APP_V = 'v70';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1547,7 +1547,7 @@ function render(){
   state._wk = wk;
   $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.hint ? vHint() : state.variant ? vVariant() : state.grade ? vGrade() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
-  document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor || state.holE || state.hint) ? 'hidden' : '';
+  document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.grade || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor || state.holE || state.hint) ? 'hidden' : '';
   hydratePhotos(); updateBadge();
 }
 
@@ -1678,7 +1678,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
   const yd = addD(d, -1), ydd = DB.days[yd];
   const ygp = isToday ? DB.photos.filter(p => p.d === yd && p.grade && !p.tcmp) : [];
   if (ygp.length && !(ydd || {}).errAsked) {   // 昨天用 AI 批改过：问老师批的和 AI 一样吗（攒数据看批改靠不靠谱）
-    const by = {}; ygp.forEach(p => { const k = subjById(p.sid).name || ''; by[k] = by[k] || [0, 0]; by[k][0]++; by[k][1] += p.grade.wrong || 0; });
+    const by = {}; ygp.forEach(p => { const k = subjById(p.sid).name || ''; by[k] = by[k] || [0, 0]; by[k][0]++; by[k][1] += gradeItems(p.id).length; });
     const wr = DB.items.filter(i => i.src === '拍照批改' && ygp.some(p => p.id === i.photoId));
     h += `<div class="card" id="tcmp"><h3>老师批的和 AI 一样吗？</h3><p class="small muted" style="margin:0 0 8px">昨天 AI 批改了${Object.entries(by).map(([n, [k, w]]) => ` ${esc(n)} ${k} 页（错 ${w} 道）`).join('、')}。老师批改发回来后对一下：</p>` +
       (state.tcmpLess ? `<div class="small muted" style="margin:0 0 6px">点掉老师判对的（AI 冤枉的）：</div>` + wr.map(i => `<div class="row" style="padding:6px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><span style="flex:1;min-width:0">${esc((i.stem || '').slice(0, 50))}</span><button class="btn sm ${(state.tcmpX || {})[i.id] ? 'good' : ''}" data-act="tcmpx" data-v="${i.id}">${(state.tcmpX || {})[i.id] ? '✓ 其实对了' : '其实对了'}</button></div>`).join('') +
@@ -1796,15 +1796,14 @@ async function compressImage(file){
   return await new Promise(res => c.toBlob(res, 'image/jpeg', 0.82));
 }
 async function addPhotos(files){
-  const ps = state.photo; let n = 0;
+  const ps = state.photo; let n = 0; const newIds = [];
   for (const f of files) {
     try { const blob = await compressImage(f); const id = uid('p');
       await IDB.set('photo:' + id, blob); photoURL[id] = URL.createObjectURL(blob);
-      DB.photos.push({id, d: state.date, sid: ps.sid, kind: ps.kind, up:false, size: blob.size, u: now()}); n++;
+      DB.photos.push({id, d: state.date, sid: ps.sid, kind: ps.kind, up:false, size: blob.size, u: now()}); newIds.push(id); n++;
     } catch(e) { toast('有一张照片读不出来'); }
   }
   touchDay(state.date); save(); state.photo = null; render();
-  const newIds = DB.photos.slice(-n).map(x => x.id);
   if (n && ps.kind === 'error' && aiReady() && !DEMO) { recogPhoto(newIds); return; }
   if (n && ps.kind === 'homework' && aiReady() && !DEMO) { gradePhoto(newIds); return; }
   toast(n ? `存了 ${n} 张` + (syncReady() ? '，稍后自动加密上传' : '（没开同步，只存在这台设备）') : '没有存上');
@@ -1843,7 +1842,8 @@ async function photoSrc(p){
 }
 function hydratePhotos(){ document.querySelectorAll('img[data-pid]').forEach(async img => { const p = DB.photos.find(x => x.id === img.dataset.pid); if (!p) return; const u = await photoSrc(p); if (u) img.src = u; else img.alt = '在别的设备上'; }); }
 const photoDone = p => EXT.filter(x => x.photoId === p.id).length + DB.items.filter(x => x.photoId === p.id).length;
-function photoStatus(p){ const n = photoDone(p); if (p.grade) return p.grade.wrong ? `已批改 · 错 ${p.grade.wrong}` : '已批改 · 全对'; return n ? `已识别 ${n} 道` : p.kind === 'error' && aiReady() ? '还没识别' : p.kind === 'homework' && aiReady() ? '还没批改' : p.up ? '已上传' : syncReady() ? '待上传' : '只在本机'; }
+const gradeItems = pid => DB.items.filter(i => i.photoId === pid && i.src === '拍照批改');
+function photoStatus(p){ const n = photoDone(p); if (p.grade) { const w = gradeItems(p.id).length; return w ? `已批改 · 错 ${w}` : '已批改 · 全对'; } return n ? `已识别 ${n} 道` : p.kind === 'error' && aiReady() ? '还没识别' : p.kind === 'homework' && aiReady() ? '还没批改' : p.up ? '已上传' : syncReady() ? '待上传' : '只在本机'; }
 /* 拍照识别错题：智谱视觉模型读题 + 按本科分类体系归类；结果先给孩子/家长确认，确认后进重做 */
 const blobToDataURL = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
 function parseJSONObj(t){
@@ -1926,11 +1926,19 @@ async function gradePhoto(pids){
   G.err = errs.join('；'); if (!G.list.length && !G.err) G.err = '没在照片里找到题目。换个角度、拍近一点再试。';
   G.busy = false; render();
 }
-// 提示里带出了正确答案就换掉：长答案按包含判断；一两个字的短答案（3、A）只在「= 3」「是 A」「答案 3」这类说法里算漏
-const gNorm = t => String(t || '').replace(/\s+/g, '').replace(/＝/g, '=').replace(/[，,。．]/g, '').toLowerCase();
-function hintLeaks(hint, key){
-  const h = gNorm(hint), ks = [gNorm(key)]; const m = ks[0].match(/=(.+)$/); if (m) ks.push(m[1]);
-  return ks.some(k => k && (k.length > 2 ? h.includes(k) : new RegExp('(=|是|为|选|答案|结果)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9.])').test(h)));
+// 提示里带出了正确答案就换掉：各种减号、度、全角等号先统一；多个答案拆开逐个查；
+// 长答案按包含判断；一两个字的短答案只认「= 3」「是 A」「等于 3」「答案 3」这类说法；数字答案再按数值比（3/4 与 0.75 算同一个），题目里本来就有的数不算
+const CN_D = {'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+const gNorm = t => String(t || '').replace(/\s+/g, '').replace(/＝/g, '=').replace(/[－−—–﹣]/g, '-').replace(/度/g, '°').replace(/[。．]/g, '')
+  .replace(/([零一二两三四五六七八九十])分之([零一二两三四五六七八九十])/g, (m, a, b) => CN_D[b] + '/' + CN_D[a]).toLowerCase();
+const gNums = t => (String(t).match(/-?\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?/g) || []).map(m => { const [a, b] = m.split('/'); return b ? +a / +b : +a; }).filter(v => isFinite(v));
+function hintLeaks(hint, key, stem){
+  const h = gNorm(hint), whole = gNorm(key), parts = [whole].concat(whole.split(/[,，;；、]|和|及/)).filter(Boolean);
+  const ks = []; parts.forEach(k => { ks.push(k); const m = k.match(/=([^=]+)$/); if (m) ks.push(m[1]); });
+  const PRE = '(=|是|为|选|填|得|等于|得到|答案|结果|应填|应是|应为|应该是)';
+  if (ks.some(k => k && (k.length > 2 ? h.includes(k) : new RegExp(PRE + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9.])').test(h)))) return true;
+  const sn = gNums(gNorm(stem)), hn = gNums(h.replace(/第-?\d+[步题行问小节个]?|\d+(步|题|行|问|小题)/g, ''));   // 「第3步」「5题」是序号不是答案
+  return ks.some(k => /^-?\d+(\.\d+)?(\/\d+(\.\d+)?)?°?$/.test(k) && gNums(k).some(v => !sn.some(x => Math.abs(x - v) < 1e-9) && hn.some(x => Math.abs(x - v) < 1e-9)));
 }
 const HINT_SAFE = '对照课本例题，再检查这一步。';
 async function gradeOne(pid, sid, G){
@@ -1945,6 +1953,7 @@ key 写这题的正确答案（只写结果，主观题留空）。
 ${cats}
 只输出 JSON 数组，不要别的文字：[{"no":"题号","stem":"题目原文，太长精简到 120 字内，公式用普通文字","ans":"学生写的答案，照抄，看不清的字写？","v":"ok","key":"","hint":"","type":"calc","sub":"","tag":"知识点，10 字内"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
   const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '批改这页' + sb.name + '作业'}]}], {temperature: 0.1, thinking: {type: 'enabled'}, _to: 180000});
+  if (state.grade !== G) return [];
   const list = parseJSONList(out); if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
   const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
   const L = list.slice(0, 30).map(x => ({no: String(x.no || '').slice(0, 8), stem: String(x.stem || '').slice(0, 300), ans: String(x.ans || '').slice(0, 200), v: GV[x.v] ? x.v : 'unsure', hint: String(x.hint || '').slice(0, 120), key: String(x.key || '').slice(0, 80),
@@ -1952,14 +1961,17 @@ ${cats}
   // 判错的再复核一次（只用文字重做这一道）：两次都错才算错，结论不一样改成「拿不准」让孩子自己选
   const W = L.filter(x => x.v === 'wrong' && x.ans.trim() && !/还没写/.test(x.hint));
   if (W.length) { G.stage = '复核'; if (state.grade === G) render(); }
-  for (let i = 0; i < W.length; i += 3) await Promise.all(W.slice(i, i + 3).map(async x => {
+  for (const x of W) {   // 一道一道复核：免费模型并发有限，一起发容易 429
+    if (state.grade !== G) return [];
     try { const j = parseJSONObj(await aiChat([{role: 'system', content: `你是初中${sb.name}老师。先自己独立把这道题做一遍，再判断学生的答案对不对。只输出 JSON：{"ok":true 或 false，没有把握写 null,"key":"正确答案，只写结果"}`},
         {role: 'user', content: `题目：${x.stem}\n学生的答案：${x.ans}`}], {temperature: 0.1, thinking: {type: 'enabled'}, _to: 120000}));
-      if (!j || j.ok !== false) { x.v = 'unsure'; x.rev = true; }
+      if (!j) { x.v = 'unsure'; x.norev = true; }                        // 复核没出结果：不硬判错，让孩子自己选
+      else if (j.ok !== false) { x.v = 'unsure'; x.rev = true; }          // 两次结论不一样
       if (j && j.key && !x.key) x.key = String(j.key).slice(0, 80);
-    } catch(e) { /* 复核失败就按第一遍的结论 */ }
-  }));
-  L.forEach(x => { if (x.hint && x.key && hintLeaks(x.hint, x.key)) x.hint = HINT_SAFE; if (x.v === 'wrong' && !x.hint) x.hint = HINT_SAFE; delete x.key; });   // 正确答案只用来拦提示，不显示、不保存
+    } catch(e) { x.v = 'unsure'; x.norev = true; }
+  }
+  if (state.grade !== G) return [];
+  L.forEach(x => { if (x.hint && !/还没写/.test(x.hint) && (!x.key || hintLeaks(x.hint, x.key, x.stem))) x.hint = HINT_SAFE; if (x.v === 'wrong' && !x.hint) x.hint = HINT_SAFE; delete x.key; });   // 没有正确答案可对照时也换成安全提示   // 正确答案只用来拦提示，不显示、不保存
   return L;
 }
 const gradeWrong = x => (x.v === 'wrong' && !x.disp) || (x.v === 'unsure' && x.pick === 'wrong');
@@ -1984,7 +1996,7 @@ function vGrade(){
       <div>${(G.pids || []).length > 1 ? `<span class="small faint">第 ${x.page} 页 · </span>` : ''}${x.no ? `<b>${esc(x.no)}</b> ` : ''}${esc(x.stem)}</div>${x.ans ? `<div class="small muted" style="margin-top:4px">你的答案：${esc(x.ans)}</div>` : ''}`;
     if (x.v === 'wrong' && !x.disp) h += `${x.hint ? `<div class="signal" style="margin:8px 0 0"><span class="k">提示</span>${esc(x.hint)}</div>` : ''}<div class="row" style="margin-top:8px"><button class="btn sm ${x.fixed ? 'good' : 'primary'}" data-act="gfix" data-v="${k}">${x.fixed ? '✓ 改好了' : '改好了'}</button><button class="btn sm ghost" data-act="gdisp" data-v="${k}">AI 判错了</button></div>`;
     else if (x.disp) h += `<div class="small muted" style="margin-top:6px">已按「对」算 <button class="btn sm ghost" data-act="gdisp" data-v="${k}">撤回</button></div>`;
-    else if (x.v === 'unsure') h += `<div class="row" style="margin-top:8px"><span class="small faint">${x.rev ? 'AI 两次结论不一样，你自己判断：' : 'AI 看不准，你自己判断：'}</span><div class="seg sm"><button data-act="gpick" data-v="${k}" data-c="ok" class="${x.pick === 'ok' ? 'on' : ''}">对</button><button data-act="gpick" data-v="${k}" data-c="wrong" class="${x.pick === 'wrong' ? 'on' : ''}">错</button></div></div>`;
+    else if (x.v === 'unsure') h += `<div class="row" style="margin-top:8px"><span class="small faint">${x.rev ? 'AI 两次结论不一样，你自己判断：' : x.norev ? 'AI 没能复核这道，你自己判断：' : 'AI 看不准，你自己判断：'}</span><div class="seg sm"><button data-act="gpick" data-v="${k}" data-c="ok" class="${x.pick === 'ok' ? 'on' : ''}">对</button><button data-act="gpick" data-v="${k}" data-c="wrong" class="${x.pick === 'wrong' ? 'on' : ''}">错</button></div></div>`;
     else if (x.v === 'subj') h += `<div class="small faint" style="margin-top:6px">主观题不批改，交给老师</div>`;
     h += `</div></div></div>`; });
   const foot = open ? `<button class="btn primary" disabled>还有 ${open} 道拿不准，先选对错</button>` : `<button class="btn primary" data-act="gsave">${c.wrong ? `错的 ${c.wrong} 道加入重做` : '都对了，收好'}</button>`;
@@ -1993,7 +2005,7 @@ function vGrade(){
 async function varSol(){
   const V = state.variant, it = findItem(V.iid); if (!it || V.solBusy) return; const sb = subjById(it.sid), q = V.q; V.solBusy = true; render();
   try { const t = (await aiChat([{role: 'system', content: `你是耐心的初中${sb.name}老师。给下面这道题写完整讲解：分步写，每步一句说清为什么这样做，最后写答案。七年级学生能看懂，公式用普通文字。`}, {role: 'user', content: '题目：' + q}], {temperature: 0.2})).trim();
-    if (state.variant !== V || V.q !== q) return; V.sol = t.slice(0, 1500) || '讲解没生成出来，再点一次试试'; }
+    if (state.variant !== V || V.q !== q) return; V.sol = t.slice(0, 1500) || '讲解没生成出来，再点一次试试'; V.sawSol = true; }
   catch(e) { if (state.variant !== V) return; V.err = '讲解失败：' + e.message; }
   V.solBusy = false; render();
 }
@@ -2005,7 +2017,7 @@ function gradeStat(){ const from = addD(today(), -30), P = DB.photos.filter(p =>
 const findItem = id => DB.items.find(x => x.id === id) || EXT.find(x => x.id === id);
 async function varGen(){
   const V = state.variant, it = findItem(V.iid); if (!it) return;
-  const sb = subjById(it.sid), gen = V.gen = (V.gen || 0) + 1; V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; V.logged = false; V.sol = ''; render();
+  const sb = subjById(it.sid), gen = V.gen = (V.gen || 0) + 1; V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; V.logged = false; V.sol = ''; V.sawSol = false; render();
   try {
     V.q = (await aiChat([{role: 'system', content: `你是有经验的初中${sb.name}老师。根据学生做错的题，出一道「同类题」：考同一个知识点、同一个容易错的地方，但换数字或换情境，难度相当，七年级学生 5 分钟内能做完。只输出题目本身，不要答案、不要提示、不要解析。数学公式用普通文字写，比如 x^2、3/4。`},
       {role: 'user', content: `原题：${it.stem || '（没有原文）'}\n知识点：${it.tag || '—'}\n错因：${typeName(it)}${subName(it) ? ' · ' + subName(it) : ''}`}], {temperature: 0.7})).trim().slice(0, 600);
@@ -2025,6 +2037,7 @@ async function varCheck(){
     const j = parseJSONObj(out); if (!j) throw new Error('判断结果看不懂');
     V.res = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)}; V.tries++;
     if (!V.logged && !it.ext) { it.vh = (it.vh || []).concat([{d: today(), ok: V.res.ok}]).slice(-10); it.u = now(); V.logged = true; save(); }
+    if (V.res.ok && !it.ext && it.vok !== today()) { it.vok = today(); it.u = now(); save(); }   // 第几次做对都算「今天同类题做对了」
   } catch(e) { V.err = '判断失败：' + e.message; }
   V.busy = false; render();
 }
@@ -2042,7 +2055,8 @@ function vVariant(){
   if (V.res) h += `<div class="signal ${V.res.ok ? 'good' : ''}" style="margin-top:12px"><span class="k">${V.res.ok ? '做对了' : '还不对'}</span>${esc(V.res.hint)}</div>`;
   let foot;
   if (V.res && !V.res.ok && V.tries >= 2 && !V.final) h += V.sol ? `<div class="card" style="margin-top:12px;white-space:pre-wrap;line-height:1.7"><div class="small faint" style="margin-bottom:4px">这道同类题的讲解</div>${esc(V.sol)}</div>` : `<button class="btn sm" style="margin-top:10px" data-act="varsol" ${V.solBusy ? 'disabled' : ''}>${V.solBusy ? 'AI 正在写讲解…' : '看这道同类题的讲解'}</button>`;
-  if (V.res && V.res.ok && V.from === 'grade') foot = `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">好了</button>`;
+  if (V.res && V.res.ok && V.sawSol && V.from !== 'grade' && !V.final) foot = `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn" data-act="vardone" data-ok="0">好了（看过讲解，这次不算做对）</button>`;
+  else if (V.res && V.res.ok && V.from === 'grade') foot = `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">好了</button>`;
   else if (V.res && V.res.ok) foot = V.final ? `<button class="btn good" data-act="vardone" data-ok="1">过关，这道算掌握了</button>` : `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">算这道重做做对了</button>`;
   else if (V.res) foot = `<button class="btn ghost" data-act="vardone" data-ok="0">还是不会</button><button class="btn primary" data-act="varcheck">改好了，再看看</button>`;
   else foot = `<button class="btn ghost" data-act="vargen">换一道</button><button class="btn primary" data-act="varcheck">对答案</button>`;
@@ -3540,14 +3554,15 @@ function readPlan(t){
   const cur = recs.find(o => o.r.total && o.nowp < o.r.total) || null, allLeft = recs.reduce((a, o) => a + o.left, 0);
   // 按天加权分：放假的日子算 2 份、标了「出去玩」的算 0，总量和截止日不变
   const W = range(t, dl).reduce((a, x) => a + readW(x), 0), wt = readW(t);
-  const past = t > dl, q = cur && !past && wt ? Math.min(cur.r.total - cur.before, Math.ceil(allLeft * wt / Math.max(W, wt))) : 0;   // 过了计划读完的日期（寒暑假前后）不再按天压量
+  const past = t > dl, q = cur && !past && (wt || !W) ? Math.min(cur.r.total - cur.before, Math.ceil(W ? allLeft * wt / W : allLeft / days)) : 0;   // 过了计划读完的日期（寒暑假前后）不再按天压量
   const readToday = recs.reduce((a, o) => a + Math.max(0, o.nowp - o.before), 0);   // 今天读完一本又开始下一本，也算读过
   return {tk, dl, days, recs, cur, q, past, done: !!cur && readToday >= q, started: recs.some(o => o.r.total)};
 }
 // 落后：从开始读那天起按天均匀应读的页数 − 实际读的页数，超过 3 天的量才算
 function readBehind(t){
   const P = readPlan(t), R = P.recs.filter(o => o.r.total); if (!R.length || P.past) return 0;
-  const s0 = R.map(o => o.r.at || Object.keys(o.r.log || {}).sort()[0] || t).sort()[0], span = Math.max(1, dayDiff(s0, P.dl) + 1), past = Math.max(0, dayDiff(s0, t));
+  const s0 = R.map(o => o.r.at || Object.keys(o.r.log || {}).sort()[0] || t).sort()[0], Wr = (a, b) => a > b ? 0 : range(a, b).reduce((x, d) => x + readW(d), 0);
+  const span = Math.max(1, Wr(s0, P.dl)), past = Wr(s0, addD(t, -1));   // 应读页数和每天分页用同一套权重（放假 2 份、出去玩 0 份）
   const tot = R.reduce((a, o) => a + o.r.total, 0), done = R.reduce((a, o) => a + o.before, 0), lag = tot * past / span - done;
   return lag >= 3 * tot / span && lag >= 10 ? Math.round(lag) : 0;
 }
@@ -3906,8 +3921,8 @@ function todayGlance(){
     probs.map(it => `<div style="margin:3px 0">· <b>${esc(subjById(it.sid).name)}</b> ${esc((it.stem || it.tag).slice(0, 60))}</div>`).join('') +
     stuck.filter(([s, r]) => !probs.some(it => it.sid === s.id && (it.stem || '').startsWith(r.stuck.slice(0, 8)))).map(([s, r]) => `<div style="margin:3px 0">· <b>${esc(s.name)}</b> ${esc(r.stuck.slice(0, 60))}</div>`).join('');
   { const gp = DB.photos.filter(p => p.d === d && p.grade); if (gp.length) { const by = {}; gp.forEach(p => { const k = subjById(p.sid).name || ''; by[k] = (by[k] || 0) + 1; });
-      const wr = DB.items.filter(i => i.src === '拍照批改' && gp.some(p => p.id === i.photoId)), vd = wr.filter(i => (i.vh || []).some(x => x.d === d && x.ok)).length;
-      h += `<p style="margin:8px 0 0">今天 AI 批改了${Object.entries(by).map(([n, k]) => ` ${esc(n)} ${k} 页`).join('、')}，错 <b>${gp.reduce((a, p) => a + (p.grade.wrong || 0), 0)}</b> 道${wr.length ? '，已进重做' : ''}${vd ? `，同类题做对 ${vd} 道` : ''}。</p>`; } }
+      const wr = DB.items.filter(i => i.src === '拍照批改' && gp.some(p => p.id === i.photoId)), vd = wr.filter(i => i.vok === d || (i.vh || []).some(x => x.d === d && x.ok)).length;
+      h += `<p style="margin:8px 0 0">今天 AI 批改了${Object.entries(by).map(([n, k]) => ` ${esc(n)} ${k} 页`).join('、')}，错 <b>${wr.length}</b> 道${wr.length ? '，已进重做' : ''}${vd ? `，同类题做对 ${vd} 道` : ''}。</p>`; } }
   const pr = dd.praise;
   h += `<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><span class="small faint">${pr ? '已经点过赞：「' + esc(pr) + '」' : '给他点个赞：'}</span>` + (pr ? '<a href="#" class="small faint" data-act="praiseundo">撤回</a>' : PRAISE.map((x, k) => `<button class="chip" data-act="praise" data-v="${k}">${esc(x)}</button>`).join('')) + `</div>`;
   return h + `</div>`;
@@ -4059,13 +4074,17 @@ async function aiChat(messages, opts, tries){
   const tmo = (opts && opts._to) || 90000; if (opts && opts._to) { opts = Object.assign({}, opts); delete opts._to; }
   const ac = window.AbortController ? new AbortController() : null, to = ac && setTimeout(() => ac.abort(), tmo);
   try { r = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {method:'POST', headers:{'Authorization':'Bearer ' + AI.key, 'Content-Type':'application/json'}, signal: ac ? ac.signal : undefined,
-    body: JSON.stringify(Object.assign({model: AI.model || 'glm-4.6v-flash', messages, stream:false}, opts || {}))}); clearTimeout(to); }
+    body: JSON.stringify(Object.assign({model: AI.model || 'glm-4.6v-flash', messages, stream:false}, opts || {}))}); }
   catch(e) { clearTimeout(to); if (e.name === 'AbortError') throw new Error(`智谱 ${Math.round(tmo / 1000)} 秒没回应，再试一次`); if (tries < 1) { await new Promise(res => setTimeout(res, 1500)); return aiChat(messages, Object.assign({}, opts, {_to: tmo}), tries + 1); } throw new Error('连不上智谱，检查一下网络'); }
-  if (!r.ok) { const t = await r.text(); let code = '', why = ''; try { const j = JSON.parse(t); code = String((j.error && j.error.code) || ''); why = (j.error && j.error.message) || ''; } catch(e) {}
+  let body = '';   // 超时要管到读完响应体（iPad 切后台时网络会挂在这一步）
+  try { body = await r.text(); } catch(e) { clearTimeout(to); throw new Error(e.name === 'AbortError' ? `智谱 ${Math.round(tmo / 1000)} 秒没回应，再试一次` : '连不上智谱，检查一下网络'); }
+  clearTimeout(to);
+  if (!r.ok) { const t = body; let code = '', why = ''; try { const j = JSON.parse(t); code = String((j.error && j.error.code) || ''); why = (j.error && j.error.message) || ''; } catch(e) {}
     // 免费模型并发满了（429）或服务端临时出错（5xx）：等一会儿自动重试；欠费（1113）不重试
-    if ((r.status === 429 && code !== '1113' && !/余额|欠费/.test(why)) || r.status >= 500) { if (tries < 2) { await new Promise(res => setTimeout(res, [2000, 5000][tries])); return aiChat(messages, Object.assign({}, opts, {_to: tmo}), tries + 1); } throw new Error('智谱现在太忙（' + r.status + '），过一两分钟再试'); }
+    if ((r.status === 429 && code !== '1113' && !/余额|欠费/.test(why)) || r.status >= 500) { if (tries < 2) { await new Promise(res => setTimeout(res, [2000, 5000][tries] + Math.random() * 2000)); return aiChat(messages, Object.assign({}, opts, {_to: tmo}), tries + 1); } throw new Error('智谱现在太忙（' + r.status + '），过一两分钟再试'); }
     throw new Error(r.status === 401 ? '密钥不对' : code === '1113' || /余额|欠费/.test(why) ? '智谱账户余额不足' : '模型返回 ' + r.status + ' ' + (why || t).slice(0, 80)); }
-  const j = await r.json(); return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+  let j; try { j = JSON.parse(body); } catch(e) { throw new Error('智谱返回的内容看不懂，再试一次'); }
+  return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
 }
 /* 智谱语音识别只收 .wav / .mp3（接口文档原文，2026-09-26 她实测 m4a 返回 400）：录音先在本机解码、重采样成 16k 单声道 WAV */
 async function toWav16k(blob){
@@ -4250,14 +4269,15 @@ const ACT = {
   gfix: el => { const x = state.grade.list[+el.dataset.v]; x.fixed = !x.fixed; render(); },
   gdisp: el => { const x = state.grade.list[+el.dataset.v]; x.disp = !x.disp; render(); },
   gpick: el => { const x = state.grade.list[+el.dataset.v]; x.pick = x.pick === el.dataset.c ? null : el.dataset.c; render(); },
-  gclose: () => { const G = state.grade; if (G && !G.busy && !G.saved && G.list.some(gradeWrong) && !confirm('错题还没加入重做，确定关掉？（照片留着，之后点照片能再批）')) return; state.grade = null; render(); },
+  gclose: () => { const G = state.grade; if (G && G.busy && !confirm('还在批改，关掉就停下，这次的结果不保留。确定？')) return; if (G && !G.busy && !G.saved && G.list.some(gradeWrong) && !confirm('错题还没加入重做，确定关掉？（照片留着，之后点照片能再批）')) return; state.grade = null; render(); },
   gdone: () => { state.grade = null; render(); },
   gsave: () => { const G = state.grade, iids = []; let d0 = state.date;
     for (const pid of (G.pids || [G.pid])) { const p = DB.photos.find(x => x.id === pid), d = p ? p.d : state.date, mine = G.list.filter(x => (x.pid || G.pid) === pid); d0 = d;
-      const had = new Set(DB.items.filter(i => i.photoId === pid).map(i => (i.stem || '').trim()));
-      for (const x of mine) if (gradeWrong(x) && x.stem.trim() && !had.has(x.stem.trim())) { const id = uid('i'); iids.push(id); had.add(x.stem.trim());
-        DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: null, photoId: pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
-      if (p && mine.length) { const c = gradeSum({list: mine}); p.grade = {n: mine.length, wrong: c.wrong, disp: mine.filter(x => x.disp).length, at: today()}; p.u = now(); touchDay(d); } }
+      const gk = x => x.no ? 'no:' + gNorm(x.no) : 'st:' + gNorm(x.stem).slice(0, 20);
+      const had = new Set(DB.items.filter(i => i.photoId === pid).map(gk));
+      for (const x of mine) if (gradeWrong(x) && x.stem.trim() && !had.has(gk(x))) { const id = uid('i'); iids.push(id); had.add(gk(x));
+        DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), no: x.no || undefined, conf: null, photoId: pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
+      if (p && mine.length) { const c = gradeSum({list: mine}); p.grade = {n: mine.length, wrong: c.wrong, disp: ((p.grade || {}).disp || 0) + mine.filter(x => x.disp).length, at: today()}; delete p.tcmp; delete p.tless; p.u = now(); touchDay(d); } }
     touchDay(d0); save();
     if (!iids.length) { state.grade = null; render(); toast(G.list.some(gradeWrong) ? '这些错题之前已经加过了' : '这页都对了 ✓'); return; }
     G.saved = true; G.iids = iids; G.vdone = {}; render(); },
