@@ -353,9 +353,9 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 /* ================= 设计层 v2（2026-09-29）：参照 Apple HIG——5 级字号、去边框靠留白和轻阴影分层、分组列表+图标、大标题 =================
    只覆盖外观，不动结构；整块删掉即回到旧样式 */
 :root{
-  --bg:#f3f1ec; --surface:#ffffff; --surface2:#f0ede6; --surface3:#f7f5f0;
-  --ink:#1d1b18; --ink2:#67625a; --ink3:#a19b91; --line:#ebe6dc;
-  --accent:#2b4c7e; --accent-bg:#e8eef7;
+  --bg:#f1f2ee; --surface:#ffffff; --surface2:#ebece7; --surface3:#f7f8f5;
+  --ink:#1b1f26; --ink2:#5f6570; --ink3:#9aa0a8; --line:#e2e4de;
+  --accent:#24406b; --accent-bg:#e6ecf5; --pen:#c8372d;
   --amber:#a8650f; --amber-bg:#fbefdc;
   --good:#2e7a57; --good-bg:#e2f1e8;
   --shadow:0 1px 2px rgba(30,25,15,.04),0 8px 24px rgba(30,25,15,.06);
@@ -363,8 +363,8 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
   --r:18px;
 }
 @media (prefers-color-scheme:dark){:root{
-  --bg:#121211; --surface:#1d1c1a; --surface2:#292724; --surface3:#191816;
-  --ink:#f3f0ea; --ink2:#b3ada2; --ink3:#7f796f; --line:#2f2d29;
+  --bg:#111315; --surface:#1b1e22; --surface2:#262a2f; --surface3:#16191c;
+  --ink:#eef0f2; --ink2:#a9b0b9; --ink3:#747b84; --line:#2c3137; --pen:#ff7b6b;
   --accent:#9dbdf0; --accent-bg:#1f2b3d; --amber:#f0b35e; --amber-bg:#3a2d18; --good:#7ccfa5; --good-bg:#18301f;
   --shadow:0 1px 0 rgba(255,255,255,.03) inset;
 }}
@@ -373,12 +373,15 @@ h2{font-family:var(--sans);font-size:28px;font-weight:700;letter-spacing:-.01em;
 h3{font-family:var(--sans);font-size:17px;font-weight:600;margin:0 0 8px}
 .small{font-size:13px} .sub{font-size:15px}
 .card{border:0;border-radius:var(--r);padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
-.tip{border-radius:14px;font-size:15px;padding:12px 16px}
+.tip{background:transparent;border-radius:0;font-size:15px;padding:2px 4px 12px;color:var(--ink2)}
+.tip b{color:var(--ink)}
+.big button{border:0;box-shadow:var(--shadow)}
+.big button.on{border:0;background:var(--accent-bg);color:var(--accent);box-shadow:none}
 .btn{border:0;background:var(--surface2);border-radius:14px;font-weight:500;min-height:44px;transition:transform .12s ease,opacity .12s}
 .btn:active{transform:scale(.97);opacity:.85}
 .btn.sm{border-radius:12px;min-height:36px;font-size:15px}
 .btn.ghost{background:transparent;color:var(--accent)}
-.btn.primary{box-shadow:0 6px 16px rgba(43,76,126,.22)}
+.btn.primary{box-shadow:0 6px 16px rgba(36,64,107,.22)}
 .chip{border:0;background:var(--surface2);font-weight:500}
 .seg{border:0;background:var(--surface2);border-radius:12px;padding:2px}
 .seg button{border:0;border-radius:10px}
@@ -397,7 +400,7 @@ a{color:var(--accent);text-decoration:none}
 
 /* 今天：大标题日期、主按钮、分组清单（图标方块 + 完成打勾动画） */
 .card.hero{background:transparent;box-shadow:none;padding:4px 2px 6px}
-.hero .d{font-family:var(--sans);font-size:32px;font-weight:700;letter-spacing:-.02em}
+.hero .d{font-family:var(--serif);font-size:32px;font-weight:700;letter-spacing:.01em}
 .hero .w{font-size:15px}
 .navbtn{border:0;background:var(--surface2);border-radius:50%;width:36px;height:36px;color:var(--ink2)}
 .streak{font-weight:600;background:var(--amber-bg)}
@@ -411,7 +414,10 @@ a{color:var(--accent);text-decoration:none}
 .todo-r .chev{font-size:22px;color:var(--ink3);opacity:.7}
 .todo-r .ck{width:36px;height:36px;border-radius:10px;border:0;position:relative;background:var(--surface2);font-size:17px}
 .todo-r .ck::after{content:'';position:absolute;inset:7px;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat;background:var(--icc,var(--ink2))}
-.todo-r.done .ck{background:var(--good) !important;color:#fff;font-weight:700;animation:pop .35s ease}
+.todo-r.done .ck{background:transparent !important;color:transparent;font-size:0}
+.todo-r.done .ck::before{content:'';position:absolute;inset:2px;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'><path d='M3.5 13.2c2 1.2 3.9 3 5.4 5.6C11.6 12.6 15.8 7.6 21 3.8'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'><path d='M3.5 13.2c2 1.2 3.9 3 5.4 5.6C11.6 12.6 15.8 7.6 21 3.8'/></svg>") center/contain no-repeat;background:var(--pen)}
+.todo-r.done.fresh .ck::before{animation:pen .5s cubic-bezier(.4,.1,.3,1) both}
+@keyframes pen{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
 .todo-r.done .ck::after{display:none}
 .todo-r.done .t{color:var(--ink3);font-weight:500}
 .todo-r.next{background:linear-gradient(90deg,var(--accent-bg),transparent 70%)}
@@ -480,7 +486,7 @@ a{color:var(--accent);text-decoration:none}
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v58';
+const APP_V = 'v59';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1506,6 +1512,7 @@ function banners(){
 
   return h;
 }
+const PEN_SEEN = new Set();
 function vToday(){
   const d = state.date, isToday = d === today();
   const dd = dayObj(d) || {subj:{}};
@@ -1564,7 +1571,8 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise && !seen.split('|').includes(x + DB.days[x].praise));
       if (pd) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
     h += notes;
-    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done' : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
+    const freshOf = x => { const k = d + '|' + x.t; if (!x.done || PEN_SEEN.has(k)) return ''; PEN_SEEN.add(k); return 'fresh'; };   // 红笔对勾只在刚完成时画一次
+    h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done ' + freshOf(x) : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div>` + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
       <button class="step ${filled >= subs.length && subs.length ? 'done' : ''}" data-act="${filled < subs.length ? 'wizstart' : 'scroll'}" data-v="slist"><span class="n">①</span><span class="t">记作业</span><span class="s">${filled}/${subs.length} 科</span></button>
       <button class="step ${left === 0 ? 'done' : ''}" data-act="tab" data-v="errors"><span class="n">②</span><span class="t">重做</span><span class="s">${left ? left + ' 道' : dn ? '做完了' : '今天没有'}</span></button>
