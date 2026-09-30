@@ -354,7 +354,7 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
    只覆盖外观，不动结构；整块删掉即回到旧样式 */
 :root{
   --bg:#f1f2ee; --surface:#ffffff; --surface2:#ebece7; --surface3:#f7f8f5;
-  --ink:#1b1f26; --ink2:#5f6570; --ink3:#9aa0a8; --line:#e2e4de;
+  --ink:#1b1f26; --ink2:#555b66; --ink3:#6b717a; --line:#e2e4de;
   --accent:#24406b; --accent-bg:#e6ecf5; --pen:#c8372d;
   --amber:#a8650f; --amber-bg:#fbefdc;
   --good:#2e7a57; --good-bg:#e2f1e8;
@@ -364,7 +364,7 @@ ol.guide{padding-left:20px;margin:6px 0;font-size:14px} ol.guide li{margin:4px 0
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#111315; --surface:#1b1e22; --surface2:#262a2f; --surface3:#16191c;
-  --ink:#eef0f2; --ink2:#a9b0b9; --ink3:#747b84; --line:#2c3137; --pen:#ff7b6b;
+  --ink:#eef0f2; --ink2:#b4bac2; --ink3:#8a919a; --line:#2c3137; --pen:#ff7b6b;
   --accent:#9dbdf0; --accent-bg:#1f2b3d; --amber:#f0b35e; --amber-bg:#3a2d18; --good:#7ccfa5; --good-bg:#18301f;
   --shadow:0 1px 0 rgba(255,255,255,.03) inset;
 }}
@@ -473,16 +473,64 @@ a{color:var(--accent);text-decoration:none}
 .redo .btn{min-height:46px;padding:10px 20px;border-radius:14px}
 /* 课文：长篇左对齐首行缩进，诗词逐行居中 */
 .prose-text{text-align:left !important}
-.prose-text>div{text-indent:2em}
+.prose-text>div{text-indent:0;margin-bottom:6px}
+.prose-text>div.small{margin-bottom:0}
+.poemv{display:flex;flex-direction:column}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition:none !important}}
 
+
+/* v65 细调（iPad 横屏截图评审） */
+.samecard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:4px 0 14px;box-shadow:0 0 0 1.5px var(--accent) inset,var(--shadow)}
+.samego{flex:none;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:12px;background:var(--accent);color:var(--surface);font-weight:600;font-size:15px}
+.todo-r.next{background:var(--accent-bg)}
+.spdone{color:var(--pen);font-weight:700;margin-right:6px}
+@media (min-width:760px){.splist{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.splist>.card{margin-bottom:12px}}
+.fnotes{margin:-4px 2px 12px;font-size:13px;color:var(--ink2)}
+.fnotes>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 小按钮、日期箭头、文字链接：看起来不变，点击范围扩到 44px */
+.btn.sm,.navbtn,.wiz-x,.streak,.seg button,a[data-act]{position:relative}
+.btn.sm::after,.navbtn::after,.wiz-x::after,.streak::after,.seg button::after,a[data-act]::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+details>summary{min-height:44px;padding-top:10px;padding-bottom:10px;box-sizing:border-box;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details:not(.more)>summary::after{content:'›';float:right;margin-left:8px;color:var(--ink3);font-size:20px;line-height:1.2;transition:transform .15s}
+details[open]:not(.more)>summary::after{transform:rotate(90deg)}
+/* 输入框统一：同一种底色和边框 */
+input:not([type]),input[type=text],input[type=number],input[type=date],input[type=password],input[type=search],textarea,select{border:1px solid var(--line);background:var(--surface);border-radius:12px;box-shadow:none;-webkit-appearance:none;appearance:none}
+input:not([type]):focus,input[type=text]:focus,input[type=number]:focus,input[type=date]:focus,input[type=password]:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b717a' stroke-width='2' stroke-linecap='round'><path d='M7 10l5 5 5-5'/></svg>");background-repeat:no-repeat;background-position:right 8px center;background-size:18px;padding-right:30px}
+@media (prefers-color-scheme:dark){
+  .btn:not(.primary):not(.good):not(.danger):not(.ghost):not(.on){box-shadow:0 0 0 1px rgba(255,255,255,.14) inset;background:#2e333a}
+  .seg{background:#23272c}
+  .badge{color:#1b1e22}
+  .tbadge{color:#10161d}
+}
+/* iPad 横屏：页头所有页都按宽栏对齐，切页不左右跳；学习方块 3 列横排，最后落单的一格占满一行 */
+@media (min-width:1000px){
+  .topin{max-width:1180px;padding-left:28px;padding-right:28px}
+  body.wide .tiles{grid-template-columns:repeat(3,1fr)}
+  body.wide .tile{min-height:92px;padding:16px 16px 16px 76px;justify-content:center}
+  body.wide .tile::before{position:absolute;left:16px;top:50%;margin:-20px 0 0}
+  body.wide .tile::after{top:50%;left:24px;margin-top:-12px}
+  body.wide .tile .tu{margin-top:0}
+  body.wide .tiles>:last-child:nth-child(3n+1){grid-column:1/-1}
+}
+
+/* iPad 横屏：一步一步填 / 随手记 / 清单编辑等改成居中卡片，背后压暗；高度跟内容走，按钮紧跟内容 */
+@media (min-width:1000px) and (min-height:600px){
+  .wiz{left:50%;right:auto;width:680px;top:calc(var(--vvt,0px) + var(--vvh,100vh) / 2);height:auto;max-height:calc(var(--vvh,100vh) - 56px);transform:translate(-50%,-50%);border-radius:22px;
+    box-shadow:0 0 0 100vmax rgba(16,18,22,.42),0 24px 64px rgba(0,0,0,.28)}
+  .wiz.tall{height:calc(var(--vvh,100vh) - 56px)}
+  .wiz-top{padding:16px 24px 6px}
+  .wiz-body{flex:0 1 auto;padding:6px 24px 8px}
+  .wiz.tall .wiz-body{flex:1}
+  .wiz-foot{padding:14px 24px 20px}
+}
 /* iPad 横屏：今天页两栏、学习方块 4 列（窄屏不受影响，顺序不变） */
 @media (min-width:1000px){
   body.wide main,body.wide .topin{max-width:1180px;padding-left:28px;padding-right:28px}
   .tgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:0 28px;align-items:start}
   .tcol{min-width:0}
   .tgrid>.tcol:last-child{padding-top:6px}
-  body.wide .tiles{grid-template-columns:repeat(4,1fr)}
 }
 
 </style>
@@ -497,7 +545,7 @@ a{color:var(--accent);text-decoration:none}
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v64';
+const APP_V = 'v65';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -809,8 +857,8 @@ function diagCard(){
 function examCard(){
   const t = today(), tk = termKey(t), E = DB.settings.examDates || {}, tl = termOf(t, DB.settings.startYear).label;
   return `<div class="card"><h3>考试日期</h3><p class="small muted" style="margin:0 0 8px">填了日期，考前两周自动多安排回检、考前三天不加新单词，今天页显示倒计时。各校日期不同，看学校通知填。</p>
-    <div class="grid2"><div><label class="f">${esc(tl)}期中</label><input type="date" data-in="examd" data-f="${tk}-mid" value="${esc(E[tk + '-mid'] || '')}"></div>
-    <div><label class="f">${esc(tl)}期末</label><input type="date" data-in="examd" data-f="${tk}-end" value="${esc(E[tk + '-end'] || '')}"></div></div></div>`;
+    <div class="grid2"><div><label class="f">${esc(tl)}期中${E[tk + '-mid'] ? ' · ' + md(E[tk + '-mid']) : ''}</label><input type="date" data-in="examd" data-f="${tk}-mid" value="${esc(E[tk + '-mid'] || '')}"></div>
+    <div><label class="f">${esc(tl)}期末${E[tk + '-end'] ? ' · ' + md(E[tk + '-end']) : ''}</label><input type="date" data-in="examd" data-f="${tk}-end" value="${esc(E[tk + '-end'] || '')}"></div></div></div>`;
 }
 function queued(it){
   if (it.q === true) return true; if (it.q === false) return false;
@@ -894,7 +942,7 @@ function vHol(){
   h += `<button class="btn sm" data-act="holadd">＋ 加一项</button>`;
   h += `<details style="margin-top:14px"><summary class="small muted">放假日期、哪几天出去玩</summary><div class="row" style="margin:8px 0 4px;flex-wrap:nowrap"><span class="small muted" style="width:2em">从</span><input id="hol-from" data-in="hol" data-f="from" type="date" class="wiz-in" style="flex:1;min-width:0" value="${E.from}"></div><div class="row" style="margin:0 0 8px;flex-wrap:nowrap"><span class="small muted" style="width:2em">到</span><input id="hol-to" data-in="hol" data-f="to" type="date" class="wiz-in" style="flex:1;min-width:0" value="${E.to}"></div>
     <p class="small faint" style="margin:0 0 6px">点一下标成「出去玩」，那天不派作业。</p><div class="row" style="gap:6px">${range(E.from, E.to).map(x => `<button class="chip ${E.out[x] ? 'on' : ''}" data-act="holoutday" data-v="${x}">${md(x)}</button>`).join('')}</div></details>`;
-  return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="holclose">取消</button><button class="btn primary" data-act="holsave">保存</button></div></div>`;
+  return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="holsave">保存</button></div></div>`;
 }
 function holLeftList(h){ return h.tasks.map(t => ({t, left: t.n - holDone(t, () => true)})).filter(o => o.left > 0); }
 function holidayCard(d){
@@ -1572,7 +1620,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
   // 「这周的小调整」「考后定的一件事」合成主按钮下面一行小字（主按钮要在第一屏）
   const notes = isToday ? (() => { const pl = planFor(monOf(d)), ex = DB.exams.filter(e => e.oneThing && e.date >= addD(today(), -45)).sort((a,b)=>a.date<b.date?1:-1)[0];
     const L = [pl && !pl.manual && pl.m && pl.m.kind !== 'total' ? `这周试：${esc(pl.act)}` : '', ex ? `考后定的：${esc(ex.oneThing)}` : ''].filter(Boolean);
-    return L.length ? `<p class="small muted" style="text-align:center;margin:-4px 0 12px">${L.join(' · ')}</p>` : ''; })() : '';
+    return L.length ? `<div class="fnotes">${L.map(x => `<div>${x}</div>`).join('')}</div>` : ''; })() : '';
   if (isToday) {
     loadLib();
     const hr = new Date().getHours() + new Date().getMinutes()/60, late = hr >= 21.75;
@@ -1967,7 +2015,7 @@ function photoStrip(ps){
 }
 function vPhotoView(){
   const p = DB.photos.find(x => x.id === state.pview); if (!p) { state.pview = null; return ''; }
-  return `<div class="wiz" style="background:#000"><div class="wiz-top"><div style="flex:1;color:#ddd">${esc(subjById(p.sid).name||'')} · ${PKIND.find(k=>k[0]===p.kind)[1]} · ${md(p.d)} · ${photoStatus(p)}</div><button class="wiz-x" data-act="pviewclose" aria-label="关闭">×</button></div>
+  return `<div class="wiz tall" style="background:#000"><div class="wiz-top"><div style="flex:1;color:#ddd">${esc(subjById(p.sid).name||'')} · ${PKIND.find(k=>k[0]===p.kind)[1]} · ${md(p.d)} · ${photoStatus(p)}</div><button class="wiz-x" data-act="pviewclose" aria-label="关闭">×</button></div>
     <div class="wiz-body" style="display:flex;align-items:center;justify-content:center"><img data-pid="${p.id}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>
     <div class="wiz-foot"><button class="btn danger" data-act="photodel" data-v="${p.id}">删除这张</button>${p.kind === 'error' && aiReady() ? `<button class="btn primary" data-act="rgphoto" data-v="${p.id}">${photoDone(p) ? '再识别一次' : '用 AI 识别错题'}</button>` : ''}<button class="btn" data-act="pviewclose">关闭</button></div></div>`;
 }
@@ -2088,7 +2136,7 @@ function vVoice(){
     <p class="small faint" style="margin:0 0 10px">例：「数学四十分钟，中间停了一次，错了两道，一道计算一道概念，卡在去括号。英语二十分钟没错。语文没作业。」</p>
     <div class="withmic"><textarea id="vq" class="wiz-in" data-in="voice" style="min-height:120px" placeholder="说完的文字会出现在这里，也可以直接打字改">${esc(v.text||'')}</textarea>${micBtn('vq')}</div>
     <div id="vqprev" style="margin-top:14px">${p ? speechPreview(p) : ''}</div></div>
-    <div class="wiz-foot"><button class="btn ghost" data-act="voiceclose">取消</button><button class="btn primary" data-act="voiceapply">写入今天</button></div></div>`;
+    <div class="wiz-foot"><button class="btn primary" data-act="voiceapply">写入今天</button></div></div>`;
 }
 
 /* ================= AI 学习教练（智谱 GLM）=================
@@ -2222,7 +2270,7 @@ function memCard(){
 }
 function vTutor(){
   const T = state.tutor, subs = subjects(today());
-  let h = `<div class="wiz" role="dialog" aria-label="AI 学习教练"><div class="wiz-top"><div style="flex:1;font-weight:600">AI 学习教练 <span class="small faint">只给提示，不直接给答案</span></div><button class="wiz-x" data-act="tuend" aria-label="结束">×</button></div>`;
+  let h = `<div class="wiz tall" role="dialog" aria-label="AI 学习教练"><div class="wiz-top"><div style="flex:1;font-weight:600">AI 学习教练 <span class="small faint">只给提示，不直接给答案</span></div><button class="wiz-x" data-act="tuend" aria-label="结束">×</button></div>`;
   if (T.result) {
     h += `<div class="wiz-body"><div class="wiz-q" style="font-size:22px;margin-top:20px">这次辅导记下了</div><div class="card"><p style="margin:0">${esc(T.result.summary)}</p>${T.result.tag ? `<p class="small faint" style="margin:6px 0 0">知识点：${esc(T.result.tag)}</p>` : ''}</div>
       <p class="small muted">下次辅导会接着这次的情况来帮他。</p>
@@ -2287,7 +2335,7 @@ function vWiz(){
   }
   if (w.step === 'pick') {
     const lw = addD(d, -7), lr = ((DB.days[lw] || {}).subj) || {}, same = w.list.filter(x => lr[x] && !lr[x].none && lr[x].min > 0), fresh0 = !w.list.some(x => filledRec(dd.subj[x]));
-    if (same.length && fresh0) h += `<button class="card" style="display:block;width:100%;text-align:left;border-color:var(--accent);margin:4px 0 14px" data-act="wizsame"><b>跟上${WD[P(lw).getDay()] === '日' ? '周日' : '周' + WD[P(lw).getDay()]}一样</b><div class="small muted" style="margin-top:4px">${same.map(x => esc(subjById(x).name) + ' ' + lr[x].min).join(' · ')} 分钟，点一下全部记好，不一样的再改</div></button>`;
+    if (same.length && fresh0) h += `<button class="card samecard" data-act="wizsame"><span style="flex:1;min-width:0"><b>跟上${WD[P(lw).getDay()] === '日' ? '周日' : '周' + WD[P(lw).getDay()]}一样</b><span class="small muted" style="display:block;margin-top:4px">${same.map(x => esc(subjById(x).name) + ' ' + lr[x].min).join('、')} 分钟</span></span><span class="samego">全部照旧 ›</span></button>`;
     h += `<div class="wiz-q" style="margin-top:8px">今天有哪几科作业？</div><p class="small faint" style="margin:-10px 0 14px">点一下选上或去掉。没选的记为「今天没作业」。</p><div class="big two">` +
       w.list.map(x => { const sx = subjById(x), on = w.pick.includes(x); return `<button class="${on ? 'on' : ''}" data-act="wizpick" data-v="${x}"><span class="dot" style="background:${sx.color};display:inline-block;margin-right:6px;vertical-align:3px"></span>${esc(sx.name)}${on ? ' ✓' : ''}</button>`; }).join('') + `</div>`;
     return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="wizpicked" ${w.pick.length ? '' : ''}>${w.pick.length ? `就这 ${w.pick.length} 科 ›` : '今天都没作业'}</button></div></div>`;
@@ -3288,10 +3336,11 @@ function vSpeak(){
   if (!L.sp) {
     const bestK = id => Math.max(-1, ...DB.speakRecs.filter(r => r.pid === id).map(r => r.acc));
     const tp = (extraTask(today()) || {}).sp; h += `<p class="sub">中考听说 25 分。每天练一小项，敢开口、说完整就好。</p>`;
-    if (P2) { h += `<h3 style="margin:14px 0 6px">信息获取：听后回答</h3>` + P2.listen.map(x => { const b = bestK(x.id); return `<button class="card ${x.id === tp ? 'due' : ''}" style="display:block;width:100%;text-align:left${x.id === tp ? ';border-color:var(--accent)' : ''}" data-act="spopen" data-v="${x.id}"><div class="row"><b>${esc(x.title)}</b>${x.id === tp ? '<i class="tbadge">今天练这篇</i>' : ''}<span class="spacer"></span><span class="small faint">${b >= 0 ? '最好 ' + b + '%' : (x.kind === 'dialogue' ? '对话' : '短文') + ' · ' + x.qs.length + ' 题'}</span></div></button>`; }).join('');
-      h += `<h3 style="margin:14px 0 6px">信息复述及提问</h3>` + P2.retell.map(x => { const b = bestK(x.id); return `<button class="card ${x.id === tp ? 'due' : ''}" style="display:block;width:100%;text-align:left${x.id === tp ? ';border-color:var(--accent)' : ''}" data-act="spopen" data-v="${x.id}"><div class="row"><b>${esc(x.title)}</b>${x.id === tp ? '<i class="tbadge">今天练这篇</i>' : ''}<span class="spacer"></span><span class="small faint">${b >= 0 ? '最好 ' + b + '%' : '复述 + 提问'}</span></div></button>`; }).join(''); }
-    h += `<h3 style="margin:14px 0 6px">模仿朗读</h3>`;
-    for (const x of P.items) { const b = best(x.id); h += `<button class="card ${x.id === tp ? 'due' : ''}" style="display:block;width:100%;text-align:left${x.id === tp ? ';border-color:var(--accent)' : ''}" data-act="spopen" data-v="${x.id}"><div class="row"><b>${esc(x.title)}</b>${x.id === tp ? '<i class="tbadge">今天练这篇</i>' : ''}<span class="spacer"></span><span class="small ${b >= 95 ? '' : 'faint'}" style="${b >= 95 ? 'color:var(--good)' : ''}">${b >= 0 ? '最好 ' + b + '%' : x.words + ' 词'}</span></div></button>`; }
+    if (P2) { h += `<h3 style="margin:14px 0 6px">信息获取：听后回答</h3><div class="splist">` + P2.listen.map(x => { const b = bestK(x.id); return `<button class="card ${x.id === tp ? 'due' : ''}" style="display:block;width:100%;text-align:left${x.id === tp ? ';border-color:var(--accent)' : ''}" data-act="spopen" data-v="${x.id}"><div class="row">${b >= 0 ? '<span class="spdone" aria-label="练过">✓</span>' : ''}<b>${esc(x.title)}</b>${x.id === tp ? '<i class="tbadge">今天练这篇</i>' : ''}<span class="spacer"></span><span class="small faint">${b >= 0 ? '最好 ' + b + '%' : (x.kind === 'dialogue' ? '对话' : '短文') + ' · ' + x.qs.length + ' 题'}</span></div></button>`; }).join('') + '</div>';
+      h += `<h3 style="margin:14px 0 6px">信息复述及提问</h3><div class="splist">` + P2.retell.map(x => { const b = bestK(x.id); return `<button class="card ${x.id === tp ? 'due' : ''}" style="display:block;width:100%;text-align:left${x.id === tp ? ';border-color:var(--accent)' : ''}" data-act="spopen" data-v="${x.id}"><div class="row">${b >= 0 ? '<span class="spdone" aria-label="练过">✓</span>' : ''}<b>${esc(x.title)}</b>${x.id === tp ? '<i class="tbadge">今天练这篇</i>' : ''}<span class="spacer"></span><span class="small faint">${b >= 0 ? '最好 ' + b + '%' : '复述 + 提问'}</span></div></button>`; }).join('') + '</div>'; }
+    h += `<h3 style="margin:14px 0 6px">模仿朗读</h3><div class="splist">`;
+    for (const x of P.items) { const b = best(x.id); h += `<button class="card ${x.id === tp ? 'due' : ''}" style="display:block;width:100%;text-align:left${x.id === tp ? ';border-color:var(--accent)' : ''}" data-act="spopen" data-v="${x.id}"><div class="row">${b >= 0 ? '<span class="spdone" aria-label="练过">✓</span>' : ''}<b>${esc(x.title)}</b>${x.id === tp ? '<i class="tbadge">今天练这篇</i>' : ''}<span class="spacer"></span><span class="small ${b >= 95 ? '' : 'faint'}" style="${b >= 95 ? 'color:var(--good)' : ''}">${b >= 0 ? '最好 ' + b + '%' : x.words + ' 词'}</span></div></button>`; }
+    h += '</div>';
     return h + `<p class="small faint">${esc(P.note)}${P2 ? ' ' + esc(P2.note) : ''}</p>`;
   }
   const x = P.items.find(i => i.id === L.sp), S = state.sp && state.sp.id === x.id ? state.sp : (state.sp = {id: x.id, phase: 'ready'});
@@ -3569,11 +3618,11 @@ function vReciteCheck(){
   }
   if (R.mode === 'dict') {   // 免费：iPad 键盘自带听写，按拼音宽松对照，和语音检验同一标准
     h += `<p class="muted">不看原文。点一下下面的框，再点键盘上的 <b>🎤 话筒键</b>，${si == null ? '从题目开始背' : `背第 ${si + 1} 段（开头是「${esc(cue)}」）`}；背完点「对答案」。</p><p class="small faint">这是 iPad 自带的听写，免费。键盘上没有话筒键的话，去「设置 → 通用 → 键盘」打开「启用听写」。同音字按对算。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="点这里，再点键盘上的话筒">${esc(R.said||'')}</textarea>`;
-    return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
+    return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
   }
   if (R.mode === 'type') {
     h += `<p class="muted">不看原文，${si == null ? '把整篇默写出来' : `把第 ${si + 1} 段默写出来（开头是「${esc(cue)}」）`}（标点可以不打）。写完点「对答案」。</p><textarea id="rc-type" class="wiz-in" style="min-height:220px" placeholder="从第一句开始写">${esc(R.said||'')}</textarea>${pencilTip()}`;
-    return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="rcclose">取消</button><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
+    return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="rctype">对答案</button></div></div>`;
   }
   h += `<div style="text-align:center;margin-top:30px"><div class="small faint">${si == null ? '不看原文，从题目开始背' : `不看原文，背第 ${si + 1} 段，开头是「${esc(cue)}」`}</div><div style="font-family:var(--serif);font-size:24px;font-weight:700;margin:10px 0">${esc(x.title)}</div><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>`;
   if (R.phase === 'rec') h += `<div style="margin:30px auto 10px;width:110px;height:110px;border-radius:50%;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center" class="mic rec">${MIC.replace('<svg','<svg style="width:44px;height:44px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…背完点下面「背完了」</div>`;
@@ -3593,24 +3642,26 @@ function vPoem(){
   if (!x) { L.view = 'recite'; return vRecite(); }
   const st = rStateX(x), mode = L.pmode || 'full', sg = recSegs(x), segAt = Object.fromEntries(sg.map(([a], k) => [a, k]));
   const lvl = L.lvl || 1;
-  let h = `<div class="row">${backBtn('recite', '篇目')}<span class="spacer"></span>${x.text ? `<div class="seg sm"><button data-act="pmode" data-v="full" class="${mode==='full'?'on':''}">原文</button><button data-act="pmode" data-v="blank" class="${mode==='blank'?'on':''}">挖空练习</button></div>` : ''}</div>`;
-  if (x.text && mode === 'blank') h += `<div class="row" style="margin-top:8px;justify-content:flex-end"><span class="small faint">难度</span><div class="seg sm">` + [[1,'提示多'],[2,'提示少'],[3,'全默']].map(([k,n]) => `<button data-act="plvl" data-v="${k}" class="${lvl===k?'on':''}">${n}</button>`).join('') + `</div></div>`;
+  let h = `<div class="poemv"><div class="row" style="order:-2">${backBtn('recite', '篇目')}<span class="spacer"></span>${x.text ? `<div class="seg sm"><button data-act="pmode" data-v="full" class="${mode==='full'?'on':''}">原文</button><button data-act="pmode" data-v="blank" class="${mode==='blank'?'on':''}">挖空练习</button></div>` : ''}</div>`;
+  if (x.text && mode === 'blank') h += `<div class="row" style="order:-2;margin-top:8px;justify-content:flex-end"><span class="small faint">难度</span><div class="seg sm">` + [[1,'提示多'],[2,'提示少'],[3,'全默']].map(([k,n]) => `<button data-act="plvl" data-v="${k}" class="${lvl===k?'on':''}">${n}</button>`).join('') + `</div></div>`;
   h += `<div class="card" style="margin-top:12px;text-align:center"><h2 style="margin:6px 0 2px">${esc(x.title)}</h2><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>
     ${x.mode === 'excerpt' ? '<div class="pill amber" style="display:inline-block;margin-top:8px">默写常考重点句 · 全文看课本</div>' : ''}${x.checked === false ? '<div class="small faint" style="margin-top:6px">这篇还没逐字校对，背之前对照课本看一眼</div>' : ''}`;
   const prose = ['文言文', '现代文'].includes(x.kind) || /[。！？].{14,}/.test((x.text || [])[0] || '');   // 文章按段落左对齐，诗词逐行居中
-  if (x.text) h += `<div class="${prose ? 'prose-text' : ''}" style="font-family:var(--serif);font-size:19px;line-height:2;margin:16px 0 6px">` + x.text.map((ln, i) => (segAt[i] != null ? `<div class="small faint" style="font-family:var(--sans);margin-top:${i ? 10 : 0}px">第 ${segAt[i] + 1} 段${segDone(x, segAt[i]) ? ' ✓' : ''}</div>` : '') + (mode === 'blank' && !(L.reveal||{})[i] ? `<div data-act="preveal" data-v="${i}" style="cursor:pointer;color:var(--ink2)">${blankLine(ln, lvl)}</div>` : `<div>${esc(ln)}</div>`)).join('') + `</div>` +
-    `<div class="row" style="justify-content:center"><button class="btn sm" data-act="sayzh">${SPK} ${x.audio ? '听标准朗读' : '朗读'}</button><button class="btn sm primary" data-act="rcheck" data-v="voice">${MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} ${sg.length ? '整篇背' : '背给我听'}</button><button class="btn sm" data-act="rcheck" data-v="type">${sg.length ? '整篇默写' : '打字默写'}</button></div>${mode==='blank' ? '<p class="small faint" style="margin:6px 0 0">点一行看原文</p>' : ''}`;
+  if (x.text) h += `<div class="row ptools" style="justify-content:center;margin-top:12px"><button class="btn sm" data-act="sayzh">${SPK} ${x.audio ? '听标准朗读' : '朗读'}</button><button class="btn sm primary" data-act="rcheck" data-v="voice">${MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"')} ${sg.length ? '整篇背' : '背给我听'}</button><button class="btn sm" data-act="rcheck" data-v="type">${sg.length ? '整篇默写' : '打字默写'}</button></div>` +
+    `<div class="${prose ? 'prose-text' : ''}" style="font-family:var(--serif);font-size:19px;line-height:2;margin:16px 0 6px">` + x.text.map((ln, i) => (segAt[i] != null ? `<div class="small faint" style="font-family:var(--sans);margin-top:${i ? 10 : 0}px">第 ${segAt[i] + 1} 段${segDone(x, segAt[i]) ? ' ✓' : ''}</div>` : '') + (mode === 'blank' && !(L.reveal||{})[i] ? `<div data-act="preveal" data-v="${i}" style="cursor:pointer;color:var(--ink2)">${blankLine(ln, lvl)}</div>` : `<div>${esc(ln)}</div>`)).join('') + `</div>` +
+    `${mode==='blank' ? '<p class="small faint" style="margin:6px 0 0">点一行看原文</p>' : ''}`;
   else h += `<p class="small muted" style="margin:14px 0">这篇只收了篇目，原文看课本。</p>`;
   const rr = DB.recite[x.id] || {};
   if (st === 'upd') h += `</div><div class="card" style="background:var(--amber-bg);border-color:transparent"><h3>课文按课本更新了</h3><p class="small muted" style="margin:0">${x.mode === 'full' ? '现在是课本要求背的全文，' : '改了个别字，'}再背一遍就好，以前的记录都还在。</p>`;
-  if (sg.length && x.text) h += `</div><div class="card"><div class="row"><h3 style="margin:0">分段背</h3><span class="spacer"></span><span class="small muted">过了 ${sg.filter((_, k) => segDone(x, k)).length}/${sg.length} 段</span></div><p class="small muted" style="margin:4px 0 8px">一段一段背，每段背对九成就打勾，${sg.length} 段都过了整篇记「会背了」。</p>` +
+  const segMid = sg.length && sg.some((_, k) => segDone(x, k)) && !sg.every((_, k) => segDone(x, k));   // 背到一半：下一段就在最上面
+  if (sg.length && x.text) h += `</div><div class="card" style="${segMid ? 'order:-1;margin-top:12px' : ''}"><div class="row"><h3 style="margin:0">分段背</h3><span class="spacer"></span><span class="small muted">过了 ${sg.filter((_, k) => segDone(x, k)).length}/${sg.length} 段</span></div><p class="small muted" style="margin:4px 0 8px">一段一段背，每段背对九成就打勾，${sg.length} 段都过了整篇记「会背了」。</p>` +
     sg.map(([a], k) => `<div class="row segrow" style="padding:6px 0;border-top:1px solid var(--line)"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">第 ${k + 1} 段 <span class="small faint">「${esc(x.text[a].replace(/[，。；：？！、“”]/g, '').slice(0, 4))}…」</span></span>${segDone(x, k) ? '<span class="pill good">✓</span>' : ''}<button class="btn sm" data-act="rcheck" data-v="voice" data-s="${k}">背这段</button><button class="btn sm ghost" data-act="rcheck" data-v="type" data-s="${k}">默写</button></div>`).join('');
   const rvSeg = sg.length ? (dayDiff('2026-01-01', today()) % sg.length) : -1;
   if (st !== 'upd' && rr.due && rr.due <= today()) h += `</div><div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>今天该复习这篇了</h3><p class="small muted" style="margin:0 0 8px">${rvSeg >= 0 ? `长篇不用整篇背，抽一段就行：<b>第 ${rvSeg + 1} 段</b>。` : ''}不看原文背一遍：90% 以上算还记得，隔更久再查；低于 70% 就改回「在背」。</p>${rvSeg >= 0 ? `<button class="btn sm primary" data-act="rcheck" data-v="voice" data-s="${rvSeg}">背第 ${rvSeg + 1} 段</button>` : ''}`;
   h += `</div>` + (st === 'upd' ? '' : `<div class="small muted" style="margin:0 4px 10px">现在：<b>${(RST.find(r => r[0] === st) || ['', '没背'])[1]}</b>${rr.solid ? ' <span class="pill good">已经记牢</span>' : rr.due ? ' · 下次复习 ' + mdShort(rr.due) : ''}</div>`) + `<div>`;
   const hist = (DB.recite[x.id] || {}).hist || [];
   if (hist.length) h += `<p class="small faint" style="margin:10px 0 0">记录：${hist.slice(-5).map(e => mdShort(e.d) + ' ' + (e.score != null ? (e.st === 'type' ? '默写 ' : '背诵 ') + e.score + '%' : (RST.find(r=>r[0]===e.st)||['',''])[1])).join(' → ')}</p>`;
-  return h + `</div>`;
+  return h + `</div></div>`;
 }
 function vBooks(){
   const B = LIB.books;
@@ -3767,7 +3818,7 @@ function whatsNew(who){
   if (seen >= WHATS_NEW.v) return '';
   if (Object.keys(DB.days).filter(dayHasData).length < 3) { try { localStorage.setItem('observer:new-' + who, WHATS_NEW.v); } catch(e) {} return ''; }
   const list = `<ul style="margin:4px 0 8px;padding-left:20px">${WHATS_NEW[who].map(x => `<li style="margin:3px 0">${x}</li>`).join('')}</ul><button class="btn sm" data-act="newseen" data-v="${who}">知道了</button>`;
-  if (who === 'parent') return `<details data-keep="pnew" ${(state.keep || {}).pnew ? 'open' : ''} class="card" style="background:var(--accent-bg);border-color:transparent"><summary>最近有 ${WHATS_NEW.parent.length} 项更新 ›</summary>${list}</details>`;   // 家长页顶部只留一行
+  if (who === 'parent') return `<details data-keep="pnew" ${(state.keep || {}).pnew ? 'open' : ''} class="card"><summary>最近有 ${WHATS_NEW.parent.length} 项更新</summary>${list}</details>`;   // 家长页顶部只留一行
   return `<div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>这次更新了什么</h3>${list}</div>`;
 }
 function attentionCard(){ const A = attentionItems(); if (!A.length) return '';
@@ -3807,7 +3858,7 @@ function vMe(part){
     h += `<div class="card"><h3>最近记录</h3>` + emo.slice(0,10).map(e => `<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="small faint num">${mdShort(e.date)}</span><span>${esc(e.trigger)}</span><span class="small muted">强度 ${e.level}${e.paused?' · 停住了':''}</span>${e.note?`<span class="small faint">${esc(e.note)}</span>`:''}<span class="spacer"></span><button class="btn sm ghost" data-act="emodel" data-v="${e.id}">删</button></div>`).join('') + `</div>`;
   }
   if (part === 'mine') return h + `</div><div>` + methodCard() + `</div></div>`;
-  h = `<div class="cols"><div>`;
+  h = `<div><div>`;   // 设置页单栏：两栏时右栏很短、下面一大片空
   h += guideCard();
   h += syncCard();
   h += aiCard();
@@ -3868,7 +3919,7 @@ function aiCard(){
     <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="aitest">检查 AI 功能</a><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div>${aiTestHTML()}${memCard()}</div>`;
   return `<div class="card"><h3>AI 学习教练 · 语音识别 ${aiReady() ? '<span class="pill good">已开启</span>' : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">用智谱大模型：背诵检验时把录音转成文字，以及之后的 AI 辅导。密钥只存在这台设备上，不进备份文件。发给模型的只有学习内容，不含名字、学校、排名和你的情绪记录。</p>
-    <label class="f">智谱 API 密钥</label><input type="password" id="ai-key" value="${esc(AI.key||'')}" placeholder="在 open.bigmodel.cn 的「API Keys」里新建" autocomplete="off">
+    <label class="f">智谱 API 密钥${AI.key ? ` <span class="faint" style="font-weight:400">已保存 · 尾号 ${esc(String(AI.key).slice(-4))}</span>` : ''}</label><input type="password" id="ai-key" value="${esc(AI.key||'')}" placeholder="在 open.bigmodel.cn 的「API Keys」里新建" autocomplete="off">
     <details style="margin-top:10px"><summary class="small faint">高级：换模型</summary><label class="f">辅导用的模型</label><select id="ai-model">${[['glm-4.6v-flash','GLM-4.6V-Flash（免费，能看图）'],['glm-5.3-flash','GLM-5.3-Flash（更强，按量付费）']].map(([k,n]) => `<option value="${k}" ${(AI.model||'glm-4.6v-flash')===k?'selected':''}>${n}</option>`).join('')}</select></details>
     <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [...new Set([10, 20, 30, 45, tutorLimit()])].sort((x, y) => x - y).map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分</button>`).join('') + `</div>
     <p class="small faint" style="margin:6px 0 0">几次加起来算，第二天自动恢复。建议不超过 30 分钟：先自己想，卡住了再问，才不会养成依赖。</p>
