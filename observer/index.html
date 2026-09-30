@@ -550,7 +550,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v71';
+const APP_V = 'v72';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -708,14 +708,16 @@ const IDB = {
   failed: false,
   async get(k){
     for (let i = 0; i < 2; i++) {
-      try { const db = await this.open(); return await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+      try { const db = await this.open(); const v = await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+        return v && v.__b instanceof ArrayBuffer ? new Blob([v.__b], {type: v.t || ''}) : v; }
       catch(e) { this.db = null; await new Promise(r => setTimeout(r, 300)); }
     }
     if (k === K_DB) this.failed = true;          // 读不出主库：本次不写 IDB，免得拿旧副本覆盖好数据
     return undefined;
   },
   async del(k){ try { const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } catch(e) {} },
-  async set(k, v){ try { const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); return true; } catch(e) { return false; } }
+  // 图片先转成字节再存：Safari 无痕模式（和部分旧版 WebKit）存 Blob 会静默失败，照片记录在、图却没了；读的时候再拼回 Blob，旧数据照样能读
+  async set(k, v){ try { if (typeof Blob !== 'undefined' && v instanceof Blob) v = {__b: await v.arrayBuffer(), t: v.type}; const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); return true; } catch(e) { return false; } }
 };
 const lsGet = k => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; } catch(e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e) { return false; } };
