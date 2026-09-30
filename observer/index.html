@@ -545,7 +545,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v65';
+const APP_V = 'v66';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1652,7 +1652,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       {t: '语文背诵', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
     // 清单保持精简：一天最多一行可选加练，原有加练优先；没有时才放「读名著」（开始读了才出现，没开始的从学习页进）
     const ex = extraTask(d); if (ex) T.push(ex);
-    else { const RP = readPlan(d); if (RP.cur && !RP.past && !holMode) T.push({t: '名著阅读', s: RP.done ? '今天读过' : `今天 ${RP.q} 页 · 可选`, done: RP.done, opt: true, act: 'golearn', v: 'read', go: ''}); }
+    else { const RP = readPlan(d); if (RP.cur && !RP.past && RP.q) T.push({t: '名著阅读', s: RP.done ? '今天读过' : `今天 ${RP.q} 页 · 可选`, done: RP.done, opt: true, act: 'golearn', v: 'read', go: ''}); }
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
     if (holPend) h += `<div style="text-align:center;margin:-4px 0 10px"><button class="btn sm ghost" data-act="holnone" data-v="${hH.id}">没有假期作业</button></div>`;
@@ -3410,12 +3410,15 @@ function saveRead(r){ DB.reads = DB.reads || {}; r.u = now(); DB.reads[r.id] = r
 const readAt = (r, pred) => { const ks = Object.keys(r.log || {}).filter(pred).sort(); return ks.length ? (+r.log[ks[ks.length - 1]] || 0) : 0; };   // 取最近一次记的页码，填错了可以改小
 function readDeadline(t){ const e = examDate(t, 'end'); if (e) return addD(e, -1);
   const y = +t.slice(0, 4), m = +t.slice(5, 7); return termKey(t).endsWith('a') ? (m >= 8 ? y + 1 : y) + '-01-20' : y + '-07-05'; }
+const readW = d => { const h = holAt(d); return !h ? 1 : h.out[d] ? 0 : 2; };
 function readPlan(t){
   const tk = termKey(t), dl = readDeadline(t), days = Math.max(1, dayDiff(t, dl) + 1);
   const recs = (READ_BOOKS[tk] || []).map(([title, author], i) => { const r = readRec(tk, i), before = Math.min(r.total || 0, readAt(r, d => d < t)), nowp = Math.min(r.total || 1e9, readAt(r, () => true));
     return {title, author, i, r, before, nowp, left: r.total ? Math.max(0, r.total - before) : 0}; });
   const cur = recs.find(o => o.r.total && o.nowp < o.r.total) || null, allLeft = recs.reduce((a, o) => a + o.left, 0);
-  const past = t > dl, q = cur && !past ? Math.min(cur.r.total - cur.before, Math.ceil(allLeft / days)) : 0;   // 过了计划读完的日期（寒暑假前后）不再按天压量
+  // 按天加权分：放假的日子算 2 份、标了「出去玩」的算 0，总量和截止日不变
+  const W = range(t, dl).reduce((a, x) => a + readW(x), 0), wt = readW(t);
+  const past = t > dl, q = cur && !past && wt ? Math.min(cur.r.total - cur.before, Math.ceil(allLeft * wt / Math.max(W, wt))) : 0;   // 过了计划读完的日期（寒暑假前后）不再按天压量
   const readToday = recs.reduce((a, o) => a + Math.max(0, o.nowp - o.before), 0);   // 今天读完一本又开始下一本，也算读过
   return {tk, dl, days, recs, cur, q, past, done: !!cur && readToday >= q, started: recs.some(o => o.r.total)};
 }
@@ -3445,7 +3448,7 @@ function vRead(){
     h += `<div class="card"><div class="row"><h3 style="margin:0">《${esc(o.title)}》</h3><span class="small muted">${esc(o.author)}</span><span class="spacer"></span>${r.total && o.nowp >= r.total ? '<span class="pill good">读完了</span>' : isCur ? '<span class="pill accent">正在读</span>' : ''}</div>`;
     if (!r.total) { h += `<p class="small muted" style="margin:8px 0">翻到最后一页，这本书一共多少页？</p><div class="row" style="flex-wrap:nowrap"><input id="rd-total-${o.i}" data-in="rd" data-f="total" data-v="${o.i}" class="wiz-in" type="number" inputmode="numeric" min="10" max="2000" style="flex:1;min-width:0" placeholder="总页数" value="${esc(D['total' + o.i] || '')}"><button class="btn sm primary" data-act="rdtotal" data-v="${o.i}">开始读</button></div></div>`; continue; }
     const pct = Math.round(100 * Math.min(o.nowp, r.total) / r.total);
-    h += `<div style="height:10px;background:var(--surface2);border-radius:5px;margin:10px 0 4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:5px"></div></div><div class="small muted">读到第 ${o.nowp} 页 / 共 ${r.total} 页${isCur && !P.past ? (P.done ? ' · 今天的份读完了 ✓' : ` · 今天读到第 ${Math.min(r.total, o.before + P.q)} 页就够了`) : ''}</div>`;
+    h += `<div style="height:10px;background:var(--surface2);border-radius:5px;margin:10px 0 4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:5px"></div></div><div class="small muted">读到第 ${o.nowp} 页 / 共 ${r.total} 页${isCur && !P.past ? (!P.q ? ' · 今天出去玩，不用读' : P.done ? ' · 今天的份读完了 ✓' : ` · 今天读到第 ${Math.min(r.total, o.before + P.q)} 页就够了`) : ''}</div>`;
     if (o.nowp < r.total) h += `<div class="row" style="margin-top:8px;flex-wrap:nowrap"><input id="rd-page-${o.i}" data-in="rd" data-f="page" data-v="${o.i}" class="wiz-in" type="number" inputmode="numeric" style="flex:1;min-width:0" placeholder="读到第几页" value="${esc(D['page' + o.i] || '')}"><button class="btn sm primary" data-act="rdpage" data-v="${o.i}">记下</button></div>`;
     h += `<details style="margin-top:10px" ${D['open' + o.i] ? 'open' : ''} data-rdopen="${o.i}"><summary class="small" style="color:var(--accent)">读完一章，用一两句话说说讲了什么</summary>
       <input id="rd-ch-${o.i}" data-in="rd" data-f="ch" data-v="${o.i}" class="wiz-in" style="margin-top:8px" placeholder="第几章 / 篇名（比如《藤野先生》）" value="${esc(D['ch' + o.i] || '')}">
