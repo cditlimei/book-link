@@ -485,6 +485,12 @@ a{color:var(--accent);text-decoration:none}
 .todo-r.next{background:var(--accent-bg)}
 .spdone{color:var(--pen);font-weight:700;margin-right:6px}
 .btn:disabled{opacity:.45;box-shadow:none;cursor:default}
+.chat{max-width:85%;padding:10px 12px;border-radius:14px;margin:8px 0;white-space:pre-wrap;line-height:1.6;width:fit-content}
+.chat.ai{background:var(--surface);box-shadow:var(--shadow)} .chat.me{margin-left:auto;background:var(--accent);color:var(--surface)}
+.tile[data-v=kp]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z'/></svg>");--ict:#eef3e2;--icc:#4f6b1f}
+.todo-r[data-v=kp] .ck,.todo-r[data-act=kpgo] .ck{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z'/></svg>")}
+.todo-r[data-act=kpgo]:not(.done) .ck{background:#eef3e2;--icc:#4f6b1f}
+@media (prefers-color-scheme:dark){.tile[data-v=kp]{--ict:#232b17;--icc:#b5cf86}.todo-r[data-act=kpgo]:not(.done) .ck{background:#232b17;--icc:#b5cf86}}
 .pvlist{width:100%;max-width:640px;overflow:auto;max-height:36%;flex:none}
 .gq .gv{flex:none;width:28px;font-size:20px;font-weight:700;line-height:1.3;color:var(--ink3)}
 .gq-ok .gv{color:var(--pen)} .gq-wrong .gv{color:var(--pen)}
@@ -550,7 +556,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v72';
+const APP_V = 'v73';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -727,13 +733,13 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, reads:{}, peRecs:[], speakRecs:[], mixRecs:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, reads:{}, kps:{}, kpTag:{}, peRecs:[], speakRecs:[], mixRecs:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
-  for (const k of ['days','weeks','months','del','extReview','words','recite','hol','reads']) x[k] = x[k] || {};
+  for (const k of ['days','weeks','months','del','extReview','words','recite','hol','reads','kps','kpTag']) x[k] = x[k] || {};
   for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs']) x[k] = x[k] || [];
   x.aiMem = x.aiMem || {};
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
@@ -1429,7 +1435,7 @@ function mergeDB(L, R){
   M.del = Object.assign({}, Ld);
   for (const id in Rd) if ((Rd[id]||0) > (M.del[id]||0)) { M.del[id] = Rd[id]; rN = true; }
   for (const id in Ld) if (!Rd[id]) lN = true;
-  for (const k of ['days','weeks','months','extReview','words','recite','aiMem','hol','reads']) {
+  for (const k of ['days','weeks','months','extReview','words','recite','aiMem','hol','reads','kps','kpTag']) {
     const a = L[k]||{}, b = R[k]||{}; M[k] = M[k] || {};
     for (const key of new Set(Object.keys(a).concat(Object.keys(b)))) {
       const x = a[key], y = b[key];
@@ -1550,9 +1556,9 @@ function render(){
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
-  $('#wiz').innerHTML = state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.hint ? vHint() : state.variant ? vVariant() : state.grade ? vGrade() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  $('#wiz').innerHTML = state.kpx ? vKpx() : state.kpsort ? vKpSort() : state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.hint ? vHint() : state.variant ? vVariant() : state.grade ? vGrade() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
-  document.body.style.overflow = (state.wiz || state.mix || state.qp || state.variant || state.grade || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor || state.holE || state.hint) ? 'hidden' : '';
+  document.body.style.overflow = (state.wiz || state.kpx || state.kpsort || state.mix || state.qp || state.variant || state.grade || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor || state.holE || state.hint) ? 'hidden' : '';
   hydratePhotos(); updateBadge();
 }
 
@@ -1662,6 +1668,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       {t: '语文背诵', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
     // 清单保持精简：一天最多一行可选加练，原有加练优先；没有时才放「读名著」（开始读了才出现，没开始的从学习页进）
     const ex = extraTask(d); if (ex) T.push(ex);
+    else if (isToday && kpToday(d)) T.push(kpToday(d));
     else { const RP = readPlan(d); if (RP.cur && !RP.past && RP.q) T.push({t: '名著阅读', s: RP.done ? '今天读过' : `今天 ${RP.q} 页 · 可选`, done: RP.done, opt: true, act: 'golearn', v: 'read', go: ''}); }
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
@@ -1670,7 +1677,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       const pd = [d, addD(d, -1)].find(x => (DB.days[x] || {}).praise && !seen.split('|').includes(x + DB.days[x].praise));
       if (pd) h += `<div class="card" style="border-color:var(--amber)"><div class="row" style="flex-wrap:nowrap"><div style="flex:1">❤ 家长看到了：<b>${esc(DB.days[pd].praise)}</b></div><button class="btn sm ghost" data-act="praiseseen" data-v="${esc(pd + DB.days[pd].praise)}">好的</button></div></div>`; }
     h += notes;
-    const penOvl = !!(state.wiz || state.holE || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.grade || state.photo || state.voice);   // 被覆盖层挡着时先不画，关掉后再画
+    const penOvl = !!(state.wiz || state.kpx || state.kpsort || state.holE || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.grade || state.photo || state.voice);   // 被覆盖层挡着时先不画，关掉后再画
     const freshOf = x => { const k = d + '|' + x.t; if (!x.done || PEN_SEEN.has(k) || (penOvl && PEN_READY && PEN_DAY === d)) return ''; PEN_SEEN.add(k); if (!PEN_READY || PEN_DAY !== d) return ''; setTimeout(penSound, 60); return 'fresh'; };   // 红笔对勾只在刚完成时画一次
     h += `<div class="card todo">` + T.map(x => `<button class="todo-r ${x.done ? 'done ' + freshOf(x) : ''} ${x === nx ? 'next' : ''}" data-act="${x.act}" data-v="${x.v}"${x.sp ? ` data-s="${x.sp}"` : ''}><span class="ck">${x.done ? '✓' : ''}</span><span class="t">${x.t}</span><span class="s">${x.s}</span><span class="chev">›</span></button>`).join('') + `</div><!--RCOL-->` + holAfterCard(d) + holidayCard(d) + examTip(d) + whatsNew('kid') + tools + welcomeCard() + (showProg && !allDone ? progressCard() : '');
     if (false) h += `<div class="steps" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
@@ -1782,11 +1789,11 @@ function vQuick(){
 async function qpClassify(id){
   const it = DB.items.find(x => x.id === id); if (!it || !aiReady()) return; const tx = taxOf(it.sid), sb = subjById(it.sid), u0 = it.u;
   const cats = ET.map(t => `${t.k}=${typeNameS(it.sid, t.k)}` + (tx ? `（细分：${tx[t.k].subs.map(a => a[0] + '=' + a[1]).join('，')}）` : '')).join('\n');
-  try { const j = parseJSONObj(await aiChat([{role: 'system', content: `你是初中${sb.name}老师。学生用一句话说了自己遇到的问题，帮他归类。type 只能是 calc / concept / read，sub 用细分的英文 key，拿不准就空。只输出 JSON：{"type":"concept","sub":"","tag":"知识点，10 字内"}。\n${cats}`}, {role: 'user', content: it.stem}], {temperature: 0.1}));
+  try { const j = parseJSONObj(await aiChat([{role: 'system', content: `你是初中${sb.name}老师。学生用一句话说了自己遇到的问题，帮他归类。type 只能是 calc / concept / read，sub 用细分的英文 key，拿不准就空。只输出 JSON：{"type":"concept","sub":"","tag":"知识点，10 字内","kp":""}。\n${cats}${kpList(it.sid).length ? `\nkp 只能从下面列表里选 id（都不合适写空字符串）：\n${kpCatalog(it.sid)}` : ''}`}, {role: 'user', content: it.stem}], {temperature: 0.1}));
     const cur = DB.items.find(x => x.id === id); if (!j || !cur || cur.u !== u0) return;
     if (['calc','concept','read'].includes(j.type)) cur.type = j.type;
     const ok = tx && j.sub && tx[cur.type].subs.some(a => a[0] === j.sub); cur.sub = ok ? j.sub : cur.type === j.type ? cur.sub : '';
-    if (j.tag && !cur.tag) cur.tag = String(j.tag).slice(0, 20); cur.u = now(); save(); if (!isTyping()) render();
+    if (j.tag && !cur.tag) cur.tag = String(j.tag).slice(0, 20); if (cur.kp === undefined && kpOk(cur.sid, j.kp)) cur.kp = j.kp; cur.u = now(); save(); if (!isTyping()) render();
   } catch(e) {}
 }
 /* ================= 拍照：本机压缩 → IndexedDB → 同步时加密上传私有仓库 photos/ ；识别在 Claude 对话里做 ================= */
@@ -1918,13 +1925,13 @@ async function recogOne(pid, R){
     const sys = `你是经验丰富的初中${sb.name}老师，帮学生整理错题。看图片，找出做错的题：老师打叉、扣分、订正过、或学生圈出来的题。看不出对错时，就列出图里所有题。
 每道题按下面的分类归类（type 必须是 calc / concept / read 之一，sub 用细分里的英文 key，拿不准就空着）：
 ${cats}
-只输出 JSON 数组，不要别的文字。格式：[{"stem":"题目原文，太长就精简到 120 字内，公式用普通文字","type":"calc","sub":"","tag":"知识点，10 字内","why":"一句话：为什么这样分类"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
+${kpList(sid).length ? `kp 写这题考的知识点，只能从下面列表里选 id（都不合适写空字符串）：\n${kpCatalog(sid)}\n` : ''}只输出 JSON 数组，不要别的文字。格式：[{"stem":"题目原文，太长就精简到 120 字内，公式用普通文字","type":"calc","sub":"","tag":"知识点，10 字内","kp":"","why":"一句话：为什么这样分类"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
     const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '识别这张' + sb.name + '错题照片'}]}], {temperature: 0.2});
     if (state.precog !== R) return;
     const list = parseJSONList(out);
     if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
     const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
-    R.list = R.list.concat(list.slice(0, 12).map(x => ({stem: String(x.stem || '').slice(0, 300), type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), why: String(x.why || '').slice(0, 80), keep: true, conf: null})));
+    R.list = R.list.concat(list.slice(0, 12).map(x => ({stem: String(x.stem || '').slice(0, 300), type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), why: String(x.why || '').slice(0, 80), kp: kpOk(sid, x.kp) ? x.kp : undefined, keep: true, conf: null})));
     if (!list.length) R.err = '没在照片里找到题目。换个角度、拍近一点再试。';
   } catch(e) { if (state.precog !== R) return; R.err = '识别失败：' + e.message; }
 }
@@ -1968,16 +1975,17 @@ async function gradeOne(pid, sid, G){
   const sys = `你是经验丰富的初中${sb.name}老师，批改学生这一页作业。逐题做三件事：读出题目和学生写的答案；自己独立把题做一遍；再对照学生的答案判断对错。
 v 只能是：ok（对）、wrong（错，包括没写）、unsure（字看不清、题目不完整、或你没有把握）、subj（作文、阅读感悟、开放题等主观题，不判）。没有把握一律 unsure，不要硬判。
 key 写这题的正确答案（只写结果，主观题留空）。
+${kpList(sid).length ? `kp 写这题考的知识点，只能从下面列表里选 id（都不合适写空字符串）：\n${kpCatalog(sid)}\n` : ''}
 错题的 hint 写一句提示，指出该回去检查哪一步或哪个概念，绝对不能写出正确答案、正确结果或完整过程；没写的题 hint 写「这题还没写」。其他情况 hint 为空。
 错题按下面分类（type 必须是 calc / concept / read 之一，sub 用细分里的英文 key，拿不准就空着）：
 ${cats}
-只输出 JSON 数组，不要别的文字：[{"no":"题号","stem":"题目原文，太长精简到 120 字内，公式用普通文字","ans":"学生写的答案，照抄，看不清的字写？","v":"ok","key":"","hint":"","type":"calc","sub":"","tag":"知识点，10 字内"}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
+只输出 JSON 数组，不要别的文字：[{"no":"题号","stem":"题目原文，太长精简到 120 字内，公式用普通文字","ans":"学生写的答案，照抄，看不清的字写？","v":"ok","key":"","hint":"","type":"calc","sub":"","tag":"知识点，10 字内","kp":""}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
   const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '批改这页' + sb.name + '作业'}]}], {temperature: 0.1, thinking: {type: 'enabled'}, _to: 180000});
   if (state.grade !== G) return [];
   const list = parseJSONList(out); if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
   const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
   const L = list.slice(0, 30).map(x => ({no: String(x.no || '').slice(0, 8), stem: String(x.stem || '').slice(0, 300), ans: String(x.ans || '').slice(0, 200), v: GV[x.v] ? x.v : 'unsure', hint: String(x.hint || '').slice(0, 120), key: String(x.key || '').slice(0, 80),
-    type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), pick: null, fixed: false, disp: false}));
+    type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), kp: kpOk(sid, x.kp) ? x.kp : undefined, pick: null, fixed: false, disp: false}));
   // 判错的再复核一次（只用文字重做这一道）：两次都错才算错，结论不一样改成「拿不准」让孩子自己选
   const W = L.filter(x => x.v === 'wrong' && x.ans.trim() && !/还没写/.test(x.hint));
   if (W.length) { G.stage = '复核'; if (state.grade === G) render(); }
@@ -3154,7 +3162,7 @@ const LIB = {words:null, recite:null, books:null, tried:false};
 async function loadLib(){
   if (LIB.tried) return; LIB.tried = true;
   const get = f => fetch('data/' + f, {cache:'no-cache'}).then(r => r.ok ? r.json() : null).catch(() => null);
-  [LIB.words, LIB.recite, LIB.books, LIB.pe, LIB.speak, LIB.speak2] = await Promise.all([get('words.json'), get('recite.json'), get('books.json'), get('pe.json'), get('speak.json'), get('speak2.json')]);
+  [LIB.words, LIB.recite, LIB.books, LIB.pe, LIB.speak, LIB.speak2, LIB.kp] = await Promise.all([get('words.json'), get('recite.json'), get('books.json'), get('pe.json'), get('speak.json'), get('speak2.json'), get('kp.json')]);
   LIB.done = true;
   if (state.tab === 'learn' || (state.tab === 'today' && !state.wiz && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)))) render();
 }
@@ -3539,6 +3547,7 @@ function vLearn(){
   if (L.view === 'read') return vRead();
   if (L.view === 'poem') return vPoem();
   if (L.view === 'books') return vBooks();
+  if (L.view === 'kp') return vKp();
   if (!LIB.tried || (LIB.words === null && LIB.recite === null && LIB.books === null && !LIB.done)) { LIB.done = true; }
   // 一屏方块：名称 + 一行现状，点进去再看说明和打印
   const W = uniqWords(), mastered = W.filter(w => (wState(w)||{}).done).length, wq = wordsLeftTonight();
@@ -3551,11 +3560,221 @@ function vLearn(){
     tile('lv', 'card', '英语单词', !LIB.words ? '加载中…' : wq ? `今天 ${wq} 个` : '今天背完了', W.length ? `已掌握 ${mastered}/${W.length}` : '') +
     tile('lv', 'recite', '语文背诵', RI.length ? `会背 ${can}/${cur.length}` : '加载中…', esc(termName(tk))) +
     (() => { const RP = readPlan(today()); return RP.recs.length ? tile('lv', 'read', '名著阅读', RP.cur ? `${RP.cur.nowp}/${RP.cur.r.total} 页` : RP.started ? '都读完了' : '还没开始', RP.cur ? `《${RP.cur.title}》` : esc(termName(RP.tk))) : ''; })() +
+    (() => { const K = kpSubs().flatMap(kpAll), n = K.filter(k => k.st === 'todo' || k.due).length, un = kpSubs().reduce((a, s) => a + kpUnsorted(s).length, 0);
+      return LIB.kp ? tile('lv', 'kp', '弄懂知识点', n ? `待攻克 ${n} 个` : un ? `${un} 道待整理` : K.length ? '都在练 / 已掌握' : '还没有', `已掌握 ${K.filter(k => k.st === 'ok').length}`) : ''; })() +
     tile('lv', 'speak', '英语听说', last ? `最近 ${last.acc}%` : '还没练过', '中考 25 分') +
     tile('lv', 'pe', '体育', est.field != null ? `现场估 ${est.field}/36` : DB.peRecs.length ? `记了 ${DB.peRecs.length} 次` : '还没测过', '中考 50 分') +
     tile('link', '../math/', '数学练习', '每天一站', '北师大七上') +
     tile('lv', 'books', '教材与中考', '版本 · 电子课本', '中考考什么') + `</div>`;
   return h;
+}
+/* ================= 弄懂知识点：错题归到知识点 + 错因（概念 / 计算 / 审题），按知识点统计；
+   每个待攻克的知识点走四步：诊断对话找卡点 → 针对卡点讲解（新例题）→ 按错因出 5 道专项 → 7 天后回查 1 道。
+   原题不给答案；诊断和练习的时间算进每晚 AI 老师时长 ================= */
+const KPT = {concept: '概念', calc: '计算', read: '审题'};
+// 错因按科目叫：数学 概念/计算/审题，语文 积累/理解/表达，英语 拼写/语法词汇/听说（和记错题时的分类一致）
+const kpTN = (sid, t) => sid === 'sx' ? KPT[t] : ((taxOf(sid) || {})[t] || {}).s || KPT[t];
+const kpTypeDesc = sid => sid === 'sx' ? 'concept=基础概念没懂，calc=计算出错，read=审题没看清' : ['calc', 'concept', 'read'].map(t => `${t}=${((taxOf(sid) || {})[t] || {}).n || KPT[t]}`).join('，');
+// 这科这类错因下常见的具体错法（记错题时的细分），给诊断对话做参考
+const kpSubsHint = (sid, t) => { const x = (taxOf(sid) || {})[t]; return x ? x.subs.map(a => a[1] + (a[2] ? '（' + a[2] + '）' : '')).join('；') : ''; };
+const kpSubs = () => LIB.kp && LIB.kp.subjects ? Object.keys(LIB.kp.subjects).filter(sid => subjById(sid).name) : [];
+const kpList = sid => { const S = LIB.kp && LIB.kp.subjects && LIB.kp.subjects[sid]; if (!S) return []; const tk = termKey(today()); return S.nodes.filter(n => !n.grade || n.grade <= tk); };
+const kpName = (sid, id) => ((LIB.kp && LIB.kp.subjects && LIB.kp.subjects[sid] || {nodes: []}).nodes.find(n => n.id === id) || {}).name || '';
+const kpOk = (sid, id) => !!id && kpList(sid).some(n => n.id === id);
+const kpCatalog = sid => kpList(sid).map(n => `${n.id}=${n.name}`).join('\n');
+// 错题的知识点：自己记的题存在题目上（it.kp），拍照错题本那几道是只读的，归类存在 DB.kpTag 里
+const itemKp = it => it.kp !== undefined ? {kp: it.kp, type: it.type} : (DB.kpTag || {})[it.id] || null;   // kp 为空字符串 = 整理过、表里没有
+function setItemKp(it, kp, type){
+  const own = DB.items.find(x => x.id === it.id);
+  if (own) { own.kp = kp || ''; if (type) own.type = type; own.u = now(); }
+  else { DB.kpTag = DB.kpTag || {}; DB.kpTag[it.id] = {sid: it.sid, kp: kp || '', type: type || it.type, u: now()}; }
+}
+const kpUnsorted = sid => allItems().filter(it => it.sid === sid && (it.stem || it.tag) && !itemKp(it));
+function kpRec(key){ return (DB.kps || {})[key] || null; }
+function saveKp(key, r){ DB.kps = DB.kps || {}; r.u = now(); DB.kps[key] = r; save(); }
+// 状态：待攻克（上次掌握后错了 2 道以上）/ 在练（专项过关，等 7 天回查）/ 已掌握（回查做对，之后没再错）/ 观察（只错过 1 道）
+function kpState(sid, id){
+  const key = sid + ':' + id, r = kpRec(key) || {}, its = allItems().filter(i => i.sid === sid && (itemKp(i) || {}).kp === id);
+  const errs = its.filter(i => !r.mast || i.d > r.mast || (i.d === r.mast && (i.u || 0) > (r.mastAt || 0))), by = {concept: 0, calc: 0, read: 0};   // 掌握当天之后又记的错题也算
+  errs.forEach(i => { const t = (itemKp(i) || {}).type || i.type; if (by[t] != null) by[t]++; });
+  const st = !its.length ? 'none' : r.mast && !errs.length ? 'ok' : r.chk ? 'doing' : errs.length >= 2 ? 'todo' : 'watch';
+  const hist = r.hist || [], stuck = hist.filter(h => h.stuck).pop();
+  return {key, sid, id, name: kpName(sid, id), r, its, errs, by, st, stuck: stuck ? stuck.stuck : '', due: !!(r.chk && r.chk <= today()), last: hist[hist.length - 1] || null};
+}
+const kpAll = sid => kpList(sid).map(n => kpState(sid, n.id)).filter(k => k.st !== 'none');
+const KST = {todo: ['待攻克', 'amber'], doing: ['在练', ''], watch: ['观察', ''], ok: ['已掌握', 'good']};
+const kpByTxt = (by, sid) => Object.entries(by).filter(([, n]) => n).map(([t, n]) => `${kpTN(sid, t)} ${n}`).join(' · ');
+function vKp(){
+  const subs = kpSubs(); const L = state.learn; if (!L.kpSid || !subs.includes(L.kpSid)) L.kpSid = subs[0];
+  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">弄懂知识点</h2></div>`;
+  if (!LIB.kp) return h + `<div class="card empty" style="margin-top:12px">${LIB.done ? '知识点表没加载到，联网后再打开。' : '加载中…'}</div>`;
+  if (subs.length > 1) h += `<div class="seg" style="margin:10px 0">` + subs.map(s => `<button data-act="kpsid" data-v="${s}" class="${L.kpSid === s ? 'on' : ''}">${esc(subjById(s).name)}</button>`).join('') + `</div>`;
+  const sid = L.kpSid, un = kpUnsorted(sid), K = kpAll(sid);
+  h += `<p class="sub" style="margin:8px 0 12px">错题按知识点归好，同一个知识点错得多，就先聊清楚卡在哪，再专门练。${subs.length < orderedSubjects(today()).length ? '现在有' + subs.map(s => subjById(s).name).join('、') + '，其他科目陆续加。' : ''}</p>`;
+  if (un.length) h += `<div class="card"><div class="row" style="flex-wrap:nowrap"><span style="flex:1"><b>还有 ${un.length} 道错题没归到知识点</b><span class="small muted" style="display:block">${aiReady() ? 'AI 先填好知识点和错因，你看一眼对不对，一道几秒钟。' : '一道一道选知识点和错因。'}</span></span><button class="btn sm primary" data-act="kpsort">整理</button></div></div>`;
+  if (!K.length) return h + (un.length ? '' : `<div class="card empty">还没有归到知识点的错题。批改作业、记错题时会自动归类。</div>`);
+  for (const st of ['todo', 'doing', 'watch', 'ok']) { const G = K.filter(k => k.st === st).sort((a, b) => b.errs.length - a.errs.length || b.its.length - a.its.length); if (!G.length) continue;
+    h += `<h3 style="margin:16px 0 8px">${KST[st][0]} <span class="small faint" style="font-weight:400">${G.length} 个</span></h3><div class="card" style="padding:4px 16px">` + G.map(k =>
+      `<div class="row kprow" style="padding:10px 0;flex-wrap:nowrap;border-top:1px solid var(--line)"><span style="flex:1;min-width:0"><b>${esc(k.name)}</b><span class="small muted" style="display:block">错 ${k.errs.length || k.its.length} 道${kpByTxt(k.by, k.sid) ? '（' + kpByTxt(k.by, k.sid) + '）' : ''}${k.stuck ? ' · 卡在：' + esc(k.stuck.slice(0, 40)) : ''}</span></span>` +
+      (st === 'ok' ? '<span class="pill good">✓</span>' : st === 'doing' && !k.due ? `<span class="pill">${mdShort(k.r.chk)} 回查</span>` : aiReady() ? `<button class="btn sm ${st === 'todo' || k.due ? 'primary' : ''}" data-act="kpgo" data-v="${k.key}">${k.due ? '回查' : st === 'doing' ? `${mdShort(k.r.chk)} 回查` : '弄懂它'}</button>` : '') + `</div>`).join('') + `</div>`; }
+  return h + `<p class="small faint" style="margin-top:10px">知识点表：${esc(LIB.kp.subjects[sid].source || '')}。只列已经学到的。</p>`;
+}
+/* 整理错题：AI 先填（10 道一批，只发题目文字），家长或孩子一道一道确认 */
+async function kpSuggest(S){
+  const sb = subjById(S.sid);
+  for (let i = 0; i < S.ids.length; i += 10) {
+    if (state.kpsort !== S) return;
+    const chunk = S.ids.slice(i, i + 10).map(id => allItems().find(x => x.id === id)).filter(Boolean).filter(it => !S.sug[it.id]);
+    if (!chunk.length) continue;
+    try { const out = await aiChat([{role: 'system', content: `你是初中${sb.name}老师。给学生的每道错题找出它考的知识点，只能从下面列表里选 id（都不合适就写空字符串），再判断错因 type：${kpTypeDesc(S.sid)}。只输出 JSON 数组：[{"n":序号,"kp":"id","type":"calc"}]\n知识点列表：\n${kpCatalog(S.sid)}`},
+        {role: 'user', content: chunk.map((it, k) => `${k + 1}. ${(it.stem || '').slice(0, 160)}${it.tag ? '（记的知识点：' + it.tag + '）' : ''}（当时记的错因：${kpTN(S.sid, it.type) || '未知'}）`).join('\n')}], {temperature: 0.1});
+      const L = parseJSONList(out) || [];
+      L.forEach(x => { const it = chunk[(+x.n || 0) - 1]; if (it) S.sug[it.id] = {kp: kpOk(S.sid, x.kp) ? x.kp : '', type: KPT[x.type] ? x.type : it.type}; });
+    } catch(e) { S.err = 'AI 没填上：' + e.message + '（可以自己选）'; }
+    if (state.kpsort === S) render();
+  }
+}
+function vKpSort(){
+  const S = state.kpsort, it = allItems().find(x => x.id === S.ids[S.i]);
+  let h = `<div class="wiz" role="dialog" aria-label="整理错题"><div class="wiz-top"><div style="flex:1;font-weight:600">整理错题 · ${esc(subjById(S.sid).name)} · ${Math.min(S.i + 1, S.ids.length)}/${S.ids.length}</div><button class="wiz-x" data-act="kpsortx" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (!it) return h + `<div class="wiz-q" style="margin-top:20px">整理完了</div><p class="muted">归好 ${S.done} 道。回到「弄懂知识点」看哪些知识点错得最多。</p></div><div class="wiz-foot"><button class="btn primary" data-act="kpsortx">看知识点</button></div></div>`;
+  const sg = S.sug[it.id], cur = S.pick[it.id] || sg || {kp: '', type: it.type};
+  h += `<div class="card" style="margin-top:6px"><div class="small faint">${md(it.d)}${it.src ? ' · ' + esc(it.src) : ''}</div><div style="margin-top:4px;font-size:17px;white-space:pre-wrap">${esc(it.stem || it.tag || '')}</div>${it.stem && it.tag ? `<div class="small muted" style="margin-top:4px">当时记的：${esc(it.tag)}</div>` : ''}</div>` +
+    (S.err ? `<div class="signal">${esc(S.err)}</div>` : '') +
+    `<label class="f">知识点${!sg && aiReady() && !S.err ? ' <span class="faint" style="font-weight:400">AI 在看…</span>' : sg ? ' <span class="faint" style="font-weight:400">AI 填的，不对就改</span>' : ''}</label><select data-in="kpsel" data-v="${it.id}"><option value="">表里没有 / 说不清</option>` +
+    kpList(S.sid).map(n => `<option value="${n.id}" ${cur.kp === n.id ? 'selected' : ''}>${esc(n.name)}</option>`).join('') + `</select>
+    <label class="f">错在哪方面</label><div class="big">` + ['concept', 'calc', 'read'].map(k => `<button class="${cur.type === k ? 'on' : ''}" data-act="kptype" data-v="${it.id}" data-t="${k}">${kpTN(S.sid, k)}</button>`).join('') + `</div>`;
+  return h + `</div><div class="wiz-foot"><button class="btn ghost" data-act="kpskip">跳过</button><button class="btn primary" data-act="kpok">对，下一道</button></div></div>`;
+}
+/* 四步专项。state.kpx = {key, sid, id, step: diag|explain|drill|done|check, msgs, stuck, type, ...} */
+function kpCtx(X){ const k = kpState(X.sid, X.id), ex = (k.errs.length ? k.errs : k.its).slice(-5);
+  return {k, errTxt: ex.map((it, i) => `${i + 1}. ${(it.stem || it.tag || '').slice(0, 160)}（错因：${kpTN(X.sid, (itemKp(it) || {}).type || it.type) || '未知'}）`).join('\n'),
+    before: (k.r.hist || []).filter(h => h.stuck).slice(-3).map(h => `${h.d}：${h.stuck}`).join('；')}; }
+const KP_RULES = '你在一对一辅导一个七年级学生。原则：不直接给他做错的原题的答案；一次只说一件事；语气平和具体，不说空洞的鼓励；数学式子用普通文字写（x^2、3/4）。';
+async function kpAsk(messages, opts){ return (await aiChat(messages, Object.assign({temperature: 0.4}, opts || {}))).trim(); }
+// ① 诊断对话：只问不讲，3–6 轮后给出卡点
+async function kpDiag(X, force){
+  const {k, errTxt, before} = kpCtx(X), sb = subjById(X.sid);
+  const sys = `${KP_RULES}\n你是初中${sb.name}老师，现在要弄清他在「${k.name}」上到底卡在哪一步。他最近做错的题：\n${errTxt}\n${before ? '以前找到过的卡点：' + before + '\n' : ''}${kpSubsHint(X.sid, X.type) ? '这一科常见的具体错法（参考，不要直接说给他听）：' + kpSubsHint(X.sid, X.type) + '\n' : ''}错因 type 的含义：${kpTypeDesc(X.sid)}。\n做法：一次只问一个短问题（不超过 50 字），让他用自己的话说、或者只做一小步；不讲解、不给答案、不评判对错。问 3 到 6 个问题，能确定卡点时，只输出一行 JSON：{"done":true,"stuck":"一句话说清卡在哪（25 字内）","type":"concept 或 calc 或 read"}。还不能确定时，只输出下一个问题。`;
+  const msgs = [{role: 'system', content: sys}].concat(X.msgs.map(m => ({role: m.me ? 'user' : 'assistant', content: m.t})));
+  if (force) msgs.push({role: 'user', content: '（老师请根据上面的对话直接给出结论 JSON）'});
+  if (!X.msgs.length) msgs.push({role: 'user', content: '老师好，我们开始吧。'});
+  X.busy = true; render();
+  try { const out = await kpAsk(msgs); if (state.kpx !== X) return;
+    const j = /\{[\s\S]*"done"[\s\S]*\}/.test(out) ? parseJSONObj(out) : null;
+    if (j && j.done) { X.stuck = String(j.stuck || '').slice(0, 60); X.type = KPT[j.type] ? j.type : X.type; X.step = 'explain'; X.busy = false; kpLog(X, {k: 'diag', stuck: X.stuck, type: X.type, turns: X.msgs.filter(m => m.me).length}); kpExplain(X); return; }
+    X.msgs.push({t: out.slice(0, 300)});
+  } catch(e) { if (state.kpx !== X) return; X.err = 'AI 没回上来：' + e.message; }
+  X.busy = false; render();
+}
+// ② 针对卡点讲解 + 新例题，最后让他复述
+async function kpExplain(X){
+  const {k, errTxt} = kpCtx(X), sb = subjById(X.sid); X.busy = true; X.exp = ''; render();
+  try { X.exp = (await kpAsk([{role: 'system', content: `${KP_RULES}\n你是初中${sb.name}老师。学生在「${k.name}」上的卡点是：${X.stuck || '还没说清，按这个知识点最容易错的地方讲'}（错因偏${kpTN(X.sid, X.type)}）。\n只针对这个卡点讲：先用 2–4 句话把道理讲清楚；再出一道新的例题（不能用下面这些他做错的题），写出完整过程，每步一句为什么；最后另起一行，以「用你自己的话说说：」开头问他一个问题，检查他听懂没有。总共不超过 300 字。\n他做错的题（不要用）：\n${errTxt}`}, {role: 'user', content: '请讲吧。'}])).slice(0, 1500); }
+  catch(e) { if (state.kpx !== X) return; X.err = '讲解没出来：' + e.message; }
+  if (state.kpx !== X) return; X.busy = false; render();
+}
+async function kpRetell(X){
+  const said = (($('#kpx-in') || {}).value || '').trim(); if (said.length < 4) return toast('用自己的话说一两句');
+  X.said = said; X.busy = true; render();
+  try { const j = parseJSONObj(await kpAsk([{role: 'system', content: `你是初中${subjById(X.sid).name}老师。刚才的讲解：\n${X.exp}\n学生用自己的话复述了。判断他是不是真的懂了这个卡点（${X.stuck}）。只输出 JSON：{"ok":true 或 false,"say":"一句话：懂了就具体说他哪里说对了；没懂就指出还差哪一点，不要重讲一遍"}`}, {role: 'user', content: said}], {temperature: 0.1}));
+    if (state.kpx !== X) return; X.retell = j ? {ok: !!j.ok, say: String(j.say || '').slice(0, 120)} : {ok: true, say: ''}; }
+  catch(e) { if (state.kpx !== X) return; X.retell = {ok: true, say: ''}; }
+  X.busy = false; render();
+}
+// ③ 按错因出 5 道专项（回查只出 1 道）
+const KP_DRILL = {
+  sx: {concept: '以判断对错并说理由、辨析两个容易混的说法、找出错误步骤这类题为主，检查是不是真懂了', calc: '都是要写步骤的计算题，由易到难，数字换着来', read: '每道题里都藏一个容易看漏的条件（单位、「不」「至少」这类词、一题问了两问），要求他先写出关键条件再作答'},
+  yw: {calc: '积累类：看拼音写字、改错别字、补全古诗文名句、改病句，每题一处', concept: '理解类：给一小段课外文字（150 字内）再问，或者解释文言词句、翻译句子，答案要能在文中找到依据', read: '表达类：按题目要求写一两句话（仿写、扩写、概括、写出理由），题干写清楚字数和要点数'},
+  yy: {calc: '拼写类：看中文或句子语境写出单词的正确形式（单复数、三单、过去式等）', concept: '语法词汇类：单句填空或选择，专门考这个语法点，换不同的句子', read: '审题类：短对话或短文（80 词内）里找线索作答，答案要靠上下文推出来'}};
+const kpDrillHow = (sid, t) => ((KP_DRILL[sid] || KP_DRILL.sx)[t]) || KP_DRILL.sx.concept;
+async function kpDrillGen(X, n){
+  const {k, errTxt} = kpCtx(X), sb = subjById(X.sid); X.busy = true; X.qs = []; X.qi = 0; render();
+  try { const L = parseJSONList(await kpAsk([{role: 'system', content: `你是初中${sb.name}老师，给七年级学生出「${k.name}」的专项练习 ${n} 道。${n > 1 ? '由易到难，' : '难度中等，'}${kpDrillHow(X.sid, X.type)}。专门冲着这个卡点：${X.stuck || '这个知识点最常见的错'}。不能用下面这些他做错的原题。每道 3 分钟内能做完。只输出 JSON 数组：[{"q":"题目"}]\n他做错的题（不要用）：\n${errTxt}`}, {role: 'user', content: '出题'}], {temperature: 0.7}));
+    if (state.kpx !== X) return; X.qs = (L || []).slice(0, n).map(x => ({q: String(x.q || '').slice(0, 400), ans: '', res: null, tries: 0, sol: ''})).filter(x => x.q);
+    if (!X.qs.length) X.err = '题没出来，再试一次'; }
+  catch(e) { if (state.kpx !== X) return; X.err = '出题失败：' + e.message; }
+  X.busy = false; render();
+}
+async function kpCheckAns(X){
+  const Q = X.qs[X.qi]; if (!Q) return; Q.ans = (($('#kpx-in') || {}).value || '').trim(); if (!Q.ans) return toast('先写你的答案');
+  const how = X.sid !== 'sx' ? '做错时指出该回去看哪里（哪个词、哪句话、哪条规则），不要直接写出正确答案' : X.type === 'calc' ? '做错时指出是哪一步开始错的（比如符号、去括号、通分），不要说正确结果' : X.type === 'read' ? '先看他写的关键条件有没有漏，漏了就指出漏了哪类条件（不要直接说出条件内容），再看答案' : '做错时指出他哪个说法或理由不对，不要直接给出正确结论';
+  X.busy = true; render();
+  try { const j = parseJSONObj(await kpAsk([{role: 'system', content: `你是初中${subjById(X.sid).name}老师，判断学生这道题做得对不对。只输出 JSON：{"ok":true 或 false,"hint":"一句话。${how}；做对时具体说好在哪"}`}, {role: 'user', content: `题目：${Q.q}\n学生的作答：${Q.ans}`}], {temperature: 0.1}));
+    if (state.kpx !== X) return; if (!j) throw new Error('判断结果看不懂'); Q.res = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)}; Q.tries++; }
+  catch(e) { if (state.kpx !== X) return; X.err = '判断失败：' + e.message; }
+  X.busy = false; render();
+}
+async function kpSol(X){
+  const Q = X.qs[X.qi]; if (!Q || Q.solBusy) return; Q.solBusy = true; render();
+  try { Q.sol = (await kpAsk([{role: 'system', content: `你是耐心的初中${subjById(X.sid).name}老师。给这道练习题写完整讲解：分步，每步一句为什么，最后写答案。七年级能看懂。`}, {role: 'user', content: '题目：' + Q.q}], {temperature: 0.2})).slice(0, 1500); }
+  catch(e) { Q.sol = '讲解没出来：' + e.message; }
+  Q.solBusy = false; Q.saw = true; if (state.kpx === X) render();
+}
+function kpLog(X, h, set){ const r = Object.assign({id: X.key, sid: X.sid, kp: X.id, hist: []}, kpRec(X.key) || {}); r.hist = (r.hist || []).concat([Object.assign({d: today()}, h)]).slice(-40);
+  for (const f in (set || {})) { if (set[f] == null) delete r[f]; else r[f] = set[f]; } saveKp(X.key, r); }
+// 今天清单里那一行（可选）：有到期回查先回查；否则有待攻克的，隔一天出一次；今天练过就打勾
+function kpToday(d){
+  if (!aiReady() || !LIB.kp) return null;
+  const K = kpSubs().flatMap(kpAll), done = K.find(k => (k.r.hist || []).some(h => h.d === d));
+  if (done) return {t: '弄懂 · ' + done.name, s: '今天练过', done: true, opt: true, act: 'golearn', v: 'kp', go: ''};
+  const due = K.find(k => k.due); if (due) return {t: '回查 · ' + due.name, s: '1 道 · 可选', done: false, opt: true, act: 'kpgo', v: due.key, go: ''};
+  const todo = K.filter(k => k.st === 'todo').sort((a, b) => b.errs.length - a.errs.length)[0];
+  return todo && dayDiff('2026-01-01', d) % 2 === 0 ? {t: '弄懂 · ' + todo.name, s: '可选', done: false, opt: true, act: 'kpgo', v: todo.key, go: ''} : null;
+}
+function kpParentCard(){
+  loadLib(); if (!LIB.kp) return '';
+  const K = kpSubs().flatMap(kpAll).filter(k => k.st === 'todo' || k.st === 'doing').sort((a, b) => (b.st === 'todo') - (a.st === 'todo') || b.errs.length - a.errs.length).slice(0, 3);
+  const un = kpSubs().reduce((a, s) => a + kpUnsorted(s).length, 0); if (!K.length && !un) return '';
+  return `<div class="card"><div class="row"><h3 style="margin:0">最该补的知识点</h3><span class="spacer"></span><button class="btn sm ghost" data-act="golearn" data-v="kp">全部</button></div>` +
+    K.map(k => { const dr = (k.r.hist || []).filter(h => h.k === 'drill').pop();
+      return `<div style="padding:8px 0;border-top:1px solid var(--line)"><b>${esc(k.name)}</b> <span class="small faint">${esc(subjById(k.sid).name)} · ${KST[k.st][0]}</span><div class="small muted">错 ${k.errs.length} 道${kpByTxt(k.by, k.sid) ? '（' + kpByTxt(k.by, k.sid) + '）' : ''}${k.stuck ? '；卡在：' + esc(k.stuck) : '；还没聊过卡在哪'}${dr ? `；专项 ${dr.ok}/${dr.n}（${mdShort(dr.d)}）` : ''}${k.r.chk ? `；${mdShort(k.r.chk)} 回查` : ''}</div></div>`; }).join('') +
+    (un ? `<div class="row" style="padding-top:8px;border-top:1px solid var(--line)"><span class="small muted" style="flex:1">还有 ${un} 道错题没归到知识点</span><button class="btn sm" data-act="golearn" data-v="kp">去整理</button></div>` : '') + `</div>`;
+}
+function kpFinish(X){
+  const ok = X.qs.filter(q => q.res && q.res.ok && !q.saw).length;
+  if (X.step === 'check') { const pass = ok >= 1; kpLog(X, {k: 'check', ok: pass}, pass ? {mast: today(), mastAt: now(), chk: null} : {chk: null}); X.result = pass ? 'mast' : 'again'; }
+  else { const pass = ok >= 4; kpLog(X, {k: 'drill', n: X.qs.length, ok, type: X.type, stuck: X.stuck}, pass ? {chk: addD(today(), 7)} : {}); X.result = pass ? 'pass' : 'more'; }
+  X.step = 'done'; render();
+}
+function kpTime(X){ if (!X || !X.t0) return; const m = Math.round((Date.now() - X.t0) / 60000 * 2) / 2; if (m > 0) { const dd = touchDay(today()); dd.aiMin = (dd.aiMin || 0) + m; save(); } X.t0 = 0; }
+function vKpx(){
+  const X = state.kpx, k = kpState(X.sid, X.id);
+  const title = X.step === 'check' || X.mode === 'check' ? '回查' : ['诊断', '讲解', '专项练习', '完成'][['diag', 'explain', 'drill', 'done'].indexOf(X.step)] || '';
+  let h = `<div class="wiz tall" role="dialog" aria-label="弄懂知识点"><div class="wiz-top"><div style="flex:1;font-weight:600">${esc(k.name)} · ${title}</div><button class="wiz-x" data-act="kpxx" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  if (X.mode !== 'check') h += `<div class="wiz-dots" style="margin:4px 0 12px">` + ['diag', 'explain', 'drill', 'done'].map((s, i, a) => `<i class="${a.indexOf(X.step) > i ? 'done' : a.indexOf(X.step) === i ? 'cur' : ''}"></i>`).join('') + `</div>`;
+  if (X.err) h += `<div class="signal">${esc(X.err)}</div>`;
+  const inp = ph => `<div class="row" style="flex-wrap:nowrap;align-items:flex-end;margin-top:10px"><textarea id="kpx-in" class="wiz-in" style="flex:1;min-height:80px" placeholder="${ph}"></textarea>${micBtn('kpx-in')}</div>${pencilTip()}`;
+  let foot = '';
+  if (X.step === 'diag') {
+    h += `<p class="small muted" style="margin:0 0 10px">先聊几句，弄清你卡在哪一步。说不清也没关系，想到什么说什么。</p>` + X.msgs.map(m => `<div class="chat ${m.me ? 'me' : 'ai'}">${esc(m.t)}</div>`).join('') + (X.busy ? '<div class="chat ai faint">…</div>' : '');
+    if (!X.busy && X.msgs.length && !X.msgs[X.msgs.length - 1].me) h += inp('打字，或者点话筒说');
+    const turns = X.msgs.filter(m => m.me).length;
+    foot = `<button class="btn ghost" data-act="kpskipdiag" ${X.busy ? 'disabled' : ''}>说不清，直接讲</button><button class="btn primary" data-act="kpsend" ${X.busy || !X.msgs.length ? 'disabled' : ''}>${turns >= 6 ? '发送并看结论' : '发送'}</button>`;
+  } else if (X.step === 'explain') {
+    if (X.stuck) h += `<div class="signal info"><span class="k">卡点</span>${esc(X.stuck)}</div>`;
+    h += X.busy && !X.exp ? '<p class="muted">AI 正在准备讲解…</p>' : `<div class="card" style="white-space:pre-wrap;line-height:1.75">${esc(X.exp)}</div>`;
+    if (X.exp && !X.retell) { h += inp('用自己的话说一两句'); foot = `<button class="btn ghost" data-act="kpdrill">先练题</button><button class="btn primary" data-act="kpretell" ${X.busy ? 'disabled' : ''}>说完了</button>`; }
+    else if (X.retell) { h += `<div class="signal ${X.retell.ok ? 'good' : ''}"><span class="k">${X.retell.ok ? '懂了' : '还差一点'}</span>${esc(X.retell.say)}</div>`; foot = X.retell.ok ? `<button class="btn primary" data-act="kpdrill">开始练 5 道</button>` : `<button class="btn ghost" data-act="kpreagain">再说一次</button><button class="btn primary" data-act="kpdrill">先练题</button>`; }
+    else foot = `<button class="btn primary" disabled>AI 正在准备…</button>`;
+  } else if (X.step === 'drill' || X.step === 'check') {
+    const Q = X.qs[X.qi];
+    if (!Q) { h += X.busy ? '<p class="muted">AI 正在出题…</p>' : ''; foot = X.busy ? '' : `<button class="btn primary" data-act="kpregen">再出一次</button>`; }
+    else {
+      h += `<p class="small faint" style="margin:0 0 6px">第 ${X.qi + 1}/${X.qs.length} 道${X.sid !== 'sx' ? '' : X.type === 'read' ? ' · 先写出题目里的关键条件，再写答案' : X.type === 'calc' ? ' · 一步一步写' : ''}</p><div class="card" style="font-size:18px;line-height:1.7;white-space:pre-wrap">${esc(Q.q)}</div>`;
+      if (!(Q.res && Q.res.ok)) h += `<textarea id="kpx-in" class="wiz-in" style="min-height:90px" placeholder="${X.sid === 'sx' && X.type === 'read' ? '关键条件：……\n答案：……' : X.sid === 'sx' ? '写答案和关键步骤' : '写答案'}">${esc(Q.ans)}</textarea>${pencilTip()}`;
+      if (X.busy) h += '<p class="muted">AI 正在看…</p>';
+      if (Q.res) h += `<div class="signal ${Q.res.ok ? 'good' : ''}" style="margin-top:10px"><span class="k">${Q.res.ok ? '对了' : '还不对'}</span>${esc(Q.res.hint)}</div>`;
+      if (Q.res && !Q.res.ok && Q.tries >= 2) h += Q.sol ? `<div class="card" style="margin-top:10px;white-space:pre-wrap;line-height:1.7"><div class="small faint">这道题的讲解（看过讲解的题不算做对）</div>${esc(Q.sol)}</div>` : `<button class="btn sm" style="margin-top:10px" data-act="kpsol" ${Q.solBusy ? 'disabled' : ''}>${Q.solBusy ? 'AI 正在写讲解…' : '看这道题的讲解'}</button>`;
+      const last = X.qi >= X.qs.length - 1, next = `<button class="btn ${Q.res && Q.res.ok ? 'primary' : 'ghost'}" data-act="kpnext">${last ? '做完了' : '下一道'}</button>`;
+      foot = Q.res && Q.res.ok ? next : Q.res ? next + `<button class="btn primary" data-act="kpcheck" ${X.busy ? 'disabled' : ''}>改好了，再看看</button>` : `<button class="btn primary" data-act="kpcheck" ${X.busy ? 'disabled' : ''}>对答案</button>`;
+    }
+  } else if (X.step === 'done') {
+    const ok = X.qs.filter(q => q.res && q.res.ok && !q.saw).length, R = {pass: [`${ok}/${X.qs.length} 过关`, `7 天后（${mdShort(addD(today(), 7))}）回查 1 道，做对就算掌握。`], more: [`${ok}/${X.qs.length}`, '还没稳，明天再来一次，会接着这个卡点练。'], mast: ['回查做对了', `「${k.name}」算掌握了。以后再错会重新提醒。`], again: ['回查没做对', '回到「待攻克」，下次先聊聊这次卡在哪。']}[X.result] || ['', ''];
+    h += `<div style="text-align:center;margin-top:40px"><div class="wiz-q">${R[0]}</div><p class="muted">${R[1]}</p>${X.stuck ? `<p class="small faint">这次找到的卡点：${esc(X.stuck)}</p>` : ''}</div>`;
+    foot = `<button class="btn primary" data-act="kpxx">好了</button>`;
+  }
+  return h + `</div><div class="wiz-foot">${foot}</div></div>`;
 }
 /* ================= 名著阅读：课本「整本书阅读」书目（按 2022 修订版电子课本目录核对，九下修订版未上线暂缺） =================
    先读完一本再读下一本；今天份 = 全部剩余页数 ÷ 离期末剩余天数，落下自动平摊。读完一章用一两句话说说（提取练习），AI 只回一句不打分 */
@@ -3973,9 +4192,9 @@ function attentionItems(){
   return A.slice(0, 3);
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
-const WHATS_NEW = {v: '2026-09-30',
-  kid: ['拍照可以<b>批改作业</b>了：写完拍一页，错的只给提示，改完每道再做一道同类题。', '「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。', '长的课文可以<b>一段一段背</b>了，每段过了打勾，全过了整篇算会。'],
-  parent: ['拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题只给提示不给答案，自动进重做，每道再出一道同类题，两次不对才讲同类题。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。', '单词和背诵的复习按 FSRS 算法排（同样记得住、复习少两三成）；AI 在孩子卡住时主动给提示，周复盘看「提示后自己做对」。']};
+const WHATS_NEW = {v: '2026-09-30b',
+  kid: ['「学习」里有<b>弄懂知识点</b>了：错得多的知识点，先和 AI 聊聊卡在哪，再专门练 5 道。', '拍照可以<b>批改作业</b>了：写完拍一页，错的只给提示，改完每道再做一道同类题。', '「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。'],
+  parent: ['弄懂知识点（数学、语文、英语）：错题归到知识点和错因（概念 / 计算 / 审题），「学习 → 弄懂知识点 → 整理」可以一次整理以前的错题，AI 先填好你确认；待攻克的知识点走四步：诊断对话找卡点 → 针对卡点讲解 → 按错因练 5 道 → 7 天后回查。复盘页有「最该补的知识点」。', '拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题只给提示不给答案，自动进重做，每道再出一道同类题，两次不对才讲同类题。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。']};
 function whatsNew(who){
   let seen = ''; try { seen = localStorage.getItem('observer:new-' + who) || ''; } catch(e) { return ''; }
   if (seen >= WHATS_NEW.v) return '';
@@ -3987,7 +4206,7 @@ function whatsNew(who){
 function attentionCard(){ const A = attentionItems(); if (!A.length) return '';
   return `<div class="card" style="border-color:var(--amber)"><h3 style="color:var(--amber)">需要注意</h3>` + A.map(([t, d]) => `<div style="padding:6px 0;border-top:1px solid var(--line)"><b>${esc(t)}</b><div class="small muted" style="margin-top:2px">${esc(d)}</div></div>`).join('') + `</div>`; }
 function parentNotes(){
-  let h = whatsNew('parent') + todayGlance() + attentionCard();
+  let h = whatsNew('parent') + todayGlance() + attentionCard() + kpParentCard();
   const n = Object.keys(DB.days).length;
   if (!DEMO && n >= 3 && !syncReady()) {
     const lb = DB.settings.lastBackup; const gap = lb ? Math.floor((now() - new Date(lb).getTime())/864e5) : 999;
@@ -4284,6 +4503,30 @@ const ACT = {
     else return toast('填分钟数，或者填开始和结束时间');
     r.none = false; if (!r.intr) r.intr = 'none'; save(); toast(`记 ${r.min} 分钟`); render(); },
   photoopen: () => { state.photo = {kind: aiReady() ? 'homework' : 'error', sid: state.openSubj || null}; render(); },
+  // ===== 弄懂知识点 =====
+  kpsid: el => { state.learn.kpSid = el.dataset.v; render(); },
+  kpsort: () => { const sid = state.learn.kpSid || kpSubs()[0], S = state.kpsort = {sid, ids: kpUnsorted(sid).map(x => x.id), i: 0, sug: {}, pick: {}, done: 0, err: ''}; render(); if (aiReady()) kpSuggest(S); },
+  kpsortx: () => { state.kpsort = null; if (state.tab !== 'learn') { state.tab = 'learn'; } state.learn = Object.assign(state.learn || {}, {view: 'kp'}); render(); },
+  kpskip: () => { state.kpsort.i++; render(); },
+  kptype: el => { const S = state.kpsort, id = el.dataset.v, it = allItems().find(x => x.id === id); S.pick[id] = Object.assign({}, S.pick[id] || S.sug[id] || {kp: '', type: it ? it.type : 'concept'}, {type: el.dataset.t}); render(); },
+  kpok: () => { const S = state.kpsort, id = S.ids[S.i], it = allItems().find(x => x.id === id); if (!it) return;
+    const sel = $('select[data-in=kpsel]'), cur = Object.assign({kp: '', type: it.type}, S.sug[id] || {}, S.pick[id] || {}); if (sel) cur.kp = sel.value;
+    setItemKp(it, cur.kp, cur.type); save(); S.done++; S.i++; render(); },
+  kpgo: el => { if (!aiReady()) return toast('先在「家长 → 设置」填智谱密钥'); const [sid, id] = el.dataset.v.split(':'); if (!kpName(sid, id)) return;
+    if (tutorMinutesToday() >= tutorLimit()) return toast(`今晚 AI 时间用完了（${tutorLimit()} 分钟），明天再来`);
+    const k = kpState(sid, id), last = (k.r.hist || []).filter(h => h.k === 'drill').pop() || {}, dom = Object.entries(k.by).sort((a, b) => b[1] - a[1])[0];
+    const X = state.kpx = {key: k.key, sid, id, msgs: [], t0: Date.now(), type: last.type || (dom && dom[1] ? dom[0] : 'concept'), stuck: last.stuck || k.stuck || '', qs: [], qi: 0};
+    if (k.due) { X.mode = 'check'; X.step = 'check'; kpDrillGen(X, 1); } else { X.step = 'diag'; kpDiag(X); } },
+  kpsend: () => { const X = state.kpx, t = (($('#kpx-in') || {}).value || '').trim(); if (!t) return toast('写一句再发'); X.msgs.push({me: true, t: t.slice(0, 300)}); kpDiag(X, X.msgs.filter(m => m.me).length >= 6); },
+  kpskipdiag: () => { const X = state.kpx; X.step = 'explain'; kpLog(X, {k: 'diag', stuck: X.stuck || '', skip: true, type: X.type}); kpExplain(X); },
+  kpretell: () => kpRetell(state.kpx),
+  kpreagain: () => { state.kpx.retell = null; render(); },
+  kpdrill: () => { const X = state.kpx; X.step = 'drill'; kpDrillGen(X, 5); },
+  kpregen: () => { const X = state.kpx; X.err = ''; kpDrillGen(X, X.mode === 'check' ? 1 : 5); },
+  kpcheck: () => kpCheckAns(state.kpx),
+  kpnext: () => { const X = state.kpx; if (X.qi < X.qs.length - 1) { X.qi++; render(); const b = $('.wiz-body'); if (b) b.scrollTop = 0; } else kpFinish(X); },
+  kpsol: () => kpSol(state.kpx),
+  kpxx: () => { const X = state.kpx; if (X && (X.step === 'drill' || X.step === 'check') && X.qs.some(q => q.res) && !confirm('练到一半，关掉这次不算。确定？')) return; kpTime(X); state.kpx = null; render(); },
   gphoto: el => { state.pview = null; gradePhoto(el.dataset.v); },
   gretry: () => gradePhoto(state.grade.pids || [state.grade.pid]),
   gfix: el => { const x = state.grade.list[+el.dataset.v]; x.fixed = !x.fixed; render(); },
@@ -4296,7 +4539,7 @@ const ACT = {
       const gk = x => x.no ? 'no:' + gNorm(x.no) : 'st:' + gNorm(x.stem).slice(0, 20);
       const had = new Set(DB.items.filter(i => i.photoId === pid).map(gk));
       for (const x of mine) if (gradeWrong(x) && x.stem.trim() && !had.has(gk(x))) { const id = uid('i'); iids.push(id); had.add(gk(x));
-        DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), no: x.no || undefined, conf: null, photoId: pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
+        DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), no: x.no || undefined, kp: x.kp, conf: null, photoId: pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
       if (p && mine.length) { shrinkPhoto(pid); const c = gradeSum({list: mine}); p.grade = {n: mine.length, wrong: c.wrong, disp: ((p.grade || {}).disp || 0) + mine.filter(x => x.disp).length, at: today()}; delete p.tcmp; delete p.tless; p.u = now(); touchDay(d); } }
     touchDay(d0); save();
     if (!iids.length) { state.grade = null; render(); toast(G.list.some(gradeWrong) ? '这些错题之前已经加过了' : '这页都对了 ✓'); return; }
@@ -4388,7 +4631,7 @@ const ACT = {
   rgsave: () => { const R = state.precog; let n = 0, d = state.date;
     for (const x of R.list) { const pid = x.pid || R.pid, p = DB.photos.find(y => y.id === pid); d = p ? p.d : state.date;
       const had = new Set(DB.items.filter(i => i.photoId === pid).map(i => (i.stem || '').trim()));
-      if (x.keep && x.stem.trim() && !had.has(x.stem.trim())) { DB.items.push({id: uid('i'), d, sid: R.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), conf: x.conf, photoId: pid, src: '拍照识别', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); n++; touchDay(d); } }
+      if (x.keep && x.stem.trim() && !had.has(x.stem.trim())) { DB.items.push({id: uid('i'), d, sid: R.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), kp: x.kp, conf: x.conf, photoId: pid, src: '拍照识别', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); n++; touchDay(d); } }
     touchDay(d); save(); state.precog = null; render(); toast(`加入了 ${n} 道，${BOXES[0]} 天后出现在「重做」`); },
   photoview: el => { state.pview = el.dataset.v; render(); },
   pvar: el => { state.pview = null; state.variant = {iid: el.dataset.v, from: 'grade'}; varGen(); },
@@ -4566,6 +4809,7 @@ function onDataIn(e){
   const el = e.target.closest && e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
   if (k === 'qptext') { if (state.qp) state.qp.text = v; return; }
+  if (k === 'kpsel') { const S = state.kpsort; if (S) { const id = el.dataset.v, it = allItems().find(x => x.id === id); S.pick[id] = Object.assign({}, S.pick[id] || S.sug[id] || {type: it ? it.type : 'concept'}, {kp: v}); } return; }
   if (k === 'rd') { (state.rd = state.rd || {})[f + el.dataset.v] = v; return; }   // 名著页草稿
   if (k === 'hol') { const E = state.holE; if (!E) return;   // 边输入边写回草稿：后台同步等引起的重绘不丢字
     if (f === 'from' || f === 'to') { if (v) E[f] = v; return; }
@@ -4611,7 +4855,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.wiz)
 let lastToday = today();
 /* 跨过零点：切回前台、每分钟、点「今天」时都检查；正在记作业/记问题等弹窗里时先不切，免得记到一半落到新的一天 */
 function checkDay(){ const t = today(); if (t === lastToday) return false;
-  if (state.wiz || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.grade || state.photo || state.voice || isTyping()) return false;
+  if (state.wiz || state.kpx || state.kpsort || state.mix || state.qp || state.tutor || state.rcheck || state.variant || state.precog || state.grade || state.photo || state.voice || isTyping()) return false;
   if (state.date === lastToday) state.date = t; if (state.week === monOf(lastToday)) state.week = monOf(t); if (state.month === mKey(lastToday)) state.month = mKey(t);
   lastToday = t; render(); return true; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDay(); });

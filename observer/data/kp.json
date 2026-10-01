@@ -1,0 +1,752 @@
+{
+ "version": 1,
+ "updated": "2026-09-30",
+ "note": "每科知识点表：错题归到这里的某一项，按知识点统计、做专项。数学取自数学 app 的中考考点树（北师大版，七上章序已核对权威目录，七下起按目录初排）；grade 是首次学到的学期，只显示已经学到的。",
+ "subjects": {
+  "sx": {
+   "name": "数学",
+   "source": "北师大版 · 中考考点树",
+   "branches": {
+    "num": "数与式",
+    "eq": "方程与不等式",
+    "fn": "函数",
+    "geo": "图形与几何",
+    "stat": "统计与概率"
+   },
+   "nodes": [
+    {
+     "id": "youli-gainian",
+     "name": "有理数与数轴",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "xiangfan-juedui",
+     "name": "相反数与绝对值",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "youli-bijiao",
+     "name": "有理数大小比较",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "youli-jiajian",
+     "name": "有理数加减（含负分数）",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "youli-chengchu",
+     "name": "有理数乘除",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "chengfang",
+     "name": "乘方与底数辨识",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "hunhe-yunsuan",
+     "name": "有理数混合运算与符号处理",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "kexue-jishu",
+     "name": "科学记数法",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "zhengshi-gainian",
+     "name": "单项式与多项式概念",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "tongleixiang",
+     "name": "合并同类项",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "quhaokuo",
+     "name": "去括号与添括号",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "zhengshi-qiuzhi",
+     "name": "整式化简求值",
+     "branch": "num",
+     "grade": "7a"
+    },
+    {
+     "id": "mi-yunsuan",
+     "name": "幂的运算性质",
+     "branch": "num",
+     "grade": "7b"
+    },
+    {
+     "id": "zhengshi-chengfa",
+     "name": "整式乘法",
+     "branch": "num",
+     "grade": "7b"
+    },
+    {
+     "id": "pingfangcha",
+     "name": "平方差公式",
+     "branch": "num",
+     "grade": "7b"
+    },
+    {
+     "id": "wanquan-pingfang",
+     "name": "完全平方公式",
+     "branch": "num",
+     "grade": "7b"
+    },
+    {
+     "id": "zhengshi-chufa",
+     "name": "整式除法",
+     "branch": "num",
+     "grade": "7b"
+    },
+    {
+     "id": "pingfanggen",
+     "name": "平方根与立方根",
+     "branch": "num",
+     "grade": "8a"
+    },
+    {
+     "id": "wulishu",
+     "name": "实数概念与估算",
+     "branch": "num",
+     "grade": "8a"
+    },
+    {
+     "id": "erci-genshi",
+     "name": "二次根式化简与运算",
+     "branch": "num",
+     "grade": "8a"
+    },
+    {
+     "id": "yinshi-fenjie",
+     "name": "因式分解",
+     "branch": "num",
+     "grade": "8b"
+    },
+    {
+     "id": "fenshi-gainian",
+     "name": "分式概念与基本性质",
+     "branch": "num",
+     "grade": "8b"
+    },
+    {
+     "id": "fenshi-yunsuan",
+     "name": "分式运算",
+     "branch": "num",
+     "grade": "8b"
+    },
+    {
+     "id": "yiyuan-jiefa",
+     "name": "一元一次方程解法",
+     "branch": "eq",
+     "grade": "7a"
+    },
+    {
+     "id": "yiyuan-yingyong",
+     "name": "一元一次方程应用",
+     "branch": "eq",
+     "grade": "7a"
+    },
+    {
+     "id": "eryuan-jiefa",
+     "name": "二元一次方程组解法",
+     "branch": "eq",
+     "grade": "8a"
+    },
+    {
+     "id": "eryuan-yingyong",
+     "name": "二元一次方程组应用",
+     "branch": "eq",
+     "grade": "8a"
+    },
+    {
+     "id": "budengshi-xingzhi",
+     "name": "不等式基本性质",
+     "branch": "eq",
+     "grade": "8b"
+    },
+    {
+     "id": "yiyuan-budengshi",
+     "name": "一元一次不等式（组）",
+     "branch": "eq",
+     "grade": "8b"
+    },
+    {
+     "id": "fenshi-fangcheng",
+     "name": "分式方程",
+     "branch": "eq",
+     "grade": "8b"
+    },
+    {
+     "id": "yiyuanerci-jiefa",
+     "name": "一元二次方程解法",
+     "branch": "eq",
+     "grade": "9a"
+    },
+    {
+     "id": "panbieshi",
+     "name": "根的判别式与根系关系",
+     "branch": "eq",
+     "grade": "9a"
+    },
+    {
+     "id": "erci-yingyong",
+     "name": "一元二次方程应用",
+     "branch": "eq",
+     "grade": "9a"
+    },
+    {
+     "id": "zuobiaoxi",
+     "name": "平面直角坐标系与点坐标",
+     "branch": "fn",
+     "grade": "8a"
+    },
+    {
+     "id": "hanshu-gainian",
+     "name": "函数概念与图象识读",
+     "branch": "fn",
+     "grade": "8a"
+    },
+    {
+     "id": "yici-tuxiang",
+     "name": "一次函数图象与性质",
+     "branch": "fn",
+     "grade": "8a"
+    },
+    {
+     "id": "yici-yingyong",
+     "name": "一次函数应用",
+     "branch": "fn",
+     "grade": "8a"
+    },
+    {
+     "id": "fanbili",
+     "name": "反比例函数",
+     "branch": "fn",
+     "grade": "9a"
+    },
+    {
+     "id": "erci-tuxiang",
+     "name": "二次函数图象与性质",
+     "branch": "fn",
+     "grade": "9b"
+    },
+    {
+     "id": "erci-dingdian",
+     "name": "二次函数顶点与最值",
+     "branch": "fn",
+     "grade": "9b"
+    },
+    {
+     "id": "erci-hanshu-yingyong",
+     "name": "二次函数应用",
+     "branch": "fn",
+     "grade": "9b"
+    },
+    {
+     "id": "hanshu-zonghe",
+     "name": "函数与方程、不等式综合",
+     "branch": "fn",
+     "grade": "9b"
+    },
+    {
+     "id": "liti-tuxing",
+     "name": "立体图形展开与截面",
+     "branch": "geo",
+     "grade": "7a"
+    },
+    {
+     "id": "santu",
+     "name": "从三个方向看（视图）",
+     "branch": "geo",
+     "grade": "7a"
+    },
+    {
+     "id": "xianduan-ju",
+     "name": "线段、距离与中点",
+     "branch": "geo",
+     "grade": "7a"
+    },
+    {
+     "id": "jiao",
+     "name": "角的度量与计算",
+     "branch": "geo",
+     "grade": "7a"
+    },
+    {
+     "id": "xiangjiao-pingxing",
+     "name": "相交线（对顶角、垂线）",
+     "branch": "geo",
+     "grade": "7b"
+    },
+    {
+     "id": "pingxing-panding",
+     "name": "平行线判定与性质",
+     "branch": "geo",
+     "grade": "7b"
+    },
+    {
+     "id": "sanjiaoxing-bianjiao",
+     "name": "三角形三边、内角关系",
+     "branch": "geo",
+     "grade": "7b"
+    },
+    {
+     "id": "quandeng",
+     "name": "全等三角形判定与性质",
+     "branch": "geo",
+     "grade": "7b"
+    },
+    {
+     "id": "zhou-duichen",
+     "name": "轴对称与等腰三角形",
+     "branch": "geo",
+     "grade": "7b"
+    },
+    {
+     "id": "gougu",
+     "name": "勾股定理及逆定理",
+     "branch": "geo",
+     "grade": "8a"
+    },
+    {
+     "id": "sanjiaoxing-zhengming",
+     "name": "三角形的证明（等腰、直角）",
+     "branch": "geo",
+     "grade": "8b"
+    },
+    {
+     "id": "chuizhi-pingfen",
+     "name": "垂直平分线与角平分线",
+     "branch": "geo",
+     "grade": "8b"
+    },
+    {
+     "id": "pingyi-xuanzhuan",
+     "name": "图形的平移与旋转",
+     "branch": "geo",
+     "grade": "8b"
+    },
+    {
+     "id": "pingxingsibianxing",
+     "name": "平行四边形判定与性质",
+     "branch": "geo",
+     "grade": "8b"
+    },
+    {
+     "id": "duobianxing-neijiao",
+     "name": "多边形内角和与外角和",
+     "branch": "geo",
+     "grade": "8b"
+    },
+    {
+     "id": "tsi-texing",
+     "name": "特殊平行四边形（矩形菱形正方形）",
+     "branch": "geo",
+     "grade": "9a"
+    },
+    {
+     "id": "xiangsi",
+     "name": "相似三角形判定与性质",
+     "branch": "geo",
+     "grade": "9a"
+    },
+    {
+     "id": "weiyi-bili",
+     "name": "位似与比例线段",
+     "branch": "geo",
+     "grade": "9a"
+    },
+    {
+     "id": "touying-shitu",
+     "name": "投影与视图",
+     "branch": "geo",
+     "grade": "9a"
+    },
+    {
+     "id": "sanjiaohanshu",
+     "name": "锐角三角函数",
+     "branch": "geo",
+     "grade": "9b"
+    },
+    {
+     "id": "jie-zhijiao",
+     "name": "解直角三角形应用",
+     "branch": "geo",
+     "grade": "9b"
+    },
+    {
+     "id": "yuan-xingzhi",
+     "name": "圆的基本性质（弦、弧、圆周角）",
+     "branch": "geo",
+     "grade": "9b"
+    },
+    {
+     "id": "yuan-weizhi",
+     "name": "点、直线与圆的位置关系（含切线）",
+     "branch": "geo",
+     "grade": "9b"
+    },
+    {
+     "id": "yuan-jisuan",
+     "name": "弧长、扇形面积与圆锥",
+     "branch": "geo",
+     "grade": "9b"
+    },
+    {
+     "id": "shuju-shouji",
+     "name": "数据的收集与统计图表",
+     "branch": "stat",
+     "grade": "7a"
+    },
+    {
+     "id": "gailv-chubu",
+     "name": "概率初步（事件与可能性）",
+     "branch": "stat",
+     "grade": "7b"
+    },
+    {
+     "id": "pingjunshu",
+     "name": "平均数、中位数、众数",
+     "branch": "stat",
+     "grade": "8a"
+    },
+    {
+     "id": "fangcha",
+     "name": "方差与数据波动",
+     "branch": "stat",
+     "grade": "8a"
+    },
+    {
+     "id": "gailv-shuzhuang",
+     "name": "树状图与列表法求概率",
+     "branch": "stat",
+     "grade": "9a"
+    },
+    {
+     "id": "tongji-jueces",
+     "name": "统计推断与决策",
+     "branch": "stat",
+     "grade": "9b"
+    }
+   ]
+  },
+  "yw": {
+   "name": "语文",
+   "source": "中考语文常见考点（按积累运用、古诗文、现代文、写作整理；深圳卷具体题型以学校为准）",
+   "nodes": [
+    {
+     "id": "zi-yin",
+     "name": "字音"
+    },
+    {
+     "id": "zi-xing",
+     "name": "字形（错别字）"
+    },
+    {
+     "id": "ci-yu",
+     "name": "词语理解与运用"
+    },
+    {
+     "id": "cheng-yu",
+     "name": "成语"
+    },
+    {
+     "id": "bing-ju",
+     "name": "病句辨析与修改"
+    },
+    {
+     "id": "biao-dian",
+     "name": "标点符号"
+    },
+    {
+     "id": "xiu-ci",
+     "name": "修辞手法"
+    },
+    {
+     "id": "pai-xu",
+     "name": "语句排序与衔接"
+    },
+    {
+     "id": "mo-xie",
+     "name": "古诗文默写"
+    },
+    {
+     "id": "ming-zhu",
+     "name": "名著阅读"
+    },
+    {
+     "id": "zong-he",
+     "name": "综合性学习（对联、材料概括等）"
+    },
+    {
+     "id": "wy-shici",
+     "name": "文言实词"
+    },
+    {
+     "id": "wy-xuci",
+     "name": "文言虚词"
+    },
+    {
+     "id": "wy-fanyi",
+     "name": "文言句子翻译"
+    },
+    {
+     "id": "wy-duanju",
+     "name": "文言断句"
+    },
+    {
+     "id": "wy-neirong",
+     "name": "文言内容理解"
+    },
+    {
+     "id": "shi-ge",
+     "name": "古诗词鉴赏"
+    },
+    {
+     "id": "jx-gaikuo",
+     "name": "记叙文：内容概括"
+    },
+    {
+     "id": "jx-renwu",
+     "name": "记叙文：人物形象"
+    },
+    {
+     "id": "jx-shangxi",
+     "name": "记叙文：词句赏析"
+    },
+    {
+     "id": "jx-zuoyong",
+     "name": "记叙文：句段作用"
+    },
+    {
+     "id": "jx-zhuzhi",
+     "name": "记叙文：标题与主旨"
+    },
+    {
+     "id": "sm-texing",
+     "name": "说明文：对象与特征"
+    },
+    {
+     "id": "sm-fangfa",
+     "name": "说明文：说明方法及作用"
+    },
+    {
+     "id": "sm-yuyan",
+     "name": "说明文：语言准确性"
+    },
+    {
+     "id": "yl-lundian",
+     "name": "议论文：论点、论据、论证"
+    },
+    {
+     "id": "fei-lianxu",
+     "name": "非连续性文本信息提取"
+    },
+    {
+     "id": "zw-shenti",
+     "name": "作文：审题立意"
+    },
+    {
+     "id": "zw-xuancai",
+     "name": "作文：选材"
+    },
+    {
+     "id": "zw-miaoxie",
+     "name": "作文：描写与细节"
+    },
+    {
+     "id": "zw-jiegou",
+     "name": "作文：结构"
+    }
+   ]
+  },
+  "yy": {
+   "name": "英语",
+   "source": "义务教育英语课程标准（2022 年版）附录 4 语法项目表，外加词汇、完形、阅读、写作、听说",
+   "nodes": [
+    {
+     "id": "noun-count",
+     "name": "名词：可数与不可数、单复数"
+    },
+    {
+     "id": "noun-poss",
+     "name": "名词所有格"
+    },
+    {
+     "id": "verb-forms",
+     "name": "动词的基本形式（三单、过去式等）"
+    },
+    {
+     "id": "verb-link",
+     "name": "系动词与助动词"
+    },
+    {
+     "id": "modal",
+     "name": "情态动词"
+    },
+    {
+     "id": "adj-comp",
+     "name": "形容词比较级和最高级"
+    },
+    {
+     "id": "adv",
+     "name": "副词及其比较级"
+    },
+    {
+     "id": "pron-pers",
+     "name": "人称代词与物主代词"
+    },
+    {
+     "id": "pron-refl",
+     "name": "反身代词"
+    },
+    {
+     "id": "pron-indef",
+     "name": "指示、不定、疑问代词"
+    },
+    {
+     "id": "num",
+     "name": "基数词与序数词"
+    },
+    {
+     "id": "prep",
+     "name": "介词"
+    },
+    {
+     "id": "conj",
+     "name": "连词"
+    },
+    {
+     "id": "article",
+     "name": "冠词"
+    },
+    {
+     "id": "word-form",
+     "name": "构词法（合成、派生、转化）"
+    },
+    {
+     "id": "sent-q",
+     "name": "疑问句（一般、特殊、选择）"
+    },
+    {
+     "id": "sent-imp",
+     "name": "祈使句与感叹句"
+    },
+    {
+     "id": "sent-pat",
+     "name": "简单句五种基本句型"
+    },
+    {
+     "id": "there-be",
+     "name": "存现句 There be"
+    },
+    {
+     "id": "t-present",
+     "name": "一般现在时"
+    },
+    {
+     "id": "t-past",
+     "name": "一般过去时"
+    },
+    {
+     "id": "t-future",
+     "name": "一般将来时"
+    },
+    {
+     "id": "t-prog",
+     "name": "现在进行时"
+    },
+    {
+     "id": "t-pastprog",
+     "name": "过去进行时"
+    },
+    {
+     "id": "t-perfect",
+     "name": "现在完成时"
+    },
+    {
+     "id": "passive",
+     "name": "被动语态"
+    },
+    {
+     "id": "infin",
+     "name": "动词不定式"
+    },
+    {
+     "id": "ing-ed",
+     "name": "动词 -ing / -ed 形式"
+    },
+    {
+     "id": "compound",
+     "name": "并列句"
+    },
+    {
+     "id": "obj-clause",
+     "name": "宾语从句"
+    },
+    {
+     "id": "adv-clause",
+     "name": "状语从句"
+    },
+    {
+     "id": "rel-clause",
+     "name": "定语从句"
+    },
+    {
+     "id": "agree",
+     "name": "主谓一致"
+    },
+    {
+     "id": "vocab-spell",
+     "name": "单词拼写"
+    },
+    {
+     "id": "vocab-mean",
+     "name": "词义辨析"
+    },
+    {
+     "id": "phrase",
+     "name": "固定搭配与短语"
+    },
+    {
+     "id": "cloze",
+     "name": "完形填空"
+    },
+    {
+     "id": "reading",
+     "name": "阅读理解"
+    },
+    {
+     "id": "writing",
+     "name": "书面表达"
+    },
+    {
+     "id": "listen",
+     "name": "听力"
+    },
+    {
+     "id": "speak",
+     "name": "口语表达"
+    }
+   ]
+  }
+ }
+}
