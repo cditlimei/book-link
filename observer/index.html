@@ -556,7 +556,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v73';
+const APP_V = 'v74';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -3573,8 +3573,10 @@ function vLearn(){
    原题不给答案；诊断和练习的时间算进每晚 AI 老师时长 ================= */
 const KPT = {concept: '概念', calc: '计算', read: '审题'};
 // 错因按科目叫：数学 概念/计算/审题，语文 积累/理解/表达，英语 拼写/语法词汇/听说（和记错题时的分类一致）
-const kpTN = (sid, t) => sid === 'sx' ? KPT[t] : ((taxOf(sid) || {})[t] || {}).s || KPT[t];
-const kpTypeDesc = sid => sid === 'sx' ? 'concept=基础概念没懂，calc=计算出错，read=审题没看清' : ['calc', 'concept', 'read'].map(t => `${t}=${((taxOf(sid) || {})[t] || {}).n || KPT[t]}`).join('，');
+// 生物、地理、历史、道法没有「计算」：这一类是记错、记混、写错字
+const KPT_MEM = {calc: '记忆', concept: '理解', read: '审题'};
+const kpTN = (sid, t) => sid === 'sx' ? KPT[t] : taxOf(sid) ? (taxOf(sid)[t] || {}).s || KPT[t] : KPT_MEM[t];
+const kpTypeDesc = sid => sid === 'sx' ? 'concept=基础概念没懂，calc=计算出错，read=审题没看清' : !taxOf(sid) ? 'calc=知识点记错、记混或写错字，concept=道理没理解，read=没看清题目或材料、答非所问' : ['calc', 'concept', 'read'].map(t => `${t}=${((taxOf(sid) || {})[t] || {}).n || KPT[t]}`).join('，');
 // 这科这类错因下常见的具体错法（记错题时的细分），给诊断对话做参考
 const kpSubsHint = (sid, t) => { const x = (taxOf(sid) || {})[t]; return x ? x.subs.map(a => a[1] + (a[2] ? '（' + a[2] + '）' : '')).join('；') : ''; };
 const kpSubs = () => LIB.kp && LIB.kp.subjects ? Object.keys(LIB.kp.subjects).filter(sid => subjById(sid).name) : [];
@@ -3608,7 +3610,7 @@ function vKp(){
   const subs = kpSubs(); const L = state.learn; if (!L.kpSid || !subs.includes(L.kpSid)) L.kpSid = subs[0];
   let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">弄懂知识点</h2></div>`;
   if (!LIB.kp) return h + `<div class="card empty" style="margin-top:12px">${LIB.done ? '知识点表没加载到，联网后再打开。' : '加载中…'}</div>`;
-  if (subs.length > 1) h += `<div class="seg" style="margin:10px 0">` + subs.map(s => `<button data-act="kpsid" data-v="${s}" class="${L.kpSid === s ? 'on' : ''}">${esc(subjById(s).name)}</button>`).join('') + `</div>`;
+  if (subs.length > 1) h += `<div class="row" style="margin:10px 0;gap:6px">` + subs.map(s => { const n = kpAll(s).filter(k => k.st === 'todo' || k.due).length; return `<button data-act="kpsid" data-v="${s}" class="chip ${L.kpSid === s ? 'on' : ''}" style="min-height:40px">${esc(subjById(s).name)}${n ? ` <b>${n}</b>` : ''}</button>`; }).join('') + `</div>`;   // 7 科放不进分段条，用能换行的小按钮，带待攻克数
   const sid = L.kpSid, un = kpUnsorted(sid), K = kpAll(sid);
   h += `<p class="sub" style="margin:8px 0 12px">错题按知识点归好，同一个知识点错得多，就先聊清楚卡在哪，再专门练。${subs.length < orderedSubjects(today()).length ? '现在有' + subs.map(s => subjById(s).name).join('、') + '，其他科目陆续加。' : ''}</p>`;
   if (un.length) h += `<div class="card"><div class="row" style="flex-wrap:nowrap"><span style="flex:1"><b>还有 ${un.length} 道错题没归到知识点</b><span class="small muted" style="display:block">${aiReady() ? 'AI 先填好知识点和错因，你看一眼对不对，一道几秒钟。' : '一道一道选知识点和错因。'}</span></span><button class="btn sm primary" data-act="kpsort">整理</button></div></div>`;
@@ -3686,8 +3688,9 @@ async function kpRetell(X){
 const KP_DRILL = {
   sx: {concept: '以判断对错并说理由、辨析两个容易混的说法、找出错误步骤这类题为主，检查是不是真懂了', calc: '都是要写步骤的计算题，由易到难，数字换着来', read: '每道题里都藏一个容易看漏的条件（单位、「不」「至少」这类词、一题问了两问），要求他先写出关键条件再作答'},
   yw: {calc: '积累类：看拼音写字、改错别字、补全古诗文名句、改病句，每题一处', concept: '理解类：给一小段课外文字（150 字内）再问，或者解释文言词句、翻译句子，答案要能在文中找到依据', read: '表达类：按题目要求写一两句话（仿写、扩写、概括、写出理由），题干写清楚字数和要点数'},
-  yy: {calc: '拼写类：看中文或句子语境写出单词的正确形式（单复数、三单、过去式等）', concept: '语法词汇类：单句填空或选择，专门考这个语法点，换不同的句子', read: '审题类：短对话或短文（80 词内）里找线索作答，答案要靠上下文推出来'}};
-const kpDrillHow = (sid, t) => ((KP_DRILL[sid] || KP_DRILL.sx)[t]) || KP_DRILL.sx.concept;
+  yy: {calc: '拼写类：看中文或句子语境写出单词的正确形式（单复数、三单、过去式等）', concept: '语法词汇类：单句填空或选择，专门考这个语法点，换不同的句子', read: '审题类：短对话或短文（80 词内）里找线索作答，答案要靠上下文推出来'},
+  mem: {calc: '记忆类：填空、判断、连线，换不同的问法考同一个知识点，答案按课本说法', concept: '理解类：给一个生活情境或小材料，问为什么、该怎么做，要说出依据', read: '材料题：给一小段材料（100 字内）或图表的文字描述，要求先写出材料里的关键信息再作答'}};
+const kpDrillHow = (sid, t) => ((KP_DRILL[sid] || (taxOf(sid) ? KP_DRILL.sx : KP_DRILL.mem))[t]) || KP_DRILL.sx.concept;
 async function kpDrillGen(X, n){
   const {k, errTxt} = kpCtx(X), sb = subjById(X.sid); X.busy = true; X.qs = []; X.qi = 0; render();
   try { const L = parseJSONList(await kpAsk([{role: 'system', content: `你是初中${sb.name}老师，给七年级学生出「${k.name}」的专项练习 ${n} 道。${n > 1 ? '由易到难，' : '难度中等，'}${kpDrillHow(X.sid, X.type)}。专门冲着这个卡点：${X.stuck || '这个知识点最常见的错'}。不能用下面这些他做错的原题。每道 3 分钟内能做完。只输出 JSON 数组：[{"q":"题目"}]\n他做错的题（不要用）：\n${errTxt}`}, {role: 'user', content: '出题'}], {temperature: 0.7}));
@@ -4194,7 +4197,7 @@ function attentionItems(){
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
 const WHATS_NEW = {v: '2026-09-30b',
   kid: ['「学习」里有<b>弄懂知识点</b>了：错得多的知识点，先和 AI 聊聊卡在哪，再专门练 5 道。', '拍照可以<b>批改作业</b>了：写完拍一页，错的只给提示，改完每道再做一道同类题。', '「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。'],
-  parent: ['弄懂知识点（数学、语文、英语）：错题归到知识点和错因（概念 / 计算 / 审题），「学习 → 弄懂知识点 → 整理」可以一次整理以前的错题，AI 先填好你确认；待攻克的知识点走四步：诊断对话找卡点 → 针对卡点讲解 → 按错因练 5 道 → 7 天后回查。复盘页有「最该补的知识点」。', '拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题只给提示不给答案，自动进重做，每道再出一道同类题，两次不对才讲同类题。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。']};
+  parent: ['弄懂知识点（七科都有，知识点按课本目录和课标整理）：错题归到知识点和错因（概念 / 计算 / 审题），「学习 → 弄懂知识点 → 整理」可以一次整理以前的错题，AI 先填好你确认；待攻克的知识点走四步：诊断对话找卡点 → 针对卡点讲解 → 按错因练 5 道 → 7 天后回查。复盘页有「最该补的知识点」。', '拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题只给提示不给答案，自动进重做，每道再出一道同类题，两次不对才讲同类题。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。', '假期作业自动拆到每天，落下的平摊到后面，收假前一晚列出没做完的。']};
 function whatsNew(who){
   let seen = ''; try { seen = localStorage.getItem('observer:new-' + who) || ''; } catch(e) { return ''; }
   if (seen >= WHATS_NEW.v) return '';
