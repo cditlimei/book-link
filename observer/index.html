@@ -556,7 +556,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v76';
+const APP_V = 'v77';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -1668,8 +1668,8 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
       {t: '语文背诵', s: rDue ? '复习 ' + rDue + ' 篇' : rToday ? '今天背过' : learning ? '在背 ' + learning + ' 篇 · 可选' : '可选', done: rDue === 0 && rToday, opt: !rDue, act: 'golearn', v: 'recite', go: `复习 ${rDue} 篇古诗`}];
     // 清单保持精简：一天最多一行可选加练，原有加练优先；没有时才放「读名著」（开始读了才出现，没开始的从学习页进）
     const ex = extraTask(d); if (ex) T.push(ex);
-    else if (isToday && exToday(d)) T.push(exToday(d));   // 考前 10 天：自测优先
-    else if (isToday && kpToday(d)) T.push(kpToday(d));   // memo：同一次渲染只算一次
+    else if (isToday && (exToday(d) || kpToday(d))) { const EX = exToday(d), KD = kpToday(d);   // 到期回查 > 没测的自测 > 弄懂 > 已测过的自测
+      T.push(KD && KD.act === 'kpgo' && KD.t.startsWith('回查') ? KD : EX && !EX.done ? EX : KD || EX); }
     else { const RP = readPlan(d); if (RP.cur && !RP.past && RP.q) T.push({t: '名著阅读', s: RP.done ? '今天读过' : `今天 ${RP.q} 页 · 可选`, done: RP.done, opt: true, act: 'golearn', v: 'read', go: ''}); }
     const nx = T.find(x => !x.done && !x.opt);
     if (nx && !late) h += `<button class="btn primary fillbtn" data-act="${nx.act}" data-v="${nx.v}">下一步：${nx.go}</button>`;
@@ -3597,7 +3597,10 @@ const kpIdx = () => memo('kpIdx', () => { const by = new Map(), un = {};
   for (const it of allItems()) { const t = itemKp(it), ok = t && (t.kp === '' || kpOk(it.sid, t.kp));
     if (!ok) { if (it.stem || it.tag) (un[it.sid] = un[it.sid] || []).push(it); continue; }
     if (t.kp) { const k = it.sid + ':' + t.kp; if (!by.has(k)) by.set(k, []); by.get(k).push(it); } }
-  const tm = new Map(); for (const r of Object.values(DB.extests || {})) for (const id of r.miss || []) { const k = r.sid + ':' + id; if (!tm.has(k) || tm.get(k) < r.d) tm.set(k, r.d); }
+  // 每个知识点看最近一次被自测到的结果：最近一次没对才算「自测没对」，记下那次的时间
+  const tm = new Map(), last = new Map(); for (const r of Object.values(DB.extests || {})) for (const x of (r.res || (r.miss || []).map(kp => ({kp, ok: false})))) {
+    const k = r.sid + ':' + x.kp, ts = exTs(r); if (!last.has(k) || last.get(k).ts < ts) last.set(k, {ts, ok: x.ok}); }
+  last.forEach((v, k) => { if (!v.ok) tm.set(k, v.ts); });
   return {by, un, tm}; });
 const kpUnsorted = sid => kpIdx().un[sid] || [];
 function kpRec(key){ return (DB.kps || {})[key] || null; }
@@ -3607,21 +3610,23 @@ function saveKp(key, r){ DB.kps = DB.kps || {}; r.u = now(); DB.kps[key] = r; sa
 const kpNeed = n => n >= 5 ? 4 : Math.max(1, Math.ceil(n * 0.8));
 function kpDerive(r){
   const H = (r.hist || []).map((h, i) => [h, i]).sort((a, b) => a[0].d < b[0].d ? -1 : a[0].d > b[0].d ? 1 : (a[0].t || 0) - (b[0].t || 0) || a[1] - b[1]).map(x => x[0]);
-  let chk = null, mast = null, pass = null, from = null;
+  let chk = null, mast = null, pass = null, from = null, passT = 0, mastT = 0;
+  const ts = h => h.t || (P(h.d).getTime() + 86399999);   // 旧记录没有时间，按当天最后一刻算
   for (const h of H) {
-    if (h.k === 'drill') { if (h.ok >= kpNeed(h.n || 5)) { chk = addD(h.d, 7); pass = h.d; } else chk = null; }
-    else if (h.k === 'check') { if (h.ok) { mast = h.d; from = pass || h.d; } chk = null; }
+    if (h.k === 'drill') { if (h.ok >= kpNeed(h.n || 5)) { chk = addD(h.d, 7); pass = h.d; passT = ts(h); } else chk = null; }
+    else if (h.k === 'check') { if (h.ok) { mast = h.d; from = pass || h.d; mastT = ts(h); } chk = null; }
   }
-  return {chk, mast, from, pass};
+  return {chk, mast, from, pass, passT, mastT};
 }
 function kpState(sid, id){
   const key = sid + ':' + id, r0 = kpRec(key) || {}, D = kpDerive(r0), r = Object.assign({}, r0, {chk: D.chk, mast: D.mast}), its = kpIdx().by.get(key) || [];
   // 掌握前要回查过关；专项过关那天之后（在练期间）又错的题照样算，回查做对也不能一笔勾销
   const errs = its.filter(i => !D.mast || i.d > D.from), by = {concept: 0, calc: 0, read: 0};
-  const tm = kpIdx().tm.get(key), testWeak = !!tm && !(D.pass && D.pass >= tm) && !(D.mast && D.mast > tm);   // 考前自测没做对，之后还没专项过关
+  const tm = kpIdx().tm.get(key), testWeak = !!tm && !(D.passT > tm) && !(D.mastT > tm);   // 最近一次自测没做对，而且在那之后还没专项过关或回查做对
   errs.forEach(i => { const t = (itemKp(i) || {}).type || i.type; if (by[t] != null) by[t]++; });
   const st = !its.length && !testWeak && !(r0.hist || []).length ? 'none' :   // 只是自测没对、没错题记录的知识点，练过之后也要留在地图上
-    !its.length && !testWeak && !D.chk && !D.mast ? 'watch' : D.mast && !errs.length && !testWeak ? 'ok' : D.chk ? 'doing' : errs.length >= 2 || testWeak ? 'todo' : 'watch';
+    !its.length && !testWeak && !D.chk && !D.mast ? 'watch' :
+    D.mast && !errs.length && !testWeak ? 'ok' : testWeak ? 'todo' : D.chk ? 'doing' : errs.length >= 2 ? 'todo' : 'watch';   // 专项过关后又自测没对：回到待攻克
   const hist = r.hist || [], stuck = hist.filter(h => h.stuck).pop();
   return {key, sid, id, name: kpName(sid, id), r, its, errs, by, st, stuck: stuck ? stuck.stuck : '', due: !!(r.chk && r.chk <= today()), last: hist[hist.length - 1] || null, testWeak};
 }
@@ -3731,7 +3736,7 @@ async function kpCheckAns(X){
   const how = X.sid !== 'sx' ? '做错时指出该回去看哪里（哪个词、哪句话、哪条规则），不要直接写出正确答案' : X.type === 'calc' ? '做错时指出是哪一步开始错的（比如符号、去括号、通分），不要说正确结果' : X.type === 'read' ? '先看他写的关键条件有没有漏，漏了就指出漏了哪类条件（不要直接说出条件内容），再看答案' : '做错时指出他哪个说法或理由不对，不要直接给出正确结论';
   X.busy = true; render();
   try { const j = parseJSONObj(await kpAsk([{role: 'system', content: `你是初中${subjById(X.sid).name}老师，判断学生这道题做得对不对。只输出 JSON：{"ok":true 或 false,"hint":"一句话。${how}；做对时具体说好在哪"}`}, {role: 'user', content: `题目：${Q.q}\n学生的作答：${Q.ans}`}], {temperature: 0.1}));
-    if (state.kpx !== X || X.qs[X.qi] !== Q) return; if (!j) throw new Error('判断结果看不懂'); Q.res = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)}; Q.tries++; X.err = ''; }
+    if (state.kpx !== X || X.qs[X.qi] !== Q) return; if (!j) throw new Error('判断结果看不懂'); Q.res = {ok: jOk(j.ok), hint: String(j.hint || '').slice(0, 160)}; Q.tries++; X.err = ''; }
   catch(e) { if (state.kpx !== X || X.qs[X.qi] !== Q) return; X.err = '判断失败：' + e.message; }
   X.busy = false; render();
 }
@@ -3818,21 +3823,27 @@ function vKpx(){
 }
 /* ================= 考前自测：考前 10 天开放，每科 8 道覆盖这学期学过的知识点（薄弱的优先），做完列出没做对的知识点，
    这些知识点直接算「待攻克」，接着用「弄懂知识点」专项。不预测分数。记录在 DB.extests[学期-期中/期末:科目] ================= */
+const jOk = v => v === true || v === 'true';   // AI 偶尔把 false 写成字符串 "false"，!! 会当成对
 const exWin = t => { const nx = nextExam(t); return nx && nx.left >= 1 && nx.left <= 10 ? nx : null; };
-const exKey = (t, sid) => { const nx = nextExam(t); return nx ? termKey(t) + '-' + nx.kind + ':' + sid : ''; };
-const exRec = (t, sid) => (DB.extests || {})[exKey(t, sid)] || null;
+// 每次自测单独一条（重测、两台设备各测一次都不会互相覆盖），记下针对的是哪场考试（examD）；旧版记录没有 examD，按测试日期落在本场考前 10 天里认
+const exRecs = (t, sid) => { const nx = nextExam(t); if (!nx) return []; return Object.values(DB.extests || {}).filter(r => r.sid === sid && (!r.examD || r.examD === nx.d) && r.d >= addD(nx.d, -10) && r.d < nx.d).sort((a, b) => (a.u || 0) - (b.u || 0)); };
+const exRec = (t, sid) => { const L = exRecs(t, sid); return L[L.length - 1] || null; };
+const exTs = r => r.t || r.u || 0;
 const exSubs = () => { const on = new Set(orderedSubjects(today()).map(s => s.id)); return kpSubs().filter(s => on.has(s)); };
 // 挑 8 个知识点：待攻克/在练/观察的先上（最多 4 个），其余从学过的里挑这学期还没测过的
-function exPick(sid, n){
-  const weak = kpAll(sid).filter(k => k.st !== 'ok').sort((a, b) => b.errs.length - a.errs.length).map(k => k.id).slice(0, Math.ceil(n / 2));
+function exPick(sid, n, kind){
+  const weak = kpAll(sid).filter(k => k.st !== 'ok').sort((a, b) => (b.testWeak - a.testWeak) || b.errs.length - a.errs.length).map(k => k.id).slice(0, Math.ceil(n / 2));   // 上次自测没对的优先回测
   const tested = new Set(Object.values(DB.extests || {}).filter(r => r.sid === sid).flatMap(r => (r.res || []).map(x => x.kp)));
-  const rest = kpList(sid).map(x => x.id).filter(id => !weak.includes(id)).sort((a, b) => (tested.has(a) - tested.has(b)) || (Math.random() - 0.5));
+  // 期中只考前半学期：按课本顺序排的表（有 grade 的）只取前 55%；语文、英语的表按考点分类，不截
+  let pool = kpList(sid); if (kind === 'mid' && pool.some(x => x.grade)) { const tk = termKey(today()), cur = pool.filter(x => x.grade === tk); const cut = new Set(cur.slice(Math.ceil(cur.length * 0.55)).map(x => x.id)); pool = pool.filter(x => !cut.has(x.id)); }
+  const rest = pool.map(x => x.id).filter(id => !weak.includes(id)).sort((a, b) => (tested.has(a) - tested.has(b)) || (Math.random() - 0.5));
   return weak.concat(rest).slice(0, n);
 }
 async function exGen(X){
-  const sb = subjById(X.sid), ids = exPick(X.sid, 8), op = kpOp(X); X.busy = true; X.err = ''; X.qs = []; X.qi = 0; render();
+  const sb = subjById(X.sid), ids = exPick(X.sid, 8, X.kind), op = kpOp(X); X.busy = true; X.err = ''; X.qs = []; X.qi = 0; render();
+  if (!ids.length) { X.busy = false; X.err = '这一科还没有可以考的知识点'; render(); return; }
   const old = allItems().filter(i => i.sid === X.sid).map(i => i.stem || '').filter(Boolean);
-  try { const L = parseJSONList(await kpAsk([{role: 'system', content: `你是初中${sb.name}老师，给七年级学生出一份考前自测，共 ${ids.length} 道，按下面知识点顺序每个一道。题型用这个知识点期中考试的常见考法，难度中等，每道 3 分钟内能做完，答案明确、能判对错（不出作文和开放题）。只输出 JSON 数组：[{"kp":"知识点 id","q":"题目"}]\n知识点：\n${ids.map(id => id + '=' + kpName(X.sid, id)).join('\n')}`}, {role: 'user', content: '出题'}], {temperature: 0.7}));
+  try { const L = parseJSONList(await kpAsk([{role: 'system', content: `你是初中${sb.name}老师，给七年级学生出一份考前自测，共 ${ids.length} 道，按下面知识点顺序每个一道。题型用这个知识点${EXAM_N[X.kind] || ''}考试的常见考法，难度中等，每道 3 分钟内能做完，答案明确、能判对错（不出作文和开放题）。只输出 JSON 数组：[{"kp":"知识点 id","q":"题目"}]\n知识点：\n${ids.map(id => id + '=' + kpName(X.sid, id)).join('\n')}`}, {role: 'user', content: '出题'}], {temperature: 0.7}));
     if (state.extest !== X || X.op !== op) return;
     X.qs = (L || []).filter(x => x && x.q && ids.includes(x.kp) && !old.some(o => kpSimilar(o, x.q))).slice(0, ids.length).map(x => ({kp: x.kp, q: String(x.q).slice(0, 400), ans: '', res: null}));
     if (X.qs.length < 3) { X.qs = []; X.err = '题没出好，再试一次'; } }
@@ -3840,16 +3851,17 @@ async function exGen(X){
   X.busy = false; render();
 }
 async function exCheck(X){
-  const Q = X.qs[X.qi]; if (!Q || X.busy) return; Q.ans = (($('#ex-in') || {}).value || Q.ans || '').trim(); if (!Q.ans) return toast('先写你的答案（不会就写「不会」）');
+  const Q = X.qs[X.qi]; if (!Q || X.busy) return; if (X.limit) return toast('今晚 AI 时间用完了，可以先交已做的'); Q.ans = (($('#ex-in') || {}).value || Q.ans || '').trim(); if (!Q.ans) return toast('先写你的答案（不会就写「不会」）');
   const op = kpOp(X); X.busy = true; render();
   try { const j = parseJSONObj(await kpAsk([{role: 'system', content: `你是初中${subjById(X.sid).name}老师，判断学生这道自测题做得对不对。只输出 JSON：{"ok":true 或 false,"hint":"一句话。做错时说该回去看哪个知识点或哪一步，不要写出正确答案；做对时具体说对在哪"}`}, {role: 'user', content: `题目：${Q.q}\n学生的作答：${Q.ans}`}], {temperature: 0.1}));
-    if (state.extest !== X || X.op !== op) return; if (!j) throw new Error('判断结果看不懂'); Q.res = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)}; X.err = ''; }
+    if (state.extest !== X || X.op !== op) return; if (!j) throw new Error('判断结果看不懂'); Q.res = {ok: jOk(j.ok), hint: String(j.hint || '').slice(0, 160)}; X.err = ''; }
   catch(e) { if (state.extest !== X || X.op !== op) return; X.err = '判断失败：' + e.message; }
   X.busy = false; render();
 }
 function exFinish(X){
   const res = X.qs.filter(q => q.res).map(q => ({kp: q.kp, ok: q.res.ok})), miss = [...new Set(res.filter(r => !r.ok).map(r => r.kp))];
-  const key = exKey(today(), X.sid); DB.extests = DB.extests || {}; DB.extests[key] = {id: key, sid: X.sid, d: today(), n: res.length, ok: res.filter(r => r.ok).length, res, miss, u: now()}; save();
+  if (!res.length) { state.extest = null; render(); return; }
+  const t = now(), key = X.examD + ':' + X.sid + ':' + t; DB.extests = DB.extests || {}; DB.extests[key] = {id: key, sid: X.sid, kind: X.kind, examD: X.examD, d: today(), t, n: res.length, ok: res.filter(r => r.ok).length, res, miss, u: t}; save();
   X.step = 'done'; X.miss = miss; render();
 }
 function vExTest(){
@@ -3867,11 +3879,13 @@ function vExTest(){
     const Q = X.qs[X.qi];
     h += `<div class="wiz-dots" style="margin:4px 0 12px">` + X.qs.map((q, i) => `<i class="${q.res ? 'done' : i === X.qi ? 'cur' : ''}"></i>`).join('') + `</div><p class="small faint" style="margin:0 0 6px">第 ${X.qi + 1}/${X.qs.length} 道 · ${esc(kpName(X.sid, Q.kp))} · 只做一次，像考试一样</p>
       <div class="card" style="font-size:18px;line-height:1.7;white-space:pre-wrap">${esc(Q.q)}</div>`;
-    if (!Q.res) h += `<textarea id="ex-in" data-in="ex" class="wiz-in" style="min-height:90px" placeholder="写答案；不会就写「不会」">${esc(Q.ans)}</textarea>${pencilTip()}`;
+    if (!Q.res) h += `<textarea id="ex-in" data-in="ex" ${X.busy ? 'readonly' : ''} class="wiz-in" style="min-height:90px" placeholder="写答案；不会就写「不会」">${esc(Q.ans)}</textarea>${pencilTip()}`;
     else h += `<div class="small muted">你的答案：${esc(Q.ans)}</div><div class="signal ${Q.res.ok ? 'good' : ''}" style="margin-top:10px"><span class="k">${Q.res.ok ? '对了' : '没对'}</span>${esc(Q.res.hint)}</div>`;
     if (X.busy) h += '<p class="muted">AI 正在看…</p>';
-    const last = X.qi >= X.qs.length - 1;
-    foot = Q.res ? `<button class="btn primary" data-act="exnext">${last ? '看结果' : '下一道'}</button>` : `<button class="btn primary" data-act="excheck" ${X.busy ? 'disabled' : ''}>交这道</button>`;
+    const last = X.qi >= X.qs.length - 1, nDone = X.qs.filter(q => q.res).length;
+    if (X.limit) h += `<div class="signal"><span class="k">时间到了</span>今晚 AI 时间（${tutorLimit()} 分钟）用完了。已做的 ${nDone} 道可以先交，剩下的明天再测。</div>`;
+    if (X.limit) foot = nDone ? `<button class="btn primary" data-act="exfin">交已做的 ${nDone} 道</button>` : `<button class="btn primary" data-act="exx">好了</button>`;
+    else foot = Q.res ? `<button class="btn primary" data-act="exnext">${last ? '看结果' : '下一道'}</button>` : `<button class="btn primary" data-act="excheck" ${X.busy ? 'disabled' : ''}>交这道</button>`;
   }
   return h + `</div><div class="wiz-foot">${foot}</div></div>`;
 }
@@ -3892,6 +3906,7 @@ function exCard(){
 function examPrepCard(){
   const nx = nextExam(today()); if (!nx || nx.left > 14 || !LIB.kp) return '';
   const wk = addD(today(), -6);
+  if (!nx.left) return `<div class="card"><h3 style="margin:0">今天${EXAM_N[nx.kind]}</h3><p class="small muted" style="margin:6px 0 0">考完别急着对答案。等卷子发回来，用「拍照 → 错题」记下丢分的题。</p></div>`;
   return `<div class="card"><h3 style="margin:0 0 6px">${EXAM_N[nx.kind]}准备 · ${md(nx.d)}（还有 ${nx.left} 天）</h3>` +
     exSubs().map(s => { const r = exRec(today(), s), K = kpAll(s), weak = K.filter(k => k.st === 'todo' || k.st === 'doing').length, dr = K.reduce((a, k) => a + (k.r.hist || []).filter(h => h.k === 'drill' && h.d >= wk).length, 0);
       return `<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><b style="width:3.5em">${esc(subjById(s).name)}</b><span class="small muted" style="flex:1">${r ? `自测 ${r.ok}/${r.n}` : nx.left <= 10 ? '还没自测' : `${md(addD(nx.d, -10))} 开放自测`} · 不稳的知识点 ${weak} 个 · 这周专项 ${dr} 次</span></div>`; }).join('') +
@@ -4626,8 +4641,10 @@ const ACT = {
   photoopen: () => { state.photo = {kind: aiReady() ? 'homework' : 'error', sid: state.openSubj || null}; render(); },
   // ===== 考前自测 =====
   exgo: el => { if (!aiReady()) return toast('先在「家长 → 设置」填智谱密钥'); if (tutorMinutesToday() >= tutorLimit()) return toast(`今晚 AI 时间用完了（${tutorLimit()} 分钟），明天再测`);
-    const X = state.extest = {sid: el.dataset.v, step: 'do', qs: [], qi: 0, t0: Date.now()}; exGen(X); },
-  exregen: () => { const X = state.extest; if (!X.busy) exGen(X); },
+    const nx = exWin(today()); if (!nx) return toast('考前 10 天才开放自测');
+    const X = state.extest = {sid: el.dataset.v, kind: nx.kind, examD: nx.d, step: 'do', qs: [], qi: 0, t0: Date.now()}; exGen(X); },   // 开始时就定下是哪场考试，中途改日期也不会记错
+  exregen: () => { const X = state.extest; if (X.busy) return; if (X.limit) return toast('今晚 AI 时间用完了，明天再测'); exGen(X); },
+  exfin: () => exFinish(state.extest),
   excheck: () => exCheck(state.extest),
   exnext: () => { const X = state.extest; if (X.qi < X.qs.length - 1) { X.qi++; render(); const b = $('.wiz-body'); if (b) b.scrollTop = 0; } else exFinish(X); },
   exx: () => { const X = state.extest; if (X && X.step !== 'done' && X.qs.some(q => q.res) && !confirm('自测做到一半，关掉这次不算。确定？')) return; kpTime(X, true); state.extest = null; render(); },
@@ -4940,7 +4957,7 @@ function onDataIn(e){
   const k = el.dataset.in, f = el.dataset.f, v = el.value;
   if (k === 'qptext') { if (state.qp) state.qp.text = v; return; }
   if (k === 'kpsel') { const S = state.kpsort; if (S) { const id = el.dataset.v; S.pick[id] = Object.assign({}, S.pick[id], {kp: v}); } return; }   // 只记改过的字段，AI 后到的建议不会被冲掉
-  if (k === 'ex') { const X = state.extest, Q = X && X.qs[X.qi]; if (Q) Q.ans = v; return; }
+  if (k === 'ex') { const X = state.extest, Q = X && !X.busy && X.qs[X.qi]; if (Q) Q.ans = v; return; }
   if (k === 'kpx') { const X = state.kpx; if (X) { const Q = (X.step === 'drill' || X.step === 'check') && X.qs[X.qi]; if (Q) Q.ans = v; else X.draft = v; } return; }
   if (k === 'rd') { (state.rd = state.rd || {})[f + el.dataset.v] = v; return; }   // 名著页草稿
   if (k === 'hol') { const E = state.holE; if (!E) return;   // 边输入边写回草稿：后台同步等引起的重绘不丢字
