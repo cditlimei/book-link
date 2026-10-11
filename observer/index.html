@@ -445,6 +445,12 @@ a{color:var(--accent);text-decoration:none}
 .tile[data-v=recite]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z'/><path d='M5 17a3 3 0 0 1 3-3h11'/></svg>");--ict:#e2f1e8;--icc:#2e7a57}
 .tile[data-v=read]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z'/><path d='M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z'/></svg>");--ict:#e1f0ef;--icc:#2a7270}
 .tile[data-v=speak]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5 11a7 7 0 0 0 14 0M12 18v3'/></svg>");--ict:#f8e8ee;--icc:#a1476a}
+.tile[data-v=ear]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M4 15v-3a8 8 0 0 1 16 0v3'/><rect x='3' y='14' width='4' height='7' rx='1.5'/><rect x='17' y='14' width='4' height='7' rx='1.5'/></svg>");--ict:#e3f3ee;--icc:#2f7a66}
+.ear-np{display:flex;align-items:center;gap:10px;margin-top:10px}.ear-np .t{flex:1;min-width:0}.ear-np .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ear-bar{height:4px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}.ear-bar i{display:block;height:100%;width:0;background:var(--accent)}
+.ear-row{display:flex;align-items:center;gap:10px;width:100%;padding:10px 0;border-top:1px solid var(--line);background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;color:var(--ink);font:inherit}
+.ear-row.on{color:var(--accent);font-weight:600}.ear-row .k{font-size:12px;color:var(--ink3);width:3.2em;flex:none}
+.ear-txt p{margin:0 0 10px;line-height:1.7;font-size:17px}
 .tile[data-v=pe]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12h4l3-8 4 16 3-8h4'/></svg>");--ict:#fbe9e7;--icc:#a4443a}
 .tile[href="../math/"]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M5 8h6M8 5v6M13 16h6M5 16l5 5M10 16l-5 5M14 7h5'/></svg>");--ict:#e8eef7;--icc:#2b4c7e}
 .tile[data-v=books]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M4 5h5v14H4zM10 5h5v14h-5z'/><path d='M16 6l4 1-3 13-4-1'/></svg>");--ict:#eeece6;--icc:#67625a}
@@ -460,6 +466,7 @@ a{color:var(--accent);text-decoration:none}
 .tile[data-v=card]{--ict:#2c2440;--icc:#c1a8ee}
 .tile[data-v=recite]{--ict:#18301f;--icc:#7ccfa5}
 .tile[data-v=read]{--ict:#15302f;--icc:#79cfcb}
+.tile[data-v=ear]{--ict:#18302b;--icc:#8fd3bf}
 .tile[data-v=speak]{--ict:#3a1f2a;--icc:#eea3c0}
 .tile[data-v=pe]{--ict:#3a1f1c;--icc:#f0a098}
 .tile[href="../math/"]{--ict:#1f2b3d;--icc:#9dbdf0}
@@ -1653,6 +1660,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
     return L.length ? `<div class="fnotes">${L.map(x => `<div>${x}</div>`).join('')}</div>` : ''; })() : '';
   if (isToday) {
     loadLib();
+    h += earCard();
     const hr = new Date().getHours() + new Date().getMinutes()/60, late = hr >= 21.75;
     const wq = LIB.words ? wordQueue().length : 0;
     const wDone = Object.values(DB.words).filter(s => (s.hist||[]).some(x => x.d === today())).length;
@@ -3551,11 +3559,152 @@ function extraTask(d){
   if (dow === 6 && LIB.pe) { const done = DB.peRecs.some(r => r.d === d); return {t: '测一次体育', s: done ? '测过了' : '一项就行 · 可选', done, opt: true, act: 'golearn', v: 'pe', go: ''}; }
   return null;
 }
+/* ================= 早上磨耳朵：英语课本课文音频（沪教版七上每单元 Reading + Focusing on culture + 单词跟读） =================
+   她 2026-10-11 要的：每天早上给孩子放初中英语课文。课文有版权，音频在私有仓库 ear/ 加密存放（Claude 用 ~/math-plan/tools/publish_ear.py 发布），
+   用同步口令解密；下载过的存本机，没网也能放。网页不能到点自己出声，所以是早上点一下开始：本单元课文 → 单词 → 上一单元课文，循环到定时（默认 15 分钟）放完当前这段再停，锁屏也能继续 */
+const EAR = {idx:null, st:'none', a:null, list:[], i:0, until:0, on:false, cur:null, keys:{}, dl:{}, url:null, err:'', lt:null};
+const EAR_KIND = {reading:'课文', culture:'阅读', words:'单词'};
+const EAR_SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+const earUnitAuto = () => enUnit(today()) || 1;
+// 手动选的单元：自动进度往前走了就作废，回到按日期估的单元（免得一直停在老单元）
+const earUnit = () => { const o = lsGet('observer:earUnit'); return o && o.a === earUnitAuto() ? o.u : earUnitAuto(); };
+const earMin = () => lsGet('observer:earMin') || 15;
+const earTrack = id => EAR.idx ? EAR.idx.tracks.find(t => t.id === id) : null;
+const earDay = u => EAR.idx ? (EAR.idx.days || []).find(d => d.unit === (u || earUnit())) : null;
+// 今天要放的各段：本单元课文 → 阅读 → 单词 → 上一单元课文复习（音频是预先拼好的一整条，这里是每段的起点）
+function earPlaylist(u){
+  const d = earDay(u); if (!d) return [];
+  return d.segs.map((s, i) => Object.assign({}, earTrack(s.id), {start: s.start, end: i + 1 < d.segs.length ? d.segs[i + 1].start : d.dur}));
+}
+const earToday = () => Math.round(((lsGet('observer:earLog') || {})[today()] || 0) / 60);
+async function loadEar(force){
+  if (!force && (EAR.idx || ['loading','err','missing','nosync'].includes(EAR.st))) return;
+  if (DEMO || !syncReady()) { EAR.st = 'nosync'; return; }
+  EAR.st = 'loading';
+  let idx = null, miss = false;
+  try { const r = await fetch(ghFileURL('ear/index.enc.json') + '?t=' + Date.now(), {headers: ghHeaders('application/vnd.github.raw+json'), cache:'no-store'});
+    if (r.ok) { idx = await decryptDB(await r.text(), SYNC.pass); IDB.set('observer:earIdx', idx); } else if (r.status === 404) miss = true; } catch(e) {}
+  if (!idx) idx = await IDB.get('observer:earIdx');
+  EAR.idx = idx && idx.days ? idx : null; EAR.st = EAR.idx ? 'ok' : miss ? 'missing' : 'err';
+  if (document.getElementById('earbox') || (state.tab === 'learn' && (state.learn || {}).view === 'home')) render();
+  if (EAR.idx) setTimeout(() => { const d = earDay(); if (d) earBlob(d).then(() => earUI()).catch(() => {}); }, 1500);   // 提前把今天这一轮下好，早上点了就响、没网也能放
+}
+async function earKey(env){ const k = env.salt + '|' + env.iter; return EAR.keys[k] || (EAR.keys[k] = deriveKey(SYNC.pass, b64d(env.salt), env.iter)); }
+function earBlob(d){
+  const ck = 'ear:' + d.id + ':' + d.ver;
+  if (EAR.dl[ck]) return EAR.dl[ck];
+  return EAR.dl[ck] = (async () => {
+    const have = await IDB.get(ck); if (have) return have;
+    const r = await fetch(ghFileURL('ear/' + d.id + '.enc'), {headers: ghHeaders('application/vnd.github.raw+json'), cache:'no-store'});
+    if (!r.ok) throw new Error('GitHub 返回 ' + r.status);
+    const env = JSON.parse(await r.text());
+    const blob = new Blob([await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(env.iv)}, await earKey(env), b64d(env.ct))], {type:'audio/mpeg'});
+    await IDB.set(ck, blob);
+    const H = lsGet('observer:earHave') || {}; if (H[d.id] && H[d.id] !== d.ver) IDB.del('ear:' + d.id + ':' + H[d.id]);   // 音频重新生成过：删旧版本
+    H[d.id] = d.ver; lsSet('observer:earHave', H);
+    return blob; })().finally(() => { setTimeout(() => { delete EAR.dl[ck]; }, 0); });
+}
+const earHave = d => !!d && (lsGet('observer:earHave') || {})[d.id] === d.ver;
+function earAudio(){
+  if (EAR.a) return EAR.a;
+  const a = EAR.a = new Audio(); a.preload = 'auto';
+  a.addEventListener('ended', () => { if (a.src === EAR_SILENT || !EAR.on) return;
+    if (Date.now() >= EAR.until) return earStop(true);
+    a.currentTime = 0; a.play().catch(() => {}); });   // 一轮放完、时间还没到：从头再来一遍
+  a.addEventListener('timeupdate', earTick);
+  a.addEventListener('play', earUI); a.addEventListener('pause', earUI);
+  if ('mediaSession' in navigator) { const ms = navigator.mediaSession, on = (k, f) => { try { ms.setActionHandler(k, f); } catch(e) {} };
+    on('play', () => { EAR.on = true; a.play().catch(() => {}); }); on('pause', () => { a.pause(); EAR.on = false; });
+    on('nexttrack', () => earSeek(EAR.i + 1)); on('previoustrack', () => earSeek(EAR.i - 1)); }
+  return a;
+}
+// 必须在点击里同步调用：先放一段静音把播放器「解锁」，iOS 才允许后面下载解密完再出声
+async function earStart(i){
+  const d = earDay(); if (!d) return;
+  const a = earAudio(); if (!(EAR.day === d && EAR.url)) { a.src = EAR_SILENT; a.play().catch(() => {}); }
+  EAR.list = earPlaylist(); EAR.until = Date.now() + earMin() * 60000; EAR.on = true; EAR.err = '';
+  EAR.i = i || 0; EAR.cur = EAR.list[EAR.i]; EAR.loading = true; earUI();
+  try {
+    if (EAR.day !== d || !EAR.url) {
+      const b = await earBlob(d); if (!EAR.on) return;
+      const old = EAR.url; EAR.url = URL.createObjectURL(b); EAR.day = d; a.src = EAR.url; if (old) URL.revokeObjectURL(old);
+    }
+    await a.play(); a.currentTime = EAR.cur.start; EAR.lt = null; earMeta();
+  } catch(e) { EAR.on = false; EAR.err = navigator.onLine === false && !earHave(d) ? '没网，这一轮还没下载到这台设备' : '没放出来，再点一次试试'; logErr('磨耳朵: ' + ((e && e.message) || e), 'ear', 0, 0, e && e.stack); }
+  EAR.loading = false; earUI();
+}
+function earSeek(i){
+  if (!EAR.list.length) return;
+  const n = EAR.list.length; i = (i + n) % n;
+  if (!EAR.url || EAR.day !== earDay()) return earStart(i);
+  if (Date.now() >= EAR.until) EAR.until = Date.now() + earMin() * 60000;
+  EAR.i = i; EAR.cur = EAR.list[i]; EAR.on = true; EAR.err = ''; EAR.lt = null;
+  EAR.a.currentTime = EAR.cur.start; EAR.a.play().catch(() => {}); earMeta(); earUI();
+}
+function earMeta(){ const t = EAR.cur; if (t && 'mediaSession' in navigator && window.MediaMetadata) try { navigator.mediaSession.metadata = new MediaMetadata({title: t.title, artist: `Unit ${t.unit} · ${EAR_KIND[t.kind] || ''}`, album: '早上磨耳朵'}); } catch(e) {} }
+function earStop(done){ EAR.on = false; if (EAR.a) EAR.a.pause(); if (done) toast(`磨耳朵 ${earMin()} 分钟放完了`); earUI(); }
+function earTick(){
+  const a = EAR.a; if (!a || a.src === EAR_SILENT || !EAR.list.length) return;
+  const ct = a.currentTime;
+  if (EAR.lt != null && !a.paused) { const dt = ct - EAR.lt; if (dt > 0 && dt < 3) { const L = lsGet('observer:earLog') || {}, k = today(); L[k] = (L[k] || 0) + dt; earTick.n = (earTick.n || 0) + 1; if (earTick.n % 20 === 0) { for (const x of Object.keys(L)) if (x < addD(k, -60)) delete L[x]; } lsSet('observer:earLog', L); } }
+  EAR.lt = ct;
+  let i = 0; EAR.list.forEach((t, k) => { if (ct >= t.start - 0.05) i = k; });
+  if (i !== EAR.i && !EAR.loading) {
+    if (EAR.on && Date.now() >= EAR.until && i > EAR.i) { EAR.lt = null; return earStop(true); }   // 定时到了：放完这一段再停，不在半句话中间断
+    EAR.i = i; EAR.cur = EAR.list[i]; earMeta(); earUI();
+  }
+  const t = EAR.cur, bar = document.getElementById('ear-bar');
+  if (bar && t) bar.style.width = Math.min(100, Math.max(0, 100 * (ct - t.start) / Math.max(1, t.end - t.start))).toFixed(1) + '%';
+}
+// 只在页面上有播放器时重绘，别的页面（比如正在填作业）不打扰
+function earUI(){ if (document.getElementById('earbox')) render(); }
+const earPlaying = () => !!(EAR.a && EAR.on && (!EAR.a.paused || EAR.loading));
+function earNowHTML(){
+  const t = EAR.cur, left = Math.max(0, Math.ceil((EAR.until - Date.now()) / 60000));
+  if (!t) return '';
+  return `<div class="ear-np"><div class="t"><span class="small faint">Unit ${t.unit} · ${EAR_KIND[t.kind] || ''}${EAR.on ? ` · ${left ? `还剩约 ${left} 分钟` : '放完这段就停'}` : ''}</span><b>${esc(t.title)}</b><div class="ear-bar"><i id="ear-bar"></i></div></div>
+    <button class="btn sm ghost" data-act="earnext" data-v="-1" aria-label="上一段">⏮</button><button class="btn sm primary" data-act="earpp" aria-label="${earPlaying() ? '暂停' : '继续'}">${EAR.loading ? '…' : earPlaying() ? '⏸' : '▶'}</button><button class="btn sm ghost" data-act="earnext" data-v="1" aria-label="下一段">⏭</button></div>`;
+}
+// 今天页：早上 5–10 点（或正在放）出现在最上面
+function earCard(){
+  loadEar();
+  const hr = new Date().getHours();
+  if (!earPlaying() && (hr < 5 || hr >= 10)) return '';
+  if (EAR.st === 'nosync' || EAR.st === 'missing') return '';
+  const u = earUnit(), n = earToday();
+  let h = `<div class="card" id="earbox"><div class="row"><h3 style="margin:0">早上磨耳朵</h3><span class="spacer"></span><span class="small muted">Unit ${u}${n ? ` · 今天听了 ${n} 分钟` : ''}</span></div>`;
+  if (EAR.st !== 'ok') return h + `<p class="small muted" style="margin:6px 0 0">${EAR.st === 'err' ? '课文音频没加载到，联网后再打开。' : '加载中…'}</p></div>`;
+  if (EAR.cur) h += earNowHTML();
+  else h += `<p class="small muted" style="margin:6px 0 10px">洗漱、吃早饭时放着，不用盯着看。本单元课文和单词，再复习上一单元，约 ${earMin()} 分钟。</p><button class="btn primary fillbtn" style="margin-bottom:0" data-act="earplay">▶ 开始放</button>`;
+  if (EAR.err) h += `<p class="small" style="color:var(--bad,#b5402a);margin:6px 0 0">${esc(EAR.err)}</p>`;
+  return h + `<div style="text-align:right;margin-top:6px"><a href="#" class="small" data-act="golearn" data-v="ear">看原文 / 换单元</a></div></div>`;
+}
+function vEar(){
+  loadEar();
+  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">早上磨耳朵</h2></div>`;
+  if (EAR.st === 'nosync') return h + `<div class="card empty">课文音频存在家里的私有仓库，要先在「家长 → 设置」里开好同步才能放。</div>`;
+  if (EAR.st === 'missing') return h + `<div class="card empty">课文音频还没传上去。</div>`;
+  if (EAR.st !== 'ok') return h + `<div class="card empty">${EAR.st === 'err' ? '课文音频没加载到，联网后再打开。' : '加载中…'}</div>`;
+  const u = earUnit(), auto = earUnitAuto(), list = earPlaylist(), n = earToday();
+  h += `<div class="card" id="earbox"><div class="small muted">${esc(EAR.idx.book || '')} · 按开学日期估计现在学到 Unit ${auto}${n ? ` · 今天听了 ${n} 分钟` : ''}</div>`;
+  h += `<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">${[1,2,3,4,5,6,7,8].map(k => `<button class="chip ${k === u ? 'on' : ''}" data-act="earunit" data-v="${k}">Unit ${k}</button>`).join('')}</div>`;
+  const d = earDay(); h += `<div class="small faint" style="margin-top:8px">这一轮 ${Math.round(d.dur / 60)} 分钟${earHave(d) ? ' · 已下载，没网也能放' : ' · 第一次放要联网下载（约 ' + Math.max(1, Math.round((d.size || 0) / 1048576)) + ' MB）'}</div>`;
+  h += `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">放多久</span>${[10,15,20,30].map(m => `<button class="chip ${m === earMin() ? 'on' : ''}" data-act="earmin" data-v="${m}">${m} 分钟</button>`).join('')}</div>`;
+  h += EAR.cur ? earNowHTML() : `<button class="btn primary fillbtn" style="margin:12px 0 0" data-act="earplay">▶ 开始放（Unit ${u}${u > 1 ? ` + 复习 Unit ${u - 1}` : ''}）</button>`;
+  if (EAR.err) h += `<p class="small" style="color:var(--bad,#b5402a);margin:6px 0 0">${esc(EAR.err)}</p>`;
+  h += `<div style="margin-top:12px">` + list.map((t, i) => `<button class="ear-row ${EAR.cur && EAR.cur.id === t.id ? 'on' : ''}" data-act="earpick" data-v="${i}"><span class="k">${t.unit === u ? EAR_KIND[t.kind] : '复习'}</span><span style="flex:1;min-width:0">${esc(t.title)}</span><span class="small faint">${Math.round((t.end - t.start) / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div></div>`;
+  const t = EAR.cur || list[0];
+  if (t) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${EAR.cur ? '正在放' : '第一段'} · Unit ${t.unit} · ${EAR_KIND[t.kind]}${t.page ? ` · 课本第 ${t.page} 页` : ''}</div>${t.paras.map((p, i) => i === 0 && t.kind !== 'words' ? `<h3 style="margin:0 0 10px">${esc(p.replace(/\.$/, ''))}</h3>` : `<p>${esc(p)}</p>`).join('')}</div>`;
+  h += `<p class="small faint" style="margin:0 4px 16px">课文按课本原文朗读（美音，略慢于正常语速），不是课本配套录音。网页不能到点自己出声，早上点一下「开始放」；放的时候锁屏也会接着放。</p>`;
+  return h;
+}
+
 function vLearn(){
   loadLib();
   const L = state.learn || (state.learn = {view:'home', book:null, unit:null});
   if (L.view === 'pe') return vPE();
   if (L.view === 'speak') return vSpeak();
+  if (L.view === 'ear') return vEar();
   if (L.view === 'words') return vWords();
   if (L.view === 'card') return vWordCard();
   if (L.view === 'recite') return vRecite();
@@ -3573,6 +3722,7 @@ function vLearn(){
   const tile = (act, v, name, st, sub, extra) => `<${act === 'link' ? `a href="${v}"` : `button data-act="${act}" data-v="${v}"${v === 'speak' && due.speak ? ` data-s="${ex.sp}"` : ''}`} class="tile ${due[v] ? 'due' : ''}"${extra || ''}><span class="tn">${name}${due[v] ? '<i class="tbadge">今天</i>' : ''}</span><span class="ts">${st}</span>${sub ? `<span class="tu">${sub}</span>` : ''}</${act === 'link' ? 'a' : 'button'}>`;
   let h = `<h2>学习</h2><div class="tiles">` +
     tile('lv', 'card', '英语单词', !LIB.words ? '加载中…' : wq ? `今天 ${wq} 个` : '今天背完了', W.length ? `已掌握 ${mastered}/${W.length}` : '') +
+    (() => { loadEar(); const n = earToday(); return EAR.st === 'nosync' ? '' : tile('lv', 'ear', '早上磨耳朵', EAR.st !== 'ok' ? (EAR.st === 'err' ? '没加载到' : '加载中…') : earPlaying() ? '正在放' : n ? `今天听了 ${n} 分钟` : `Unit ${earUnit()} 课文`, '课本课文 · 单词'); })() +
     tile('lv', 'recite', '语文背诵', RI.length ? `会背 ${can}/${cur.length}` : '加载中…', esc(termName(tk))) +
     (() => { const RP = readPlan(today()); return RP.recs.length ? tile('lv', 'read', '名著阅读', RP.cur ? `${RP.cur.nowp}/${RP.cur.r.total} 页` : RP.started ? '都读完了' : '还没开始', RP.cur ? `《${RP.cur.title}》` : esc(termName(RP.tk))) : ''; })() +
     (() => { const K = kpSubs().flatMap(kpAll), n = K.filter(k => k.st === 'todo' || k.due).length, un = kpSubs().reduce((a, s) => a + kpUnsorted(s).length, 0);
@@ -4628,6 +4778,15 @@ const ACT = {
   toggleq: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.q = !queued(it); it.u = now(); save(); render(); },
   pv: el => { state.pv = el.dataset.v; state.examEdit = null; render(); window.scrollTo(0,0); },
   lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { stopAllEn(); state.learn.sp = null; state.sp = null; } if (el.dataset.v === 'speak' && el.dataset.s) state.learn.sp = el.dataset.s; render(); window.scrollTo(0,0); },
+  earplay: () => earStart(0),
+  earpick: el => earSeek(+el.dataset.v),
+  earpp: () => { const a = EAR.a; if (!EAR.url || EAR.day !== earDay()) return earStart(EAR.cur ? EAR.i : 0);
+    if (earPlaying()) { a.pause(); EAR.on = false; return; }
+    if (Date.now() >= EAR.until) EAR.until = Date.now() + earMin() * 60000;
+    EAR.on = true; EAR.err = ''; EAR.lt = null; a.play().catch(() => earStart(EAR.i)); },
+  earnext: el => earSeek(EAR.i + (+el.dataset.v)),
+  earunit: el => { lsSet('observer:earUnit', {u: +el.dataset.v, a: earUnitAuto()}); if (EAR.on) earStop(); EAR.cur = null; EAR.list = []; render(); const d = earDay(); if (d) earBlob(d).then(() => earUI()).catch(() => {}); },
+  earmin: el => { lsSet('observer:earMin', +el.dataset.v); if (EAR.on) EAR.until = Date.now() + (+el.dataset.v) * 60000; render(); },
   wbook: el => { state.learn.book = el.dataset.v; state.learn.unit = null; render(); },
   wunit: el => { state.learn.unit = el.dataset.v || null; render(); },
   say: el => speak(el.dataset.v, 'en-US'),
