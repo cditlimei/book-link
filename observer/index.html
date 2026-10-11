@@ -1958,7 +1958,7 @@ ${kpList(sid).length ? `kp 写这题考的知识点，只能从下面列表里�
     if (!list.length) R.err = '没在照片里找到题目。换个角度、拍近一点再试。';
   } catch(e) { if (state.precog !== R) return; R.err = '识别失败：' + e.message; }
 }
-/* 拍照批改作业：逐题判对错（开思考模式，先自己做一遍再对照）；错题只给一句提示不给答案，进重做并各出一道同类题。
+/* 拍照批改作业：逐题判对错（开思考模式，先自己做一遍再对照）；错题直接给完整讲解（错在哪一步 + 分步正确做法 + 答案，2026-10-11 她定的，不再只给提示），进重做并各出一道同类题。
    拿不准的让孩子自己选，AI 判错了可以纠正（记在照片上，家长设置页能看到被纠正几次） */
 const GV = {ok: ['✓', '对'], wrong: ['✗', '错'], unsure: ['？', '拿不准'], subj: ['—', '主观题不批改']};
 // 一次选了几页就逐页批，结果合成一张单；每题记是哪一页（p/page），保存时各页分别记统计
@@ -1976,7 +1976,7 @@ async function gradePhoto(pids){
   G.err = errs.join('；'); if (!G.list.length && !G.err) G.err = '没在照片里找到题目。换个角度、拍近一点再试。';
   G.busy = false; render();
 }
-// 提示里带出了正确答案就换掉：各种减号、度、全角等号先统一；多个答案拆开逐个查；
+// （旧）提示防漏答案的检查：批改改成直接讲解后不再用，留给以后别处要「只提示」时用。各种减号、度、全角等号先统一；多个答案拆开逐个查；
 // 长答案按包含判断；一两个字的短答案只认「= 3」「是 A」「等于 3」「答案 3」这类说法；数字答案再按数值比（3/4 与 0.75 算同一个），题目里本来就有的数不算
 const CN_D = {'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
 const gNorm = t => String(t || '').replace(/\s+/g, '').replace(/＝/g, '=').replace(/[－−—–﹣]/g, '-').replace(/度/g, '°').replace(/[。．]/g, '')
@@ -1999,18 +1999,18 @@ async function gradeOne(pid, sid, G){
 v 只能是：ok（对）、wrong（错，包括没写）、unsure（字看不清、题目不完整、或你没有把握）、subj（作文、阅读感悟、开放题等主观题，不判）。没有把握一律 unsure，不要硬判。
 key 写这题的正确答案（只写结果，主观题留空）。
 ${kpList(sid).length ? `kp 写这题考的知识点，只能从下面列表里选 id（都不合适写空字符串）：\n${kpCatalog(sid)}\n` : ''}
-错题的 hint 写一句提示，指出该回去检查哪一步或哪个概念，绝对不能写出正确答案、正确结果或完整过程；没写的题 hint 写「这题还没写」。其他情况 hint 为空。
+v 是 wrong 或 unsure 的题写 exp：完整讲解，先一句话指出学生错在哪一步或哪个概念，再分步写正确做法，每步说清为什么这样做，最后一行写「答案：…」；七年级学生能看懂，公式用普通文字，用换行分步，200 字内。没写的题 exp 写「这题还没写」加完整做法。其他情况 exp 为空。
 错题按下面分类（type 必须是 calc / concept / read 之一，sub 用细分里的英文 key，拿不准就空着）：
 ${cats}
-只输出 JSON 数组，不要别的文字：[{"no":"题号","stem":"题目原文，太长精简到 120 字内，公式用普通文字","ans":"学生写的答案，照抄，看不清的字写？","v":"ok","key":"","hint":"","type":"calc","sub":"","tag":"知识点，10 字内","kp":""}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
+只输出 JSON 数组，不要别的文字：[{"no":"题号","stem":"题目原文，太长精简到 120 字内，公式用普通文字","ans":"学生写的答案，照抄，看不清的字写？","v":"ok","key":"","exp":"","type":"calc","sub":"","tag":"知识点，10 字内","kp":""}]。图里没有题就输出 []。不要写学生姓名、学校、班级。`;
   const out = await aiChat([{role: 'system', content: sys}, {role: 'user', content: [{type: 'image_url', image_url: {url: await blobToDataURL(blob)}}, {type: 'text', text: '批改这页' + sb.name + '作业'}]}], {temperature: 0.1, thinking: {type: 'enabled'}, _to: 180000});
   if (state.grade !== G) return [];
   const list = parseJSONList(out); if (!list) throw new Error('AI 返回的格式看不懂，再试一次');
   const okSub = k => !tx || !k ? '' : (tx.calc.subs.concat(tx.concept.subs, tx.read.subs).some(a => a[0] === k) ? k : '');
-  const L = list.slice(0, 30).map(x => ({no: String(x.no || '').slice(0, 8), stem: String(x.stem || '').slice(0, 300), ans: String(x.ans || '').slice(0, 200), v: GV[x.v] ? x.v : 'unsure', hint: String(x.hint || '').slice(0, 120), key: String(x.key || '').slice(0, 80),
+  const L = list.slice(0, 30).map(x => ({no: String(x.no || '').slice(0, 8), stem: String(x.stem || '').slice(0, 300), ans: String(x.ans || '').slice(0, 200), v: GV[x.v] ? x.v : 'unsure', exp: String(x.exp || '').slice(0, 1200), key: String(x.key || '').slice(0, 80),
     type: ['calc','concept','read'].includes(x.type) ? x.type : 'concept', sub: okSub(x.sub), tag: String(x.tag || '').slice(0, 20), kp: kpOk(sid, x.kp) ? x.kp : undefined, pick: null, fixed: false, disp: false}));
   // 判错的再复核一次（只用文字重做这一道）：两次都错才算错，结论不一样改成「拿不准」让孩子自己选
-  const W = L.filter(x => x.v === 'wrong' && x.ans.trim() && !/还没写/.test(x.hint));
+  const W = L.filter(x => x.v === 'wrong' && x.ans.trim() && !/还没写/.test(x.exp));
   if (W.length) { G.stage = '复核'; if (state.grade === G) render(); }
   for (const x of W) {   // 一道一道复核：免费模型并发有限，一起发容易 429
     if (state.grade !== G) return [];
@@ -2022,7 +2022,7 @@ ${cats}
     } catch(e) { x.v = 'unsure'; x.norev = true; }
   }
   if (state.grade !== G) return [];
-  L.forEach(x => { if (x.hint && !/还没写/.test(x.hint) && (!x.key || hintLeaks(x.hint, x.key, x.stem))) x.hint = HINT_SAFE; if (x.v === 'wrong' && !x.hint) x.hint = HINT_SAFE; delete x.key; });   // 没有正确答案可对照时也换成安全提示   // 正确答案只用来拦提示，不显示、不保存
+  L.forEach(x => { if ((x.v === 'wrong' || x.v === 'unsure') && !x.exp) x.exp = x.key ? '答案：' + x.key : ''; });   // 讲解没写出来至少给答案；正确答案随错题一起保存，重做时能看
   return L;
 }
 const gradeWrong = x => (x.v === 'wrong' && !x.disp) || (x.v === 'unsure' && x.pick === 'wrong');
@@ -2040,14 +2040,15 @@ function vGrade(){
     return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="gdone">好了</button></div></div>`;
   }
   const c = gradeSum(G), open = G.list.filter(x => x.v === 'unsure' && !x.pick).length;
-  h += `<p class="muted" style="margin:6px 0 12px">对 ${c.ok} · 错 ${c.wrong}${c.unsure ? ' · 拿不准 ' + c.unsure : ''}${c.subj ? ' · 主观题 ' + c.subj : ''}。${c.wrong ? '错的先看提示自己改，改完点「改好了」。' : ''}</p>`;
+  h += `<p class="muted" style="margin:6px 0 12px">对 ${c.ok} · 错 ${c.wrong}${c.unsure ? ' · 拿不准 ' + c.unsure : ''}${c.subj ? ' · 主观题 ' + c.subj : ''}。${c.wrong ? '错的先看讲解，在本子上改好再点「改好了」。' : ''}</p>`;
   G.list.forEach((x, k) => {
     const st = gradeWrong(x) ? 'wrong' : x.disp || (x.v === 'unsure' && x.pick === 'ok') ? 'ok' : x.v;
     h += `<div class="card gq gq-${st}" style="padding:12px 14px"><div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="gv">${GV[st][0]}</span><div style="flex:1;min-width:0">
       <div>${(G.pids || []).length > 1 ? `<span class="small faint">第 ${x.page} 页 · </span>` : ''}${x.no ? `<b>${esc(x.no)}</b> ` : ''}${esc(x.stem)}</div>${x.ans ? `<div class="small muted" style="margin-top:4px">你的答案：${esc(x.ans)}</div>` : ''}`;
-    if (x.v === 'wrong' && !x.disp) h += `${x.hint ? `<div class="signal" style="margin:8px 0 0"><span class="k">提示</span>${esc(x.hint)}</div>` : ''}<div class="row" style="margin-top:8px"><button class="btn sm ${x.fixed ? 'good' : 'primary'}" data-act="gfix" data-v="${k}">${x.fixed ? '✓ 在本子上改好了' : '在本子上改好了'}</button><button class="btn sm ghost" data-act="gdisp" data-v="${k}">AI 判错了</button></div>`;
+    const expBox = x.exp ? `<div class="signal" style="margin:8px 0 0;white-space:pre-wrap;line-height:1.6"><span class="k">讲解</span>${esc(x.exp)}</div>` : '';
+    if (x.v === 'wrong' && !x.disp) h += `${expBox}<div class="row" style="margin-top:8px"><button class="btn sm ${x.fixed ? 'good' : 'primary'}" data-act="gfix" data-v="${k}">${x.fixed ? '✓ 在本子上改好了' : '在本子上改好了'}</button><button class="btn sm ghost" data-act="gdisp" data-v="${k}">AI 判错了</button></div>`;
     else if (x.disp) h += `<div class="small muted" style="margin-top:6px">已按「对」算 <button class="btn sm ghost" data-act="gdisp" data-v="${k}">撤回</button></div>`;
-    else if (x.v === 'unsure') h += `<div class="row" style="margin-top:8px"><span class="small faint">${x.rev ? 'AI 两次结论不一样，你自己判断：' : x.norev ? 'AI 没能复核这道，你自己判断：' : 'AI 看不准，你自己判断：'}</span><div class="seg sm"><button data-act="gpick" data-v="${k}" data-c="ok" class="${x.pick === 'ok' ? 'on' : ''}">对</button><button data-act="gpick" data-v="${k}" data-c="wrong" class="${x.pick === 'wrong' ? 'on' : ''}">错</button></div></div>`;
+    else if (x.v === 'unsure') h += `${x.pick === 'wrong' ? expBox : ''}<div class="row" style="margin-top:8px"><span class="small faint">${x.rev ? 'AI 两次结论不一样，你自己判断：' : x.norev ? 'AI 没能复核这道，你自己判断：' : 'AI 看不准，你自己判断：'}</span><div class="seg sm"><button data-act="gpick" data-v="${k}" data-c="ok" class="${x.pick === 'ok' ? 'on' : ''}">对</button><button data-act="gpick" data-v="${k}" data-c="wrong" class="${x.pick === 'wrong' ? 'on' : ''}">错</button></div></div>`;
     else if (x.v === 'subj') h += `<div class="small faint" style="margin-top:6px">主观题不批改，交给老师</div>`;
     h += `</div></div></div>`; });
   const foot = open ? `<button class="btn primary" disabled>还有 ${open} 道拿不准，先选对错</button>` : `<button class="btn primary" data-act="gsave">${c.wrong ? `错的 ${c.wrong} 道加入重做` : '都对了，收好'}</button>`;
@@ -2105,7 +2106,7 @@ function vVariant(){
   if (V.busy) h += `<p class="muted">AI 正在看…</p>`;
   if (V.res) h += `<div class="signal ${V.res.ok ? 'good' : ''}" style="margin-top:12px"><span class="k">${V.res.ok ? '做对了' : '还不对'}</span>${esc(V.res.hint)}</div>`;
   let foot;
-  if (V.res && !V.res.ok && V.tries >= 2 && !V.final) h += V.sol ? `<div class="card" style="margin-top:12px;white-space:pre-wrap;line-height:1.7"><div class="small faint" style="margin-bottom:4px">这道同类题的讲解</div>${esc(V.sol)}</div>` : `<button class="btn sm" style="margin-top:10px" data-act="varsol" ${V.solBusy ? 'disabled' : ''}>${V.solBusy ? 'AI 正在写讲解…' : '看这道同类题的讲解'}</button>`;
+  if (V.res && !V.res.ok && V.tries >= 1 && !V.final) h += V.sol ? `<div class="card" style="margin-top:12px;white-space:pre-wrap;line-height:1.7"><div class="small faint" style="margin-bottom:4px">这道同类题的讲解</div>${esc(V.sol)}</div>` : `<button class="btn sm" style="margin-top:10px" data-act="varsol" ${V.solBusy ? 'disabled' : ''}>${V.solBusy ? 'AI 正在写讲解…' : '看这道同类题的讲解'}</button>`;
   if (V.res && V.res.ok && V.sawSol && V.from !== 'grade' && !V.final) foot = `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn" data-act="vardone" data-ok="0">好了（看过讲解，这次不算做对）</button>`;
   else if (V.res && V.res.ok && V.from === 'grade') foot = `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">好了</button>`;
   else if (V.res && V.res.ok) foot = V.final ? `<button class="btn good" data-act="vardone" data-ok="1">过关，这道算掌握了</button>` : `<button class="btn ghost" data-act="vargen">再来一道</button><button class="btn good" data-act="vardone" data-ok="1">算这道重做做对了</button>`;
@@ -2211,7 +2212,7 @@ function vPhotoSheet(){
   return `<div class="wiz" role="dialog" aria-label="拍照"><div class="wiz-top"><div style="flex:1;font-weight:600">拍照记录 · ${md(state.date)}</div><button class="wiz-x" data-act="photoclose" aria-label="关闭">×</button></div><div class="wiz-body">
     <div class="wiz-q" style="font-size:22px;margin-top:6px">拍的是什么？</div><div class="big">` + PKIND.map(([k,n]) => `<button class="${ps.kind===k?'on':''}" data-act="pkind" data-v="${k}">${n}</button>`).join('') + `</div>
     <div class="wiz-q" style="font-size:22px;margin-top:22px">哪一科？</div><div class="row">` + subs.map(s => `<button class="chip ${ps.sid===s.id?'on':''}" style="min-height:42px;font-size:16px" data-act="psubj" data-v="${s.id}"><span class="dot" style="background:${s.color};margin-right:5px"></span>${esc(s.name)}</button>`).join('') + `</div>
-    <p class="small faint" style="margin-top:18px">${ps.kind === 'homework' ? (aiReady() ? '批改作业：写完拍一页，拍平、拍清楚，别拍到名字。AI 逐题判对错，错的只给提示不给答案，改完每道再做一道同类题。' : '批改作业要先在「家长 → 设置」填智谱密钥（批改用的模型免费）。') : ps.kind === 'error' ? (aiReady() ? '错题照片：只拍做错的题，一张可以拍多道，字小就拍近一点，别拍到名字。拍完 AI 会自动认题、分好类，你确认后进「重做」。' : '错题照片：只拍做错的题，一张可以拍多道。在「家长 → 设置」填了智谱密钥，拍完就能自动识别成错题。') : '照片会存起来，开了同步会加密上传。'}</p></div>
+    <p class="small faint" style="margin-top:18px">${ps.kind === 'homework' ? (aiReady() ? '批改作业：写完拍一页，拍平、拍清楚，别拍到名字。AI 逐题判对错，错的直接讲完整解题过程，看懂改好后每道再做一道同类题。' : '批改作业要先在「家长 → 设置」填智谱密钥（批改用的模型免费）。') : ps.kind === 'error' ? (aiReady() ? '错题照片：只拍做错的题，一张可以拍多道，字小就拍近一点，别拍到名字。拍完 AI 会自动认题、分好类，你确认后进「重做」。' : '错题照片：只拍做错的题，一张可以拍多道。在「家长 → 设置」填了智谱密钥，拍完就能自动识别成错题。') : '照片会存起来，开了同步会加密上传。'}</p></div>
     <div class="wiz-foot"><label class="btn primary" style="display:flex;align-items:center;justify-content:center;gap:8px;${ps.sid?'':'opacity:.45;pointer-events:none'}">${CAM} ${ps.sid ? '拍照 / 从相册选' : '先选科目'}<input type="file" accept="image/*" multiple id="photoin" style="display:none"></label></div></div>`;
 }
 
@@ -2628,6 +2629,7 @@ function vRedo(){
       ${it.stem ? `<div class="q" style="font-size:17px;line-height:1.6;white-space:pre-wrap">${esc(it.stem)}</div>${it.tag ? `<div class="small faint">知识点：${esc(it.tag)}</div>` : ''}` : `<div class="q">${it.tag ? esc(it.tag) : `${md(it.d)}${esc(s.name)}作业里的一题`}</div>`}
       ${it.photoId && DB.photos.some(p => p.id === it.photoId) ? `<img data-pid="${it.photoId}" data-act="photoview" data-v="${it.photoId}" alt="原题照片" style="display:block;max-width:100%;max-height:180px;margin:8px 0;border-radius:10px;object-fit:contain;background:var(--surface2);cursor:zoom-in">` : ''}
       <div class="small muted">${md(it.d)}的${esc(s.name)}${it.src === '随手记' ? '（自己记的问题）' : it.src === '拍照识别' ? '（拍照识别）' : '作业'}${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck && it.src !== '随手记' && it.src !== '拍照识别' ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
+      ${it.exp ? `<details class="small" style="margin-top:8px"><summary style="color:var(--accent);cursor:pointer">看批改时的讲解</summary><div style="white-space:pre-wrap;line-height:1.6;margin-top:6px">${esc(it.exp)}</div></details>` : ''}
       <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div><div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</a>${(it.stem || it.tag) && aiReady() ? `<a href="#" class="small" style="color:var(--accent)" data-act="varopen" data-v="${esc(it.id)}">练一道同类题</a>` : ''}<a href="#" class="small faint" data-act="skipitem" data-v="${it.id}">找不到原题</a></div></div>`;
   }
   if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">今天就这些。</p>`;
@@ -4498,8 +4500,8 @@ function attentionItems(){
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
 const WHATS_NEW = {v: '2026-10-02',
-  kid: ['「学习」里有<b>弄懂知识点</b>了：错得多的知识点，先和 AI 聊聊卡在哪，再专门练 5 道。', '拍照可以<b>批改作业</b>了：写完拍一页，错的只给提示，改完每道再做一道同类题。', '「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。'],
-  parent: ['考前自测：期中、期末前 10 天，每科 8 道覆盖学过的知识点（薄弱的优先），没做对的直接排进「弄懂知识点」；考前 14 天复盘页出现「期中准备」，写各科自测情况、不稳的知识点和这周专项次数，不预测分数。', '弄懂知识点（七科都有，知识点按课本目录和课标整理）：错题归到知识点和错因（概念 / 计算 / 审题），「学习 → 弄懂知识点 → 整理」可以一次整理以前的错题，AI 先填好你确认；待攻克的知识点走四步：诊断对话找卡点 → 针对卡点讲解 → 按错因练 5 道 → 7 天后回查。复盘页有「最该补的知识点」。', '拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题只给提示不给答案，自动进重做，每道再出一道同类题，两次不对才讲同类题。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。']};
+  kid: ['「学习」里有<b>弄懂知识点</b>了：错得多的知识点，先和 AI 聊聊卡在哪，再专门练 5 道。', '拍照可以<b>批改作业</b>了：写完拍一页，错的直接讲完整过程，改完每道再做一道同类题。', '「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。'],
+  parent: ['考前自测：期中、期末前 10 天，每科 8 道覆盖学过的知识点（薄弱的优先），没做对的直接排进「弄懂知识点」；考前 14 天复盘页出现「期中准备」，写各科自测情况、不稳的知识点和这周专项次数，不预测分数。', '弄懂知识点（七科都有，知识点按课本目录和课标整理）：错题归到知识点和错因（概念 / 计算 / 审题），「学习 → 弄懂知识点 → 整理」可以一次整理以前的错题，AI 先填好你确认；待攻克的知识点走四步：诊断对话找卡点 → 针对卡点讲解 → 按错因练 5 道 → 7 天后回查。复盘页有「最该补的知识点」。', '拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题直接讲完整解题过程（2026-10-11 起），自动进重做，每道再出一道同类题，同类题没对也能看讲解。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。']};
 function whatsNew(who){
   let seen = ''; try { seen = localStorage.getItem('observer:new-' + who) || ''; } catch(e) { return ''; }
   if (seen >= WHATS_NEW.v) return '';
@@ -4865,7 +4867,7 @@ const ACT = {
       const gk = x => x.no ? 'no:' + gNorm(x.no) : 'st:' + gNorm(x.stem).slice(0, 20);
       const had = new Set(DB.items.filter(i => i.photoId === pid).map(gk));
       for (const x of mine) if (gradeWrong(x) && x.stem.trim() && !had.has(gk(x))) { const id = uid('i'); iids.push(id); had.add(gk(x));
-        DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), no: x.no || undefined, kp: x.kp, conf: null, photoId: pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
+        DB.items.push({id, d, sid: G.sid, type: x.type, sub: x.sub || undefined, tag: x.tag, stem: x.stem.trim(), no: x.no || undefined, kp: x.kp, exp: x.exp || undefined, key: x.key || undefined, conf: null, photoId: pid, src: '拍照批改', q: true, box: 0, due: addD(d, BOXES[0]), hist: [], done: false, u: now()}); }
       if (p && mine.length) { shrinkPhoto(pid); const c = gradeSum({list: mine}); p.grade = {n: mine.length, wrong: c.wrong, disp: ((p.grade || {}).disp || 0) + mine.filter(x => x.disp).length, at: today()}; delete p.tcmp; delete p.tless; p.u = now(); touchDay(d); } }
     touchDay(d0); save();
     if (!iids.length) { state.grade = null; render(); toast(G.list.some(gradeWrong) ? '这些错题之前已经加过了' : '这页都对了 ✓'); return; }
