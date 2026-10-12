@@ -806,6 +806,19 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 #main[data-lv]:not([data-lv=home]):not([data-lv=""]) .card{border-top:3px solid transparent;border-image:var(--sub) 1;border-radius:var(--r)}
 #main[data-lv]:not([data-lv=home]):not([data-lv=""]) .card{border-top:0;box-shadow:0 0 0 1.5px color-mix(in srgb,var(--vc) 14%,transparent) inset,var(--shadow)}
 #main[data-lv]:not([data-lv=home]):not([data-lv=""]) .ear-bar i,#main[data-lv]:not([data-lv=home]):not([data-lv=""]) div[style*="background:var(--accent)"]{background:var(--sub) !important}
+
+/* ===== v6d 其余全屏弹层：默认蓝紫，选了科目跟科目色 ===== */
+.wiz:not([aria-label="一步一步填"]){--sc:var(--v1);--sc2:var(--v2);--sc3:hsl(190 75% 48%)}
+.wiz-top > div:first-child,.wiz-top > b,.wiz-top > span:first-child{font-weight:700}
+.wiz .btn.primary{background:var(--grad);border:0;box-shadow:0 8px 20px color-mix(in srgb,var(--sc) 38%,transparent);font-weight:600}
+.wiz .btn.primary:disabled,.wiz .btn.primary[disabled]{background:color-mix(in srgb,var(--sc) 25%,var(--surface2));box-shadow:none;color:color-mix(in srgb,var(--ink) 55%,transparent)}
+.wiz .chip{background:color-mix(in srgb,var(--sc) 9%,var(--surface));box-shadow:0 1px 0 color-mix(in srgb,var(--sc) 18%,transparent)}
+.wiz .chip.on{background:var(--grad);color:#fff;box-shadow:0 6px 14px color-mix(in srgb,var(--sc) 35%,transparent)}
+.wiz .chip.on .dot{background:#fff !important}
+.wiz textarea,.wiz input[type=text],.wiz select{background:var(--surface);box-shadow:0 0 0 1.5px color-mix(in srgb,var(--sc) 18%,transparent) inset}
+.wiz textarea:focus,.wiz input[type=text]:focus,.wiz select:focus{box-shadow:0 0 0 2px var(--sc) inset}
+.wiz .mic{border:0;background:var(--grad);color:#fff;box-shadow:0 6px 14px color-mix(in srgb,var(--sc) 35%,transparent)}
+.wiz .card{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--sc) 14%,transparent) inset,var(--shadow)}
 </style>
 </head>
 <body>
@@ -1821,6 +1834,7 @@ function render(){
   const wb = $('.wiz-body'), wk = state.wiz ? state.wiz.i + '|' + state.wiz.step : '', keep = wb && wk && wk === state._wk ? {top: wb.scrollTop, open: !!$('.wiz details.more[open]'), v: ['w-min','w-start','w-end'].map(id => { const e = document.getElementById(id); return e ? e.value : null; })} : null;
   state._wk = wk;
   $('#wiz').innerHTML = state.extest ? vExTest() : state.kpx ? vKpx() : state.kpsort ? vKpSort() : state.wiz ? vWiz() : state.voice ? vVoice() : state.photo ? vPhotoSheet() : state.pview ? vPhotoView() : state.mix ? vMix() : state.qp ? vQuick() : state.holE ? vHol() : state.hint ? vHint() : state.variant ? vVariant() : state.grade ? vGrade() : state.precog ? vPhotoRecog() : state.rcheck ? vReciteCheck() : state.tutor ? vTutor() : '';
+  wizTint();
   if (keep) { const b = $('.wiz-body'), dt = $('.wiz details.more'); if (dt && keep.open) dt.open = true; ['w-min','w-start','w-end'].forEach((id, k) => { const e = document.getElementById(id); if (e && keep.v[k] && !e.value) e.value = keep.v[k]; }); if (b) b.scrollTop = keep.top; }
   document.body.style.overflow = (state.wiz || state.extest || state.kpx || state.kpsort || state.mix || state.qp || state.variant || state.grade || state.precog || state.voice || state.photo || state.pview || state.rcheck || state.tutor || state.holE || state.hint) ? 'hidden' : '';
   hydratePhotos(); updateBadge();
@@ -2851,9 +2865,13 @@ function vWiz(){
   return h + `</div><div class="wiz-foot">${foot}</div></div>`;
 }
 /* 向导专用：把偏灰的科目色提饱和、调到中等明度，再给一个邻近色做渐变对 */
-function hexHsl(hex){ const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return null; const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let h = 0, sat = 0;
+function hexHsl(hex){ const rg = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(hex || ''); const m = rg ? null : /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m && !rg) return null; const n = m ? parseInt(m[1], 16) : ((+rg[1] << 16) | (+rg[2] << 8) | +rg[3]), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let h = 0, sat = 0;
   if (mx !== mn) { const d = mx - mn; sat = l > .5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; } return [h, sat, l]; }
 function vivid(hex, dh){ const c = hexHsl(hex); if (!c) return hex || '#4a7bd0'; const h = ((c[0] + (dh || 0)) % 360 + 360) % 360, sa = Math.max(c[1], .74), l = Math.min(.58, Math.max(.48, c[2])); return `hsl(${h.toFixed(0)} ${(sa * 100).toFixed(0)}% ${(l * 100).toFixed(0)}%)`; }
+function wizTint(){ const w = $('#wiz .wiz'); if (!w || w.getAttribute('aria-label') === '一步一步填') return;
+  const d = w.querySelector('.chip.on .dot, button.on .dot, .chip.on .sw'); let c = d ? (d.style.backgroundColor || getComputedStyle(d).backgroundColor) : '';
+  if (!c) { const t = w.querySelector('.wiz-top'), name = t ? t.textContent : ''; const sb = (DB.settings.subjects || []).find(x => name.includes(x.name)); if (sb) c = sb.color; }
+  if (!c || !hexHsl(c)) return; w.style.setProperty('--sc', vivid(c)); w.style.setProperty('--sc2', vivid(c, 38)); w.style.setProperty('--sc3', vivid(c, -50)); }
 function subjGlyph(name){
   const P = /语文/.test(name) ? '<path d="M12 6h28a6 6 0 0 1 6 6v36H18a6 6 0 0 0-6 6V6z"/><path d="M12 54V12"/><path d="M22 18h16M22 26h16M22 34h10"/>'
     : /数学/.test(name) ? '<path d="M10 50 50 10"/><path d="M10 10h40M30 10v40"/><circle cx="18" cy="42" r="3"/><circle cx="42" cy="42" r="3"/>'
