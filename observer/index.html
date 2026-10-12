@@ -706,6 +706,86 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 .wiz-total b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 .wiz-done svg circle{fill:url(#wizgrad)}
 .wiz-x{background:color-mix(in srgb,var(--sc) 14%,transparent);color:var(--sc-ink)}
+
+/* ===== v6 主页面同风格：今天页 / 重做页 / 标签栏 ===== */
+:root{--v1:hsl(222 78% 56%);--v2:hsl(262 72% 60%);--vgrad:linear-gradient(135deg,var(--v1),var(--v2))}
+.card.hero{background:var(--vgrad);color:#fff;box-shadow:0 12px 28px color-mix(in srgb,var(--v1) 38%,transparent);overflow:hidden;position:relative}
+.card.hero::before{content:'';position:absolute;right:-40px;top:-60px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.14);animation:float 7s ease-in-out infinite}
+.card.hero::after{content:'';position:absolute;left:-30px;bottom:-70px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.1)}
+.hero-top,.wstrip{position:relative;z-index:1}
+.hero .d{font-family:var(--sans);font-size:30px;letter-spacing:-.01em;color:#fff}
+.hero .w{color:rgba(255,255,255,.85)} .hero .w a{color:#fff !important;text-decoration:underline}
+.hero .navbtn{background:rgba(255,255,255,.18);border:0;color:#fff;transition:transform .12s,background .15s}
+.hero .navbtn:active{transform:scale(.9);background:rgba(255,255,255,.3)}
+.hero .streak{background:rgba(255,255,255,.22);color:#fff} .hero .streak b{color:#fff}
+.hero .wstrip button{color:rgba(255,255,255,.75)} .hero .wstrip i{border-color:rgba(255,255,255,.35);color:#fff;background:transparent}
+.hero .wstrip .rec i{background:rgba(255,255,255,.28);border-color:transparent;color:#fff} .hero .wstrip .sel i{border-color:#fff;background:#fff;color:var(--v1);font-weight:700}
+.fillbtn.primary{background:var(--vgrad);box-shadow:0 10px 24px color-mix(in srgb,var(--v1) 40%,transparent);animation:breathe 2.6s ease-in-out infinite;transition:transform .12s}
+.fillbtn.primary:active{transform:scale(.97);animation:none}
+@keyframes breathe{0%,100%{box-shadow:0 10px 24px color-mix(in srgb,var(--v1) 40%,transparent)}50%{box-shadow:0 14px 34px color-mix(in srgb,var(--v1) 60%,transparent)}}
+/* 待办行：彩色图标块 + 按下反馈 */
+.todo-r{transition:transform .12s,background .15s;border-radius:14px}
+.todo-r:active{transform:scale(.98);background:color-mix(in srgb,var(--vc,var(--accent)) 10%,transparent)}
+.todo-r .ck{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,var(--vc),color-mix(in srgb,var(--vc) 62%,#fff)) !important;box-shadow:0 5px 12px color-mix(in srgb,var(--vc) 35%,transparent);transition:transform .15s}
+.todo-r .ck::after{background:#fff;inset:8px}
+.todo-r[data-act=wizstart],.todo-r[data-act=slopen]{--vc:hsl(222 78% 56%)}
+.todo-r[data-v=errors]{--vc:hsl(28 92% 54%)}
+.todo-r[data-v=card]{--vc:hsl(262 72% 60%)}
+.todo-r[data-v=recite]{--vc:hsl(152 62% 42%)}
+.todo-r[data-v=read]{--vc:hsl(180 62% 40%)}
+.todo-r[data-act=holgo],.todo-r[data-act=holedit]{--vc:hsl(16 85% 56%)}
+.todo-r[data-v=speak]{--vc:hsl(335 72% 58%)}
+.todo-r[data-v=pe]{--vc:hsl(4 78% 58%)}
+.todo-r.done .ck{background:linear-gradient(135deg,hsl(152 62% 42%),hsl(152 62% 56%)) !important;box-shadow:0 5px 12px hsl(152 62% 42% / .35)}
+.todo-r.done .ck::before{background:#fff;inset:8px}
+.todo-r.done .t{color:var(--ink2);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink) 35%,transparent)}
+.todo-r.next{background:linear-gradient(90deg,color-mix(in srgb,var(--vc,var(--accent)) 14%,transparent),transparent 75%)}
+.todo-r.next .chev{color:var(--vc,var(--accent));font-weight:700}
+.todo-r .s{color:var(--ink3)}
+/* 底部标签栏 */
+.tabin button{transition:transform .12s;color:var(--ink3)} .tabin button:active{transform:scale(.9)}
+.tabin button.on{color:var(--v1)}
+.tabin button.on svg{animation:tabpop .4s cubic-bezier(.2,.8,.3,1.5)}
+@keyframes tabpop{0%{transform:scale(.7)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+.tabin button.on::before{content:'';position:absolute;top:7px;width:48px;height:30px;border-radius:15px;background:color-mix(in srgb,var(--v1) 14%,transparent);z-index:-1}
+.tabin button{z-index:0}
+.badge{background:linear-gradient(135deg,hsl(28 92% 54%),hsl(4 78% 58%));box-shadow:0 2px 6px hsl(28 92% 54% / .4)}
+/* 重做页 */
+.kpi{border:0;background:var(--surface)} .kpi b{font-family:var(--sans);font-weight:800;font-size:28px;background:var(--vgrad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card.redo{border-left:0;--c:var(--accent);box-shadow:0 0 0 1.5px color-mix(in srgb,var(--c) 30%,transparent) inset,var(--shadow);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 9%,var(--surface)),var(--surface) 55%)}
+.card.redo.sure{box-shadow:0 0 0 2px hsl(38 92% 52%) inset,var(--shadow)}
+.card.redo .dot{width:12px;height:12px;background:var(--c) !important;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent)}
+.card.redo .q{font-family:var(--sans);font-weight:700;font-size:19px}
+.btn.good{background:linear-gradient(135deg,hsl(152 62% 40%),hsl(165 60% 48%));border:0;color:#fff;font-weight:600;box-shadow:0 8px 18px hsl(152 62% 40% / .35)}
+.card.redo .row .btn:not(.good){background:color-mix(in srgb,var(--c) 10%,var(--surface2))}
+.tools .btn{transition:transform .12s} .tools .btn:active{transform:scale(.95)}
+.tile{transition:transform .12s} .tile:active{transform:scale(.97)}
+.chip{transition:transform .12s,background .15s} .chip:active{transform:scale(.94)}
+.chip.on{background:var(--vgrad);color:#fff}
+.step{transition:transform .12s} .step:active{transform:scale(.96)}
+.step.done{background:linear-gradient(135deg,hsl(152 62% 42% / .18),hsl(165 60% 48% / .12))}
+/* 切标签页入场 */
+#main.enter > *{animation:rise .45s cubic-bezier(.2,.8,.3,1) both}
+#main.enter > :nth-child(1){animation-delay:0ms} #main.enter > :nth-child(2){animation-delay:50ms} #main.enter > :nth-child(3){animation-delay:100ms} #main.enter > :nth-child(4){animation-delay:150ms} #main.enter > :nth-child(5){animation-delay:200ms} #main.enter > :nth-child(6){animation-delay:250ms} #main.enter > :nth-child(n+7){animation-delay:300ms}
+@media (prefers-color-scheme:dark){:root{--v1:hsl(222 80% 62%);--v2:hsl(262 74% 66%)} .card.hero{box-shadow:0 12px 28px color-mix(in srgb,var(--v1) 25%,transparent)} .tabin button.on{color:var(--v1)}}
+@media (prefers-reduced-motion:reduce){.card.hero::before,.fillbtn.primary,.tabin button.on svg,#main.enter > *{animation:none !important}}
+
+/* ===== v6b 学习页方块 + 家长页 ===== */
+.tile{--vc:var(--v1);background:linear-gradient(160deg,color-mix(in srgb,var(--vc) 12%,var(--surface)),var(--surface) 60%);box-shadow:0 2px 0 color-mix(in srgb,var(--vc) 22%,transparent),var(--shadow)}
+.tile::before{background:linear-gradient(135deg,var(--vc),color-mix(in srgb,var(--vc) 62%,#fff)) !important;box-shadow:0 6px 14px color-mix(in srgb,var(--vc) 35%,transparent);border-radius:13px}
+.tile::after{background:#fff !important}
+.tile.due{box-shadow:0 0 0 2px var(--vc) inset,0 8px 20px color-mix(in srgb,var(--vc) 22%,transparent)}
+.tile .tn .pill{background:linear-gradient(135deg,var(--vc),color-mix(in srgb,var(--vc) 70%,#fff));color:#fff;font-weight:600}
+.tile[data-v=card]{--vc:hsl(262 72% 60%)} .tile[data-v=recite]{--vc:hsl(152 62% 42%)} .tile[data-v=read]{--vc:hsl(180 62% 40%)}
+.tile[data-v=kp]{--vc:hsl(42 92% 50%)} .tile[data-v=speak]{--vc:hsl(335 72% 58%)} .tile[data-v=pe]{--vc:hsl(4 78% 58%)}
+.tile[href="../math/"]{--vc:hsl(222 78% 56%)} .tile[data-v=books]{--vc:hsl(205 60% 48%)} .tile[data-v=ear]{--vc:hsl(290 60% 58%)} .tile[data-v=ting]{--vc:hsl(16 85% 56%)}
+.tile .tn+*{color:var(--vc);font-weight:600}
+/* 家长页：分段控件、周/月统计表 */
+.seg:not(.wide) button.on{background:var(--vgrad);color:#fff;box-shadow:0 4px 12px color-mix(in srgb,var(--v1) 35%,transparent)}
+.seg:not(.wide) button{transition:transform .12s,background .15s} .seg:not(.wide) button:active{transform:scale(.95)}
+.tile .tbadge{background:linear-gradient(135deg,var(--vc),color-mix(in srgb,var(--vc) 70%,#fff));color:#fff;box-shadow:0 3px 8px color-mix(in srgb,var(--vc) 35%,transparent)}
+.wk .c{transition:transform .12s} .wk .c:not(.blank){background:color-mix(in srgb,var(--v1) 12%,var(--surface2))}
+.legend .sw,.pill .sw{border-radius:3px}
 </style>
 </head>
 <body>
@@ -2806,7 +2886,7 @@ function vRedo(){
     const s = subjById(it.sid); const r = DB.days[it.d] && DB.days[it.d].subj[it.sid];
     if (it.ext) { h += extCard(it, s); continue; }
     const nth = (it.hist||[]).length + 1;
-    h += `<div class="card redo ${it.conf==='sure'?'sure':''}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
+    h += `<div class="card redo ${it.conf==='sure'?'sure':''}" style="--c:${vivid(s.color)}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
       ${it.stem ? `<div class="q" style="font-size:17px;line-height:1.6;white-space:pre-wrap">${esc(it.stem)}</div>${it.tag ? `<div class="small faint">知识点：${esc(it.tag)}</div>` : ''}` : `<div class="q">${it.tag ? esc(it.tag) : `${md(it.d)}${esc(s.name)}作业里的一题`}</div>`}
       ${it.photoId && DB.photos.some(p => p.id === it.photoId) ? `<img data-pid="${it.photoId}" data-act="photoview" data-v="${it.photoId}" alt="原题照片" style="display:block;max-width:100%;max-height:180px;margin:8px 0;border-radius:10px;object-fit:contain;background:var(--surface2);cursor:zoom-in">` : ''}
       <div class="small muted">${md(it.d)}的${esc(s.name)}${it.src === '随手记' ? '（自己记的问题）' : it.src === '拍照识别' ? '（拍照识别）' : '作业'}${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck && it.src !== '随手记' && it.src !== '拍照识别' ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
@@ -2824,7 +2904,7 @@ function vRedo(){
 }
 function extCard(it, s){
   const nth = (it.hist||[]).length + 1;
-  return `<div class="card redo"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill accent">拍照错题本</span><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
+  return `<div class="card redo" style="--c:${vivid(s.color)}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill accent">拍照错题本</span><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
     <div class="q" style="font-family:var(--mono);font-size:17px">${esc(it.stem)}</div>
     <div class="small muted">${esc(it.src)}${it.tag ? ' · '+esc(it.tag) : ''}</div>
     <details style="margin-top:8px"><summary class="small" style="color:var(--accent)">做完再点开看答案</summary>
@@ -5109,7 +5189,8 @@ function methodCard(){
 }
 
 /* ================= 事件 ================= */
-function setTab(t){ if (t !== state.tab) stopAllEn(); if (t === 'today') checkDay(); state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0); }
+function setTab(t){ const changed = t !== state.tab; if (changed) stopAllEn(); if (t === 'today') checkDay(); state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0);
+  if (changed) { const m = $('#main'); m.classList.add('enter'); clearTimeout(setTab._t); setTab._t = setTimeout(() => m.classList.remove('enter'), 900); } }
 const ACT = {
   tab: el => { if (el.dataset.v === 'errors') state.errView = 'redo'; setTab(el.dataset.v); },
   day: (el, e) => { e.preventDefault(); const v = +el.dataset.v; state.date = v === 0 ? today() : addD(state.date, v); if (state.date > today()) state.date = today(); state.openSubj = null; render(); },
@@ -5550,6 +5631,8 @@ const WIZ_NAV = {wiznext:'fwd', wizpicked:'fwd', wizsame:'fwd', wizrest:'fwd', w
 document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.stopPropagation(); if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault();
     const inWiz = state.wiz && el.closest('#wiz'), act = el.dataset.act, before = inWiz ? [state.wiz.i, state.wiz.step].join() : null;
     f(el, e);
+    if (!inWiz && !state.wiz && el.tagName === 'BUTTON' && act !== 'tab' && !el.closest('#tabs')) { const sel = `#main [data-act="${act}"]` + (el.dataset.v != null ? `[data-v="${el.dataset.v}"]` : '') + (el.dataset.t ? `[data-t="${el.dataset.t}"]` : '');
+      const nx = $(sel); if (nx && nx.tagName === 'BUTTON' && nx.closest('.card, .tools, .steps, .seg, .chiprow')) { nx.classList.add('tapped'); nx.addEventListener('animationend', () => nx.classList.remove('tapped'), {once:true}); } return; }
     if (!inWiz || !state.wiz) return;
     // 重绘后把「刚点的那个」找回来弹一下；数字跳一下；换了页就滑进来
     const sel = `#wiz [data-act="${act}"]` + (el.dataset.v != null ? `[data-v="${el.dataset.v}"]` : '') + (el.dataset.t ? `[data-t="${el.dataset.t}"]` : '') + (el.dataset.s ? `[data-s="${el.dataset.s}"]` : '');
