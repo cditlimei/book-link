@@ -3769,6 +3769,30 @@ async function spStart2(S){
   try { sr.start(); } catch(e) { await new Promise(r => setTimeout(r, 300)); sr.start(); }   // 上一次识别还没完全停掉时第一次 start 会抛，等一下再来
   S.phase = 'rec'; S.t0 = Date.now(); spTick(); render();
 }
+/* 设备自检：把 iPad/手机上每一步能不能用直接印在屏幕上，远程排查用 */
+async function spCheck(){
+  const S = state.sp || (state.sp = {id: state.learn.sp, phase: 'ready'}); if (S.chk === 'busy') return; S.chk = 'busy'; render();
+  const L = []; const ua = navigator.userAgent, m = /OS (\d+_\d+)/.exec(ua);
+  L.push(`设备：${/iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'iPad' : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : '电脑'}${m ? ' iOS ' + m[1].replace('_', '.') : ''}`);
+  L.push(`打开方式：${navigator.standalone ? '桌面图标（独立窗口）' : matchMedia('(display-mode: standalone)').matches ? '桌面图标' : '浏览器'}`);
+  L.push(`安全连接：${isSecureContext ? '是' : '否（麦克风需要 https）'}`);
+  L.push(`智谱识别：${aiReady() ? (asrPaused() ? '有密钥但暂停' : '可用') : '没填密钥'}`);
+  L.push(`麦克风接口：${navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '有' : '没有'}`);
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    try { const st = await Promise.race([navigator.mediaDevices.getUserMedia({audio: true}), new Promise((_, r) => setTimeout(() => r(new Error('10 秒没响应')), 10000))]); st.getTracks().forEach(t => t.stop()); L.push('麦克风权限：拿到了'); }
+    catch(e) { L.push(`麦克风权限：失败 ${e.name || ''} ${e.message || ''}`); } }
+  L.push(`录音接口：${window.MediaRecorder ? '有' : '没有'}`);
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  L.push(`系统语音识别：${SR ? '有' : '没有'}`);
+  if (SR) { const r = await new Promise(res => { let done = false; const fin = t => { if (!done) { done = true; res(t); } };
+      try { const sr = new SR(); sr.lang = 'en-US'; sr.onstart = () => { setTimeout(() => { try { sr.stop(); } catch(e) {} }, 1500); };
+        sr.onerror = e => fin('报错 ' + e.error); sr.onend = () => fin('能启动'); sr.onresult = () => fin('能启动且有结果');
+        sr.start(); setTimeout(() => fin('5 秒没任何回应'), 5000); }
+      catch(e) { fin('启动就抛错 ' + (e.name || '') + ' ' + (e.message || '')); } });
+    L.push('识别启动测试：' + r); }
+  L.push(`时间：${new Date().toLocaleString('zh-CN', {hour12: false})}`);
+  S.chk = L.join('\n'); render();
+}
 function spTick(){ clearInterval(window.__spT); window.__spT = setInterval(() => { const S = state.sp; if (!S || S.phase !== 'rec') return clearInterval(window.__spT); const left = 50 - Math.floor((Date.now() - S.t0) / 1000); const el = $('#sp-left'); if (el) el.textContent = Math.max(0, left); if (left <= 0) spStop(); }, 500); }
 async function spStop(){
   const S = state.sp;
@@ -3816,6 +3840,8 @@ function vSpeak(){
       <details style="text-align:left;margin-top:8px"><summary class="small faint">识别到的内容</summary><p class="small muted">${esc(S.said)}</p></details><div class="row" style="justify-content:center;margin-top:10px"><button class="btn primary" data-act="spstart">再读一遍</button></div></div>`; }
   else h += `<div class="card" style="text-align:center"><p class="muted" style="margin:0 0 10px">先听一遍示范，再看着原文读。</p><button class="btn primary" style="min-height:56px;font-size:18px;padding:0 26px" data-act="spstart">${MIC.replace('<svg','<svg style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-4px"')} 开始朗读</button><p class="small faint" style="margin-top:8px">${aiReady() && !asrPaused() ? '用智谱语音识别（0.06 元/分钟，读一篇约 3 分钱）' : '用设备自带的英语识别'}</p></div>`;
   if (S.err) h += `<div class="signal">${esc(S.err)}</div>`;
+  h += `<div class="row" style="justify-content:center;margin:4px 0 8px"><button class="btn sm ghost" data-act="spcheck">${S.chk === 'busy' ? '正在检测…' : '检测麦克风和识别'}</button></div>`;
+  if (S.chk && S.chk !== 'busy') h += `<div class="card small" style="white-space:pre-wrap;line-height:1.6;font-family:var(--mono);font-size:12.5px">${esc(S.chk)}</div><p class="small faint" style="text-align:center;margin:-6px 0 10px">把这张截图发给妈妈</p>`;
   const hist = DB.speakRecs.filter(r => r.pid === x.id).slice(-6).reverse();
   if (hist.length) h += `<div class="small" style="margin-top:4px">` + hist.map(r => `<span class="pill" style="margin:2px 4px 2px 0">${mdShort(r.d)} ${r.acc}% · ${r.sec} 秒</span>`).join('') + `</div>`;
   return h;
@@ -5410,6 +5436,7 @@ const ACT = {
   rtagain: () => { state.rt = null; render(); },
   spplay: () => { const x = LIB.speak.items.find(i => i.id === state.learn.sp); const a = window.__enAudio || (window.__enAudio = new Audio()); if (!a.paused) { a.pause(); return; } a.src = x.audio; a.play().catch(() => speak(x.text, 'en-US')); },
   spstart: () => { state.sp = {id: state.learn.sp, phase: 'ready'}; spStart(); },
+  spcheck: () => spCheck(),
   spstop: () => spStop(),
   peaddall: () => { const ch = peChoice(); let n = 0, bad = '', msg = [];
     let badIt = null;
