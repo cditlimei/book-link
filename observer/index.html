@@ -3909,7 +3909,9 @@ function tingPlayerHTML(full){
 }
 function tingCard(){ loadTing(); if (TING.st === 'nosync' || TING.st === 'missing') return ''; return tingPlayerHTML(false); }
 function vTing(){
-  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">听讲解</h2></div>` + tingPlayerHTML(true);
+  // 从今天页点进来的，返回就回今天页；从学习页进来的回学习
+  const fromToday = (state.learn || {}).from === 'today';
+  let h = `<div class="row">${fromToday ? '<button class="btn sm ghost" data-act="tab" data-v="today">‹ 今天</button>' : backBtn('home')}<h2 style="margin:0">听讲解</h2></div>` + tingPlayerHTML(true);
   if (TING.st !== 'ok') return h;
   const t = today(), list = tingList(t), L = tingLog(), wk = tingWeek(t), subj = tingSubjToday(t);
   if (list.length) h += `<div style="margin-top:12px">` + list.map((s, i) => `<button class="ear-row ${TING.cur && TING.cur.id === s.id ? 'on' : ''}" data-act="tingpick" data-v="${i}"><span class="k">${TING_KIND[s.kind] || (L[s.id] ? '复习' : TING_SUBJ[s.subj])}</span><span style="flex:1;min-width:0">${esc(s.title)}${tingAnswered(s.id) === 'ok' ? ' <span class="small" style="color:var(--good,#2f7a66)">✓</span>' : tingAnswered(s.id) === 'no' ? ' <span class="small" style="color:var(--bad,#b5402a)">没答上</span>' : ''}</span><span class="small faint">${Math.round(s.dur / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div>`;
@@ -5000,7 +5002,7 @@ const ACT = {
     const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.adjust = m ? m[0] : t.slice(0, 60); w.u = now(); (w.fu = w.fu || {}).adjust = w.u; save(); toast('已写进「下周只调一件事」'); render(); },
   pet: el => { const pe = JSON.parse(JSON.stringify(DB.settings.pe || {})); pe.tests = pe.tests || {}; pe.tests[el.dataset.y] = pe.tests[el.dataset.y] === el.dataset.v ? '' : el.dataset.v; setSetting('pe', pe); save(); render(); },
   explain: el => { const dd = dayObj(today()) || {}; setDayField(today(), 'explain', (dd.explain || 0) + 1); save(); toast(el.dataset.v === '1' ? '好。只听不判，就是在帮他' : '让他换个说法再讲一遍'); render(); },
-  golearn: el => { stopAllEn(); state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.sp = null; state.ls = null; state.rt = null; } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
+  golearn: el => { stopAllEn(); const from = state.tab; state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.from = from; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.sp = null; state.ls = null; state.rt = null; } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
   toggleq: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.q = !queued(it); it.u = now(); save(); render(); },
   pv: el => { state.pv = el.dataset.v; state.examEdit = null; render(); window.scrollTo(0,0); },
   lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { stopAllEn(); state.learn.sp = null; state.sp = null; } if (el.dataset.v === 'speak' && el.dataset.s) state.learn.sp = el.dataset.s; render(); window.scrollTo(0,0); },
