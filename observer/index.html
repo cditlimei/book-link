@@ -569,6 +569,143 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
   .tgrid>.tcol:last-child{padding-top:6px}
 }
 
+
+/* ===== 一步一步填 v5：每科自己的主题色 + 点击反馈 ===== */
+.wiz{--sc:var(--accent);--sc-bg:color-mix(in srgb,var(--sc) 13%,var(--bg));--sc-ink:color-mix(in srgb,var(--sc) 78%,var(--ink));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--sc) 16%,var(--bg)) 0,color-mix(in srgb,var(--sc) 6%,var(--bg)) 180px,var(--bg) 420px)}
+@media (prefers-color-scheme:dark){.wiz{--sc-ink:color-mix(in srgb,var(--sc) 75%,#fff);background:linear-gradient(180deg,color-mix(in srgb,var(--sc) 22%,var(--bg)) 0,color-mix(in srgb,var(--sc) 8%,var(--bg)) 180px,var(--bg) 420px)}}
+.wiz-dots i{height:7px;background:color-mix(in srgb,var(--ink) 10%,transparent);--c:var(--accent)}
+.wiz-dots i.done{background:var(--c)} .wiz-dots i.cur{background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 25%,transparent);animation:dotpulse 1.6s ease-in-out infinite}
+@keyframes dotpulse{50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--c) 12%,transparent)}}
+.wiz-x{border:0;background:color-mix(in srgb,var(--ink) 7%,transparent)}
+.wiz-subj{margin:14px 0 4px;gap:0}
+.wiz-subj .tag{display:inline-flex;align-items:center;gap:7px;background:var(--sc);color:#fff;border-radius:999px;padding:5px 13px 5px 10px;font-size:14px;font-weight:600;letter-spacing:.02em;box-shadow:0 4px 12px color-mix(in srgb,var(--sc) 35%,transparent)}
+.wiz-subj .tag i{width:8px;height:8px;border-radius:50%;background:#fff;opacity:.9}
+.wiz-q{font-size:28px;letter-spacing:-.01em}
+.big button{border-radius:18px;background:var(--surface);transition:transform .14s cubic-bezier(.2,.8,.3,1.4),background .15s,color .15s,box-shadow .15s;position:relative;overflow:hidden}
+.big button:active{transform:scale(.94)}
+.big button.on{background:var(--sc);color:#fff;box-shadow:0 8px 20px color-mix(in srgb,var(--sc) 38%,transparent);transform:translateY(-1px)}
+.big button.on small{color:rgba(255,255,255,.8)}
+.big button.on::after{content:"✓";position:absolute;top:6px;right:9px;font-size:13px;font-weight:700;opacity:.9}
+.big button.wide.on::after{top:50%;transform:translateY(-50%)}
+.seg.wide{border-radius:16px;padding:3px;background:color-mix(in srgb,var(--ink) 7%,transparent)}
+.seg.wide button{min-height:58px;border-radius:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13.5px;transition:transform .14s,background .15s;line-height:1.1}
+.seg.wide button:active{transform:scale(.95)}
+.seg.wide button.on{background:var(--surface);color:var(--sc-ink);box-shadow:0 2px 8px rgba(0,0,0,.14);font-weight:600}
+.seg.wide button svg{width:34px;height:12px;display:block}
+.seg.wide button svg rect{fill:currentColor;opacity:.35} .seg.wide button.on svg rect{opacity:.9;fill:var(--sc)}
+.cnt{transition:background .2s,box-shadow .2s;border:0;--tc:var(--ink3)}
+.cnt.has{background:color-mix(in srgb,var(--tc) 12%,var(--surface));box-shadow:0 0 0 1.5px color-mix(in srgb,var(--tc) 45%,transparent) inset,var(--shadow)}
+.cnt button{border:0;background:color-mix(in srgb,var(--ink) 7%,transparent);transition:transform .12s,background .15s}
+.cnt button:active{transform:scale(.88)}
+.cnt.has button[data-v="1"]{background:var(--tc);color:#fff}
+.cnt .v{font-weight:700;transition:color .15s} .cnt.has .v{color:var(--tc)}
+.wiz-foot .btn.primary{background:var(--sc);border-color:var(--sc);box-shadow:0 8px 20px color-mix(in srgb,var(--sc) 35%,transparent);font-weight:600}
+@media (prefers-color-scheme:dark){.wiz-foot .btn.primary,.wiz-subj .tag,.big button.on,.cnt.has button[data-v="1"]{color:#fff}}
+.wiz-foot .btn.ghost{color:var(--sc-ink)}
+.wiz .samecard{box-shadow:0 0 0 1.5px var(--sc) inset,var(--shadow);background:color-mix(in srgb,var(--sc) 6%,var(--surface))}
+.wiz .samego{background:var(--sc)}
+.big.pick button{min-height:76px;justify-content:flex-start;text-align:left;display:flex;align-items:center;gap:12px;padding:8px 14px;font-size:20px}
+.big.pick button .dot{width:14px;height:14px;transition:transform .15s}
+.big.pick button.on{background:color-mix(in srgb,var(--pc) 16%,var(--surface));color:color-mix(in srgb,var(--pc) 70%,var(--ink));box-shadow:0 0 0 2px var(--pc) inset;transform:none}
+.big.pick button.on .dot{transform:scale(1.25);box-shadow:0 0 0 3px color-mix(in srgb,var(--pc) 25%,transparent)}
+.big.pick button.on::after{content:"✓";position:static;margin-left:auto;width:26px;height:26px;border-radius:50%;background:var(--pc);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px}
+/* 汇总页 */
+.wiz-total{display:flex;align-items:baseline;gap:8px;margin:-8px 0 16px;color:var(--ink2);font-size:15px}
+.wiz-total b{font-size:34px;color:var(--ink);font-weight:700;letter-spacing:-.02em;line-height:1}
+.wiz-sum{display:grid;grid-template-columns:3.2em 1fr auto;align-items:center;gap:10px 12px;padding:12px 14px;margin-bottom:8px;border:0;border-radius:16px;background:var(--surface);box-shadow:var(--shadow);transition:transform .12s;--c:var(--accent)}
+.wiz-sum:active{transform:scale(.98)}
+.wiz-sum b{display:flex;align-items:center;gap:7px;font-size:16px}
+.wiz-sum .bar{height:10px;border-radius:5px;background:color-mix(in srgb,var(--ink) 7%,transparent);overflow:hidden}
+.wiz-sum .bar i{display:block;height:100%;border-radius:5px;background:var(--c);width:var(--w,0);animation:grow .6s cubic-bezier(.2,.8,.3,1) both}
+@keyframes grow{from{width:0}}
+.wiz-sum .mins{font-size:15px;color:var(--ink2);white-space:nowrap;text-align:right;min-width:4.5em}
+.wiz-sum .mins b{display:inline;font-size:17px;color:var(--ink)}
+.wiz-sum.miss{background:color-mix(in srgb,var(--amber) 10%,var(--surface));box-shadow:0 0 0 1.5px color-mix(in srgb,var(--amber) 45%,transparent) inset}
+.wiz-sum.miss .mins{color:var(--amber);font-weight:600}
+.wiz-sum.off{opacity:.6}
+.wiz-done{display:flex;align-items:center;gap:14px;margin:18px 0 6px}
+.wiz-done svg{width:54px;height:54px;flex:none}
+.wiz-done svg circle{fill:#2e7a57} .wiz-done svg path{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;animation:draw .5s .15s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.wiz-done .wiz-q{margin:0}
+/* 点击反馈：刚点中的那个弹一下、数字跳一下、换页滑入 */
+.tapped{animation:tap .28s cubic-bezier(.2,.8,.3,1.4)}
+@keyframes tap{0%{transform:scale(.92)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+.big button.on.tapped{animation:tapon .32s cubic-bezier(.2,.8,.3,1.4)}
+@keyframes tapon{0%{transform:scale(.9)}55%{transform:scale(1.08) translateY(-1px)}100%{transform:scale(1) translateY(-1px)}}
+.bump{animation:bump .3s cubic-bezier(.2,.8,.3,1.4)}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.45) translateY(-3px)}100%{transform:scale(1)}}
+.wiz-body.fwd{animation:fwd .26s cubic-bezier(.2,.7,.2,1)} .wiz-body.bak{animation:bak .26s cubic-bezier(.2,.7,.2,1)}
+@keyframes fwd{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes bak{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.tapped,.bump,.wiz-body.fwd,.wiz-body.bak,.wiz-sum .bar i,.wiz-dots i.cur,.wiz-done svg path{animation:none;stroke-dashoffset:0}}
+
+/* ===== v5b 动效加厚：逐个浮现 / 科目大图标漂浮 / 数字滚动 / 填完撒点 ===== */
+.wiz-body{position:relative}
+.wiz-glyph{position:absolute;right:-18px;top:-6px;width:170px;height:170px;color:var(--sc);opacity:.13;pointer-events:none;animation:glyphin .7s cubic-bezier(.2,.8,.3,1) both,float 6s 1s ease-in-out infinite}
+.wiz-glyph svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+@keyframes glyphin{from{opacity:0;transform:rotate(-14deg) scale(.6)}to{opacity:.13;transform:none}}
+@keyframes float{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-10px) rotate(4deg)}}
+.wiz-body.fwd .wiz-q,.wiz-body.bak .wiz-q,.wiz-body.fwd .wiz-subj,.wiz-body.bak .wiz-subj{animation:rise .4s cubic-bezier(.2,.8,.3,1) both}
+.wiz-body.fwd .big button,.wiz-body.bak .big button,.wiz-body.fwd .cnt,.wiz-body.bak .cnt,.wiz-body.fwd .seg.wide,.wiz-body.bak .seg.wide,.wiz-body.fwd .wiz-sum,.wiz-body.fwd .card,.wiz-body.fwd .wiz-total,.wiz-body.fwd .wiz-done{animation:rise .45s cubic-bezier(.2,.8,.3,1) both;animation-delay:calc(var(--k,0) * 45ms + 60ms)}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+.big button.on{animation-name:rise}
+.wiz-dots i.done{animation:fill .5s cubic-bezier(.2,.8,.3,1) both;transform-origin:left}
+@keyframes fill{from{transform:scaleX(.2);opacity:.4}}
+/* 填完撒点 */
+.wiz-done{position:relative}
+.wiz-done .burst{position:absolute;left:27px;top:27px;width:0;height:0;pointer-events:none}
+.wiz-done .burst i{position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--c);animation:burst .9s .25s cubic-bezier(.1,.7,.3,1) both}
+@keyframes burst{0%{transform:translate(0,0) scale(.4);opacity:0}15%{opacity:1}100%{transform:translate(var(--x),var(--y)) scale(1);opacity:0}}
+.wiz-done svg{animation:popin .5s cubic-bezier(.2,.8,.3,1.5) both}
+@keyframes popin{from{transform:scale(.3);opacity:0}}
+.wiz-total b{display:inline-block;min-width:1.6em}
+@media (prefers-reduced-motion:reduce){.wiz-glyph,.wiz-body.fwd *,.wiz-body.bak *,.wiz-dots i.done,.wiz-done .burst i,.wiz-done svg{animation:none !important}.wiz-done .burst{display:none}}
+
+/* ===== v5c 色彩加浓：双色渐变 + 邻近色光斑 ===== */
+.wiz{--sc2:var(--sc);--sc3:var(--sc);--grad:linear-gradient(135deg,var(--sc) 0%,var(--sc2) 100%);
+  background:
+    radial-gradient(520px 360px at 110% -40px,color-mix(in srgb,var(--sc2) 55%,transparent) 0,transparent 70%),
+    radial-gradient(420px 320px at -20% 12%,color-mix(in srgb,var(--sc3) 38%,transparent) 0,transparent 70%),
+    linear-gradient(180deg,color-mix(in srgb,var(--sc) 34%,var(--bg)) 0,color-mix(in srgb,var(--sc) 10%,var(--bg)) 260px,var(--bg) 520px)}
+@media (prefers-color-scheme:dark){.wiz{background:
+    radial-gradient(520px 360px at 110% -40px,color-mix(in srgb,var(--sc2) 45%,transparent) 0,transparent 70%),
+    radial-gradient(420px 320px at -20% 12%,color-mix(in srgb,var(--sc3) 30%,transparent) 0,transparent 70%),
+    linear-gradient(180deg,color-mix(in srgb,var(--sc) 36%,var(--bg)) 0,color-mix(in srgb,var(--sc) 12%,var(--bg)) 260px,var(--bg) 520px)}}
+.wiz-dots i{background:color-mix(in srgb,var(--ink) 14%,transparent)}
+.wiz-dots i.done,.wiz-dots i.cur{background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 70%,#fff))}
+.wiz-subj .tag{background:var(--grad);box-shadow:0 6px 16px color-mix(in srgb,var(--sc) 45%,transparent)}
+.wiz-glyph{opacity:.22;color:var(--sc3)} @keyframes glyphin{from{opacity:0;transform:rotate(-14deg) scale(.6)}to{opacity:.22;transform:none}}
+.wiz-q{color:var(--ink)}
+.big button{background:color-mix(in srgb,var(--sc) 9%,var(--surface));box-shadow:0 2px 0 color-mix(in srgb,var(--sc) 22%,transparent),var(--shadow)}
+.big button small{color:color-mix(in srgb,var(--sc) 60%,var(--ink3))}
+.big button.on{background:var(--grad);box-shadow:0 10px 24px color-mix(in srgb,var(--sc) 45%,transparent)}
+.seg.wide{background:color-mix(in srgb,var(--sc) 14%,transparent)}
+.seg.wide button.on{color:#fff;background:var(--grad);box-shadow:0 4px 12px color-mix(in srgb,var(--sc) 40%,transparent)}
+.seg.wide button.on svg rect{fill:#fff;opacity:.95}
+.seg.wide button svg rect{fill:var(--sc);opacity:.5}
+.cnt{background:color-mix(in srgb,var(--tc) 8%,var(--surface))}
+.cnt.has{background:color-mix(in srgb,var(--tc) 20%,var(--surface));box-shadow:0 0 0 2px var(--tc) inset,0 6px 16px color-mix(in srgb,var(--tc) 25%,transparent)}
+.cnt.has button[data-v="1"]{background:linear-gradient(135deg,var(--tc),color-mix(in srgb,var(--tc) 70%,#fff))}
+.cnt .sw{border-radius:4px}
+.wiz-foot .btn.primary{background:var(--grad);box-shadow:0 10px 24px color-mix(in srgb,var(--sc) 42%,transparent)}
+.wiz-foot .btn.ghost{background:color-mix(in srgb,var(--sc) 10%,transparent);color:var(--sc-ink)}
+.wiz .samecard{background:linear-gradient(135deg,color-mix(in srgb,var(--sc) 16%,var(--surface)),color-mix(in srgb,var(--sc2) 16%,var(--surface)));box-shadow:0 0 0 2px var(--sc) inset,var(--shadow)}
+.wiz .samego{background:var(--grad)}
+.big.pick button{background:color-mix(in srgb,var(--pc) 10%,var(--surface));box-shadow:0 2px 0 color-mix(in srgb,var(--pc) 25%,transparent),var(--shadow)}
+.big.pick button.on{background:linear-gradient(135deg,var(--pc),var(--pc2));color:#fff;box-shadow:0 10px 24px color-mix(in srgb,var(--pc) 45%,transparent)}
+.big.pick button.on .dot{background:#fff !important;box-shadow:0 0 0 3px rgba(255,255,255,.35)}
+.big.pick button.on::after{background:#fff;color:var(--pc)}
+.wiz-sum{background:color-mix(in srgb,var(--c) 7%,var(--surface))}
+.wiz-sum .bar{background:color-mix(in srgb,var(--c) 16%,transparent)}
+.wiz-sum .bar i{background:linear-gradient(90deg,var(--c),var(--c2,var(--c)))}
+.wiz-sum .mins b{color:var(--c)}
+.wiz-sum.miss{background:linear-gradient(135deg,#ffe9b3,#ffd6a0);box-shadow:0 0 0 2px #f2a93b inset} .wiz-sum.miss .mins{color:#a85a00}
+@media (prefers-color-scheme:dark){.wiz-sum.miss{background:linear-gradient(135deg,#5a3d0a,#6b3f12);box-shadow:0 0 0 2px #f2a93b inset}.wiz-sum.miss .mins{color:#ffd27a}}
+.wiz-total b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.wiz-done svg circle{fill:url(#wizgrad)}
+.wiz-x{background:color-mix(in srgb,var(--sc) 14%,transparent);color:var(--sc-ink)}
 </style>
 </head>
 <body>
@@ -2514,7 +2651,12 @@ function wizStart(){
   let list = subs.map(s => s.id);
   if (!fresh) { const act = list.filter(x => !((dd.subj[x] || {}).none)); if (act.length) list = act; i = Math.max(0, list.findIndex(x => !filledRec(dd.subj[x]))); }
   state.wiz = {list, all: subs.map(s => s.id), i, step: fresh ? 'pick' : 'min', canPick: true, skipFilled: !fresh, pick: fresh ? subs.filter(s => !anyHist || had(s.id)).map(s => s.id) : null}; render();
+  const b = $('#wiz .wiz-body'); if (b) { b.classList.add('fwd'); wizCountUp(); }
 }
+function wizCountUp(){ const el = $('#wiz .wiz-total b'); if (!el || matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  const to = +el.textContent || 0, t0 = performance.now(), dur = 700;
+  const tick = t => { const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3); el.textContent = Math.round(to * e); if (p < 1) requestAnimationFrame(tick); else el.textContent = to; };
+  requestAnimationFrame(tick); }
 function wizGo(step){ const w = state.wiz;
   if (step === 'next') { w.i++; w.step = 'min';
     // 接着填 / 从汇总页点回来补：后面已经填好的科目不用再过一遍，直接到下一个没填的，都填了就到汇总
@@ -2522,13 +2664,20 @@ function wizGo(step){ const w = state.wiz;
   else w.step = step; render(); const b = $('.wiz-body'); if (b) b.scrollTop = 0; }
 function vWiz(){
   const w = state.wiz, d = state.date, dd = dayObj(d) || {subj:{}};
-  const dots = w.list.map((sid, k) => `<i class="${k === w.i ? 'cur' : filledRec(dd.subj[sid]) ? 'done' : ''}"></i>`).join('');
-  let h = `<div class="wiz" role="dialog" aria-label="一步一步填"><div class="wiz-top"><div class="wiz-dots">${dots}</div><span class="small faint num">${Math.min(w.i+1, w.list.length)}/${w.list.length}</span><button class="wiz-x" data-act="wizclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
+  const dots = w.list.map((sid, k) => `<i class="${k === w.i ? 'cur' : filledRec(dd.subj[sid]) ? 'done' : ''}" style="--c:${vivid(subjById(sid).color)}"></i>`).join('');
+  const base = w.step !== 'pick' && w.i < w.list.length ? subjById(w.list[w.i]).color : w.i >= w.list.length && !w.list.some(x => !filledRec(dd.subj[x])) ? '#2e9a5c' : '#3b6fd6';
+  const sc = vivid(base), sc2 = vivid(base, 38), sc3 = vivid(base, -50);
+  let h = `<div class="wiz" role="dialog" aria-label="一步一步填" style="--sc:${sc};--sc2:${sc2};--sc3:${sc3}"><div class="wiz-top"><div class="wiz-dots">${dots}</div><span class="small faint num">${Math.min(w.i+1, w.list.length)}/${w.list.length}</span><button class="wiz-x" data-act="wizclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
   if (w.i >= w.list.length) {
-    const miss = w.list.filter(x => !filledRec(dd.subj[x])).length;
-    h += `<div class="wiz-q" style="margin-top:24px">${!w.list.length ? '今天都没作业 ✓' : miss ? `还有 ${miss} 科没填` : '填完了 ✓'}</div>${miss ? `<p class="small faint" style="margin:-10px 0 12px">写完了点下面那科补上就行，其余已经记好。</p>` : ''}`;
-    w.list.forEach((sid, k) => { const s = subjById(sid), r = dd.subj[sid], n = itemsOn(d, sid).length;
-      h += `<div class="wiz-sum" data-act="wizgo" data-v="${k}" style="cursor:pointer"><span class="dot" style="background:${s.color}"></span><b style="width:3em">${esc(s.name)}</b><span class="muted">${!filledRec(r) ? '没填，点这里补' : r.none ? '没作业' : [r.min+' 分钟', n ? '记了 ' + n + ' 道题' : ''].filter(Boolean).join(' · ')}</span></div>`; });
+    const miss = w.list.filter(x => !filledRec(dd.subj[x])).length, tot = w.list.reduce((a, x) => a + ((dd.subj[x] || {}).none ? 0 : ((dd.subj[x] || {}).min || 0)), 0), mx = Math.max(1, ...w.list.map(x => (dd.subj[x] || {}).none ? 0 : ((dd.subj[x] || {}).min || 0)));
+    const cols = w.list.map(x => vivid(subjById(x).color)).concat(['#2ecc71', '#ffb347', '#ff6b81']);
+    const tick = `<svg viewBox="0 0 54 54" aria-hidden="true"><defs><linearGradient id="wizgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${sc}"/><stop offset="1" stop-color="${sc2}"/></linearGradient></defs><circle cx="27" cy="27" r="27"/><path d="M16 28l8 8 15-17"/></svg><span class="burst">${Array.from({length: 14}, (_, k) => { const a = k / 14 * Math.PI * 2, R = 44 + (k % 3) * 14; return `<i style="--c:${cols[k % cols.length]};--x:${Math.round(Math.cos(a) * R)}px;--y:${Math.round(Math.sin(a) * R)}px;animation-delay:${250 + (k % 4) * 60}ms"></i>`; }).join('')}</span>`;
+    if (!w.list.length) h += `<div class="wiz-done">${tick}<div class="wiz-q">今天都没作业</div></div>`;
+    else if (miss) h += `<div class="wiz-q" style="margin-top:24px">还有 ${miss} 科没填</div><p class="small faint" style="margin:-10px 0 14px">写完了点下面那科补上就行，其余已经记好。</p>`;
+    else h += `<div class="wiz-done">${tick}<div class="wiz-q">填完了</div></div>`;
+    if (w.list.length && tot) h += `<div class="wiz-total"><b class="num">${tot}</b>分钟 · 今天一共</div>`;
+    w.list.forEach((sid, k) => { const s = subjById(sid), r = dd.subj[sid] || {}, n = itemsOn(d, sid).length, ok = filledRec(r), m = r.none ? 0 : (r.min || 0);
+      h += `<div class="wiz-sum ${!ok ? 'miss' : r.none ? 'off' : ''}" data-act="wizgo" data-v="${k}" style="cursor:pointer;--c:${vivid(s.color)};--c2:${vivid(s.color, 38)};--k:${k + 2}"><b><span class="dot" style="background:${vivid(s.color)}"></span>${esc(s.name)}</b><span class="bar"><i style="--w:${ok && !r.none ? Math.round(m / mx * 100) : 0}%"></i></span><span class="mins">${!ok ? '没填，点我补' : r.none ? '没作业' : `<b class="num">${m}</b> 分钟${n ? `<br><span class="small faint">记了 ${n} 道题</span>` : ''}`}</span></div>`; });
     const left = redoLeftToday();
     h += `</div><div class="wiz-foot">${left ? `<button class="btn good" data-act="wizredo">去重做 ${left} 道错题</button>` : ''}<button class="btn ${left ? '' : 'primary'}" data-act="wizclose">完成</button></div></div>`;
     return h;
@@ -2536,17 +2685,17 @@ function vWiz(){
   if (w.step === 'pick') {
     const lw = addD(d, -7), lr = ((DB.days[lw] || {}).subj) || {}, same = w.list.filter(x => lr[x] && !lr[x].none && lr[x].min > 0), fresh0 = !w.list.some(x => filledRec(dd.subj[x]));
     if (same.length && fresh0) h += `<button class="card samecard" data-act="wizsame"><span style="flex:1;min-width:0"><b>跟上${WD[P(lw).getDay()] === '日' ? '周日' : '周' + WD[P(lw).getDay()]}一样</b><span class="small muted" style="display:block;margin-top:4px">${same.map(x => esc(subjById(x).name) + ' ' + lr[x].min).join('、')} 分钟</span></span><span class="samego">全部照旧 ›</span></button>`;
-    h += `<div class="wiz-q" style="margin-top:8px">今天有哪几科作业？</div><p class="small faint" style="margin:-10px 0 14px">点一下选上或去掉。没选的记为「今天没作业」。</p><div class="big two">` +
-      w.list.map(x => { const sx = subjById(x), on = w.pick.includes(x); return `<button class="${on ? 'on' : ''}" data-act="wizpick" data-v="${x}"><span class="dot" style="background:${sx.color};display:inline-block;margin-right:6px;vertical-align:3px"></span>${esc(sx.name)}${on ? ' ✓' : ''}</button>`; }).join('') + `</div>`;
+    h += `<div class="wiz-q" style="margin-top:8px">今天有哪几科作业？</div><p class="small faint" style="margin:-10px 0 14px">点一下选上或去掉。没选的记为「今天没作业」。</p><div class="big two pick">` +
+      w.list.map(x => { const sx = subjById(x), on = w.pick.includes(x); return `<button class="${on ? 'on' : ''}" data-act="wizpick" data-v="${x}" style="--pc:${vivid(sx.color)};--pc2:${vivid(sx.color, 38)};--k:${w.list.indexOf(x)}"><span class="dot" style="background:${vivid(sx.color)}"></span>${esc(sx.name)}</button>`; }).join('') + `</div>`;
     return h + `</div><div class="wiz-foot"><button class="btn primary" data-act="wizpicked" ${w.pick.length ? '' : ''}>${w.pick.length ? `就这 ${w.pick.length} 科 ›` : '今天都没作业'}</button></div></div>`;
   }
   const sid = w.list[w.i], s = subjById(sid), r = (dd.subj[sid]) || {}, its = itemsOn(d, sid);
-  h += `<div class="wiz-subj"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</div>`;
+  h += subjGlyph(s.name) + `<div class="wiz-subj"><span class="tag"><i></i>${esc(s.name)}</span></div>`;
   let foot = w.i > 0 || w.step !== 'min' || w.canPick ? `<button class="btn ghost" data-act="wizback">‹ 上一步</button>` : '';
   if (w.step === 'min') {
     h += `<div class="wiz-q">${esc(s.name)}今天做了多久？</div><div class="big">`;
     if (r.min && !WIZ_MIN.includes(r.min)) h += `<button class="wide on" data-act="wizmin" data-v="keep">${r.min} 分钟<small>计时器 / 已填</small></button>`;
-    h += WIZ_MIN.map(m => `<button class="${r.min === m && !r.none ? 'on' : ''}" data-act="wizmin" data-v="${m}">${m}<small>分钟</small></button>`).join('');
+    h += WIZ_MIN.map((m, k) => `<button class="${r.min === m && !r.none ? 'on' : ''}" data-act="wizmin" data-v="${m}" style="--k:${k}">${m}<small>分钟</small></button>`).join('');
     h += `</div>
       <details class="more" style="margin:8px 0 0" ${r.min && !WIZ_MIN.includes(r.min) && !r.none ? '' : ''}><summary>都不对？自己填分钟或几点到几点</summary><div class="card" style="padding:12px 14px">
         <div class="row"><input type="number" inputmode="numeric" min="0" max="600" id="w-min" class="minin" value="${r.min && !WIZ_MIN.includes(r.min) ? r.min : ''}" placeholder="37"><span class="muted">分钟</span></div>
@@ -2554,10 +2703,10 @@ function vWiz(){
         <button class="btn primary sm" style="margin-top:10px" data-act="wizmanual">用我填的</button></div></details>`;
     const iv = r.intr || 'none';
     h += `<div class="wiz-lab">中途停下来过吗？<span class="faint">（倒水、玩手机、换科都算）</span></div><div class="seg wide">` +
-      [['none','没停过'],['early','开头停了'],['mid','中间停了'],['late','快完时停了']].map(([k,n]) => `<button data-act="wizintr" data-v="${k}" class="${iv === k ? 'on' : ''}">${n}</button>`).join('') + `</div>`;
+      [['none','没停过'],['early','开头停了'],['mid','中间停了'],['late','快完时停了']].map(([k,n]) => `<button data-act="wizintr" data-v="${k}" class="${iv === k ? 'on' : ''}">${intrIcon(k)}${n}</button>`).join('') + `</div>`;
     h += `<div class="wiz-lab">有没做对的题吗？<span class="faint">（都对就不用点）</span></div>`;
-    for (const t of ET) { const n = its.filter(it => it.type === t.k).length;
-      h += `<div class="cnt sm"><span class="nm"><i class="sw" style="background:${ET_COLOR[t.k]};width:12px;height:12px"></i>${typeNameS(sid, t.k)}</span><button data-act="wizerr" data-t="${t.k}" data-v="-1" aria-label="减少">−</button><span class="v">${n}</span><button data-act="wizerr" data-t="${t.k}" data-v="1" aria-label="增加">+</button></div>`; }
+    ET.forEach((t, k) => { const n = its.filter(it => it.type === t.k).length;
+      h += `<div class="cnt sm ${n ? 'has' : ''}" style="--tc:${vivid(ET_COLOR[t.k])};--k:${k + 10}"><span class="nm"><i class="sw" style="background:${ET_COLOR[t.k]};width:12px;height:12px"></i>${typeNameS(sid, t.k)}</span><button data-act="wizerr" data-t="${t.k}" data-v="-1" aria-label="减少">−</button><span class="v">${n}</span><button data-act="wizerr" data-t="${t.k}" data-v="1" aria-label="增加">+</button></div>`; });
     h += `<button class="btn ghost" style="width:100%;margin-top:6px" data-act="wizmin" data-v="none">今天没有${esc(s.name)}作业</button>`;
     const empty = !r.none && !(r.min > 0);
     foot += `<button class="btn primary" data-act="wiznext">${empty ? (w.i + 1 < w.list.length ? '还没写，先跳过 ›' : '还没写，先跳过') : w.i + 1 < w.list.length ? '下一科 ›' : '完成'}</button>`;
@@ -2600,6 +2749,25 @@ function vWiz(){
   }
   return h + `</div><div class="wiz-foot">${foot}</div></div>`;
 }
+/* 向导专用：把偏灰的科目色提饱和、调到中等明度，再给一个邻近色做渐变对 */
+function hexHsl(hex){ const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return null; const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let h = 0, sat = 0;
+  if (mx !== mn) { const d = mx - mn; sat = l > .5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; } return [h, sat, l]; }
+function vivid(hex, dh){ const c = hexHsl(hex); if (!c) return hex || '#4a7bd0'; const h = ((c[0] + (dh || 0)) % 360 + 360) % 360, sa = Math.max(c[1], .74), l = Math.min(.58, Math.max(.48, c[2])); return `hsl(${h.toFixed(0)} ${(sa * 100).toFixed(0)}% ${(l * 100).toFixed(0)}%)`; }
+function subjGlyph(name){
+  const P = /语文/.test(name) ? '<path d="M12 6h28a6 6 0 0 1 6 6v36H18a6 6 0 0 0-6 6V6z"/><path d="M12 54V12"/><path d="M22 18h16M22 26h16M22 34h10"/>'
+    : /数学/.test(name) ? '<path d="M10 50 50 10"/><path d="M10 10h40M30 10v40"/><circle cx="18" cy="42" r="3"/><circle cx="42" cy="42" r="3"/>'
+    : /英语/.test(name) ? '<path d="M8 46 20 14l12 32M12 36h16"/><path d="M38 24h8a6 6 0 0 1 0 12h-8zM38 36h10a6 6 0 0 1 0 12H38z"/>'
+    : /道法|政治/.test(name) ? '<path d="M30 8v44M12 52h36"/><path d="M8 20h44"/><path d="M8 20l-4 14h16l-4-14M52 20l-4 14h16l-4-14"/>'
+    : /历史/.test(name) ? '<path d="M14 10h30a6 6 0 0 1 0 12H14z"/><path d="M14 22v30h30V22"/><path d="M22 32h14M22 40h10"/>'
+    : /地理/.test(name) ? '<circle cx="30" cy="30" r="22"/><path d="M8 30h44M30 8c8 8 8 36 0 44M30 8c-8 8-8 36 0 44"/>'
+    : /生物/.test(name) ? '<path d="M12 48C12 24 28 12 50 12c0 22-12 38-38 36z"/><path d="M12 48 42 18"/>'
+    : /物理/.test(name) ? '<circle cx="30" cy="30" r="4"/><ellipse cx="30" cy="30" rx="24" ry="9"/><ellipse cx="30" cy="30" rx="24" ry="9" transform="rotate(60 30 30)"/><ellipse cx="30" cy="30" rx="24" ry="9" transform="rotate(120 30 30)"/>'
+    : /化学/.test(name) ? '<path d="M22 8h16M26 8v16L10 50a4 4 0 0 0 4 6h32a4 4 0 0 0 4-6L34 24V8"/><path d="M18 42h24"/>'
+    : '<path d="M14 8h32v44H14z"/><path d="M22 20h16M22 30h16M22 40h10"/>';
+  return `<div class="wiz-glyph" aria-hidden="true"><svg viewBox="0 0 60 60">${P}</svg></div>`; }
+function intrIcon(k){ const gap = {none:null, early:[8,14], mid:[14,20], late:[20,26]}[k];
+  if (!gap) return `<svg viewBox="0 0 34 12" aria-hidden="true"><rect x="0" y="3" width="34" height="6" rx="3"/></svg>`;
+  return `<svg viewBox="0 0 34 12" aria-hidden="true"><rect x="0" y="3" width="${gap[0]}" height="6" rx="3"/><rect x="${gap[1]}" y="3" width="${34 - gap[1]}" height="6" rx="3"/></svg>`; }
 function stuckQ(name){
   if (/数学|物理|化学|科学/.test(name)) return '哪一步最不确定？';
   if (/语文/.test(name)) return '哪一句读不懂？哪道题最没把握？';
@@ -5378,7 +5546,18 @@ function importData(txt){
     DB = mergeDB(DB, x).M; save(); toast('已合并导入'); render();
   } catch(e) { toast('这不是有效的备份'); }
 }
-document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.stopPropagation(); if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault(); f(el, e); } });
+const WIZ_NAV = {wiznext:'fwd', wizpicked:'fwd', wizsame:'fwd', wizrest:'fwd', wizgo:'fwd', wizback:'bak', wizmanual:null};
+document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.stopPropagation(); if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault();
+    const inWiz = state.wiz && el.closest('#wiz'), act = el.dataset.act, before = inWiz ? [state.wiz.i, state.wiz.step].join() : null;
+    f(el, e);
+    if (!inWiz || !state.wiz) return;
+    // 重绘后把「刚点的那个」找回来弹一下；数字跳一下；换了页就滑进来
+    const sel = `#wiz [data-act="${act}"]` + (el.dataset.v != null ? `[data-v="${el.dataset.v}"]` : '') + (el.dataset.t ? `[data-t="${el.dataset.t}"]` : '') + (el.dataset.s ? `[data-s="${el.dataset.s}"]` : '');
+    const nx = $(sel); if (nx && !(act in WIZ_NAV)) { nx.classList.add('tapped'); nx.addEventListener('animationend', () => nx.classList.remove('tapped'), {once:true}); }
+    if (act === 'wizerr' && nx) { const v = nx.parentElement.querySelector('.v'); if (v) v.classList.add('bump'); }
+    const dir = WIZ_NAV[act]; const body = $('#wiz .wiz-body');
+    if (dir && body && [state.wiz.i, state.wiz.step].join() !== before) { body.classList.add(dir); wizCountUp(); } } });
+document.addEventListener('pointerdown', e => { if (state.wiz && e.target.closest('#wiz button') && navigator.vibrate) { try { navigator.vibrate(8); } catch(_) {} } }, {passive:true});
 function onDataIn(e){
   const el = e.target.closest && e.target.closest('[data-in]'); if (!el) return;
   const k = el.dataset.in, f = el.dataset.f, v = el.value;

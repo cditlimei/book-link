@@ -1,6 +1,6 @@
 import subprocess, time, json, traceback
 from playwright.sync_api import sync_playwright
-PORT=18931
+PORT=18933
 srv = subprocess.Popen(['python3','-m','http.server',str(PORT),'-d','/home/coder/book-link/observer'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
 R=[]
 def ok(name, cond, extra=''):
