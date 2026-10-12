@@ -3741,7 +3741,14 @@ async function rtAskStop(){ const S = state.rt; if (!S || !S.rec) return; S.rec 
     DB.speakRecs.push({id: uid('sp'), d: today(), kind: 'retell', pid: x.id, acc: Math.round((pts * 0.6 + qs * 0.4) * 100), u: now()}); save(); render(); } }
 async function spStart(){
   const S = state.sp; S.said = ''; S.err = ''; S.res = null;
+  S.phase = 'starting'; render();   // 点了就有反应：拿麦克风权限可能要等几秒
+  try { await spStart2(S); }
+  catch(e) { if (state.sp !== S) return; S.phase = 'ready'; S.err = '没开始成功：' + (e && e.message || e) + '。再点一次试试；还不行就截图给妈妈。'; SREC = null; render(); }
+  finally { if (state.sp === S && S.phase === 'starting') { S.phase = 'ready'; render(); } }
+}
+async function spStart2(S){
   try { window.__enAudio && window.__enAudio.pause(); } catch(e) {}
+  if (SREC) { const R = SREC; SREC = null; R.on = false; clearTimeout(R.cut); try { R.sr ? R.sr.stop() : (R.mr && R.mr.state === 'recording' && R.mr.stop()); } catch(e) {} if (R.stream) R.stream.getTracks().forEach(t => t.stop()); }
   if (aiReady() && !asrPaused() && window.MediaRecorder && navigator.mediaDevices) {
     try { const stream = await navigator.mediaDevices.getUserMedia({audio: true});
       const type = ['audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
@@ -3751,23 +3758,27 @@ async function spStart(){
         mr.onstop = () => { if (parts.length) R.blobs.push(new Blob(parts, {type: mr.mimeType || type})); if (R.on) next(); else if (R.done) R.done(); };
         mr.start(); R.cut = setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 25000); };
       next(); S.phase = 'rec'; S.t0 = Date.now(); spTick(); render(); return;
-    } catch(e) { S.err = '没拿到麦克风权限'; }
+    } catch(e) { S.err = '没拿到麦克风权限（' + (e && (e.name || e.message) || '') + '）'; }
   }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { S.phase = 'ready'; S.err = (S.err ? S.err + '。' : '') + '这台设备不能语音识别。在「家长 → 设置」填智谱密钥后再试。'; render(); return; }
   const sr = new SR(); sr.lang = 'en-US'; sr.continuous = true; sr.interimResults = false;
-  SREC = {sr, on: true, t0: Date.now()}; sr.onresult = e => { for (let k = e.resultIndex; k < e.results.length; k++) if (e.results[k].isFinal) S.said += ' ' + e.results[k][0].transcript; };
-  sr.onerror = e => { if (/not-allowed|service-not-allowed|network|audio-capture|language-not-supported/.test(e.error)) { S.err = '浏览器不给用语音识别。在「家长 → 设置」填智谱密钥后再试。'; S.phase = 'ready'; SREC = null; render(); } };
-  sr.onend = () => { if (SREC && SREC.on) { try { sr.start(); } catch(e) {} } };
-  sr.start(); S.phase = 'rec'; S.t0 = Date.now(); spTick(); render();
+  const R = SREC = {sr, on: true, t0: Date.now()}; sr.onresult = e => { for (let k = e.resultIndex; k < e.results.length; k++) if (e.results[k].isFinal) S.said += ' ' + e.results[k][0].transcript; };
+  sr.onerror = e => { S.lastErr = e.error; if (/not-allowed|service-not-allowed|network|audio-capture|language-not-supported/.test(e.error)) { S.err = '浏览器不给用语音识别（' + e.error + '）。在「家长 → 设置」填智谱密钥后再试。'; S.phase = 'ready'; if (SREC === R) SREC = null; R.on = false; render(); } };
+  sr.onend = () => { if (SREC === R && R.on) { try { sr.start(); } catch(e) {} } };
+  try { sr.start(); } catch(e) { await new Promise(r => setTimeout(r, 300)); sr.start(); }   // 上一次识别还没完全停掉时第一次 start 会抛，等一下再来
+  S.phase = 'rec'; S.t0 = Date.now(); spTick(); render();
 }
 function spTick(){ clearInterval(window.__spT); window.__spT = setInterval(() => { const S = state.sp; if (!S || S.phase !== 'rec') return clearInterval(window.__spT); const left = 50 - Math.floor((Date.now() - S.t0) / 1000); const el = $('#sp-left'); if (el) el.textContent = Math.max(0, left); if (left <= 0) spStop(); }, 500); }
 async function spStop(){
-  const S = state.sp; if (!SREC || !S || S.phase !== 'rec') return; const R = SREC; R.on = false; S.sec = Math.round((Date.now() - S.t0) / 1000); S.phase = 'busy'; render();
+  const S = state.sp;
+  if (!S || S.phase !== 'rec') { toast(S && S.phase === 'busy' ? '正在识别，等一下' : '还没开始录，先点「开始朗读」'); return; }
+  if (!SREC) { S.phase = 'ready'; S.err = '录音中途被打断了（切过页面、来电或退到后台都会），再点「开始朗读」读一遍。'; clearInterval(window.__spT); render(); return; }
+  const R = SREC; R.on = false; S.sec = Math.round((Date.now() - S.t0) / 1000); S.phase = 'busy'; render();
   try {
     if (R.sr) { R.sr.stop(); await new Promise(r => setTimeout(r, 800)); }
     else { clearTimeout(R.cut); await new Promise(res => { R.done = res; if (R.mr && R.mr.state === 'recording') R.mr.stop(); else res(); }); R.stream.getTracks().forEach(t => t.stop());
-      let txt = ''; for (const b of R.blobs) txt += ' ' + await aiASR(b); S.said = txt; }
+      let txt = ''; for (const b of R.blobs) txt += ' ' + await Promise.race([aiASR(b), new Promise((_, rej) => setTimeout(() => rej(new Error('识别超时，网络太慢')), 25000))]); S.said = txt; }
   } catch(e) { S.err = e.noMoney ? '智谱语音识别余额不足（0.06 元/分钟）。先用设备自带识别，或者去智谱充值。' : '识别失败：' + e.message; if (e.noMoney) { AI.asrOff = Date.now(); saveAI(); } }
   if (SREC === R) SREC = null;
   if (state.sp !== S) return;
@@ -3797,7 +3808,8 @@ function vSpeak(){
   h += `<div class="card"><div class="row"><h3 style="margin:0">${esc(x.title)}</h3><span class="spacer"></span><span class="small faint">${x.words} 词</span></div>
     <div style="font-family:Georgia,serif;font-size:19px;line-height:1.8;margin:10px 0">${S.phase === 'result' ? markedEn(x.text, S.res.ok) : esc(x.text)}</div>
     <div class="row"><button class="btn sm" data-act="spplay">${SPK} 听示范</button></div></div>`;
-  if (S.phase === 'rec') h += `<div class="card" style="text-align:center"><div class="mic rec" style="margin:6px auto;width:90px;height:90px;border-radius:50%;background:var(--danger);display:flex;align-items:center;justify-content:center">${MIC.replace('<svg','<svg style="width:40px;height:40px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…还剩 <b id="sp-left">50</b> 秒</div><button class="btn primary" style="margin-top:10px" data-act="spstop">读完了</button></div>`;
+  if (S.phase === 'starting') h += `<div class="card empty">正在打开麦克风…<br><span class="small faint">手机问「允许使用麦克风吗」就点允许</span></div>`;
+  else if (S.phase === 'rec') h += `<div class="card" style="text-align:center"><div class="mic rec" style="margin:6px auto;width:90px;height:90px;border-radius:50%;background:var(--danger);display:flex;align-items:center;justify-content:center">${MIC.replace('<svg','<svg style="width:40px;height:40px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…还剩 <b id="sp-left">50</b> 秒</div><button class="btn primary" style="margin-top:10px" data-act="spstop">读完了</button></div>`;
   else if (S.phase === 'busy') h += `<div class="card empty">正在对照原文…</div>`;
   else if (S.phase === 'result') { const p = Math.round(S.res.score * 100);
     h += `<div class="card" style="text-align:center"><div style="font-family:var(--mono);font-size:40px;font-weight:700;color:${p >= 95 ? 'var(--good)' : 'var(--amber)'}">${p}%</div><div class="muted">读对 ${S.res.got}/${S.res.total} 个词 · 用了 ${S.sec} 秒${S.sec > 50 ? '（考试只给 50 秒）' : ''}</div><p class="small faint" style="margin:8px 0 0">标黄的是没识别到的词：可能漏读了，也可能发音不清。先听示范里这几个词怎么读，再读一遍。</p>
