@@ -3758,6 +3758,7 @@ function tingPlan(t, subj){
   }
   if (subj === 'review') { for (const s of avail.filter(heard).sort(byOld)) { if (sum >= tgt - 60) break; take(s); }
     const m = avail.find(s => s.subj === 'sx' && !heard(s)) || avail.filter(s => s.subj === 'sx' && old(s)).sort(byOld)[0]; if (m) take(m);   // 周日带一段数学概念问答
+    for (const s of avail.filter(s => s.subj === 'yw' && !heard(s) && s.kind !== 'recite')) { if (sum >= tgt - 60) break; take(s); }   // 听过的还不多：补语文新段凑够时长
     if (out.length) return out; subj = 'yw'; }
   for (const s of avail.filter(s => s.subj === subj && !heard(s) && s.kind !== 'recite')) { if (sum >= tgt - 100) break; take(s); }
   if (subj === 'yw') { const rc = avail.find(s => s.kind === 'recite' && !heard(s)) || avail.filter(s => s.kind === 'recite' && old(s)).sort(byOld)[0]; if (rc) take(rc); }   // 语文日带一篇古诗文跟背
@@ -3769,9 +3770,9 @@ function tingPlan(t, subj){
 // 当天的计划算一次就定住（存本机），放完以后不会因为「听过了」又换成新的一组；换科目 / 改时长才重算
 function tingList(t){
   const subj = tingSubjToday(t), C = lsGet('observer:tingPlan'), byId = id => TING.idx.segs.find(s => s.id === id);
-  let L = C && C.d === t && C.s === subj && C.m === tingMin() ? C.ids.map(byId).filter(Boolean) : null;
-  if (!L || !L.length) { L = tingPlan(t, subj); if (L.length && t === today()) lsSet('observer:tingPlan', {d: t, s: subj, m: tingMin(), ids: L.map(s => s.id)}); }
-  let p = 0; return L.map(s => { const o = Object.assign({}, s, {start: p, end: p + s.dur}); p += s.dur; return o; });
+  let L = C && C.d === t && C.s === subj && C.m === tingMin() ? C.ids.map(byId).filter(Boolean) : null, rv = C && C.rv || null;
+  if (!L || !L.length) { L = tingPlan(t, subj); const H = tingLog(); rv = L.filter(s => H[s.id] && H[s.id].d < t).map(s => s.id); if (L.length && t === today()) lsSet('observer:tingPlan', {d: t, s: subj, m: tingMin(), ids: L.map(s => s.id), rv}); }
+  const RV = new Set(rv || []); let p = 0; return L.map(s => { const o = Object.assign({}, s, {start: p, end: p + s.dur, rv: RV.has(s.id)}); p += s.dur; return o; });
 }
 const tingDev = () => { let d = lsGet('observer:dev'); if (!d) { d = Math.random().toString(36).slice(2, 8); lsSet('observer:dev', d); } return d; };
 const tingSecOf = date => { const L = tingLog(), pre = 't:' + date; let sec = 0; for (const k in L) if (k === pre || k.startsWith(pre + ':')) sec += L[k].s || 0; return sec; };
@@ -3876,18 +3877,20 @@ function tingAnswer(id, ok){
   toast(ok ? '记下了' : `记下了，「${kpName(s.subj, s.lesson) || s.title}」进了弄懂知识点`);
 }
 const tingAnswered = id => { const r = tingLog()[id]; return r && r.rd === today() ? r.r : ''; };
-function tingAskHTML(id, label){ const s = TING.idx && TING.idx.segs.find(x => x.id === id); if (!s || tingAnswered(id)) return '';
-  return `<div class="row" style="gap:8px;margin-top:8px"><span class="small muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label || '刚才那题'}</span><button class="btn sm" data-act="tingans" data-v="ok" data-s="${id}">答上了</button><button class="btn sm ghost" data-act="tingans" data-v="no" data-s="${id}">没答上</button></div>`; }
+function tingAskHTML(id, label){ const s = TING.idx && TING.idx.segs.find(x => x.id === id); if (!s || tingAnswered(id)) return ''; if (!label) label = s.kind === 'recite' ? '背下来了吗' : s.q;
+  return `<div class="row" style="gap:8px;margin-top:8px"><span class="small muted" style="flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${label || '刚才那题'}</span><button class="btn sm" data-act="tingans" data-v="ok" data-s="${id}">答上了</button><button class="btn sm ghost" data-act="tingans" data-v="no" data-s="${id}">没答上</button></div>`; }
 const tingPlaying = () => !!(TING.a && TING.on && (!TING.a.paused || TING.loading));
 function tingNowHTML(){
   const t = TING.cur; if (!t) return '';
   const on = tingPlaying();
-  return `<div class="ear-np" style="margin-top:12px"><div class="t"><span class="small faint">${TING_KIND[t.kind] || TING_SUBJ[t.subj] || ''} · 第 ${TING.i + 1}/${TING.list.length} 段</span><b>${esc(t.title)}</b><div class="ear-bar"><i id="ting-bar"></i></div></div>
-    <button class="btn ghost tbtn" data-act="tingnext" data-v="-1" aria-label="上一段">${SVG_PREV}</button><button class="btn primary tbtn big" data-act="tingpp" aria-label="${on ? '暂停' : '继续'}">${TING.loading ? '<span class="small">…</span>' : on ? SVG_PAUSE : SVG_PLAY}</button><button class="btn ghost tbtn" data-act="tingnext" data-v="1" aria-label="下一段">${SVG_NEXT}</button></div>` + (TING.ask ? tingAskHTML(TING.ask, '刚才那题「' + esc((TING.idx.segs.find(x => x.id === TING.ask) || {}).title || '') + '」') : '');
+  const ended = !!(TING.a && !TING.on && (TING.a.ended || (TING.a.duration && TING.a.currentTime >= TING.a.duration - 0.3)));
+  return `<div class="ear-np" style="margin-top:12px"><div class="t"><span class="small faint">${ended ? '放完了 · ▶ 从头再放' : `${TING_KIND[t.kind] || TING_SUBJ[t.subj] || ''} · 第 ${TING.i + 1}/${TING.list.length} 段`}</span><b>${esc(t.title)}</b><div class="ear-bar"><i id="ting-bar"></i></div></div>
+    <button class="btn ghost tbtn" data-act="tingnext" data-v="-1" aria-label="上一段">${SVG_PREV}</button><button class="btn primary tbtn big" data-act="tingpp" aria-label="${on ? '暂停' : '继续'}">${TING.loading ? '<span class="small">…</span>' : on ? SVG_PAUSE : SVG_PLAY}</button><button class="btn ghost tbtn" data-act="tingnext" data-v="1" aria-label="下一段">${SVG_NEXT}</button></div>` + (TING.ask ? tingAskHTML(TING.ask) : '');
 }
 const tingMins = list => Math.max(1, Math.round(list.reduce((a, s) => a + s.dur, 0) / 60));
 // 科目一排横滑，就在播放卡上：点哪科立刻换成哪科；正在放的话直接接着放新的一组。今天轮到的科目带「今天」
 function tingChipsHTML(){
+  setTimeout(() => { const r = document.querySelector('.chiprow'), on = r && r.querySelector('.chip.on'); if (r && on && (on.offsetLeft + on.offsetWidth > r.scrollLeft + r.clientWidth || on.offsetLeft < r.scrollLeft)) r.scrollLeft = Math.max(0, on.offsetLeft - 12); }, 0);
   const t = today(), cur = tingSubjToday(t), ex = tingExam(t), rota = ex ? 'exam' : TING_ROTA[P(t).getDay()];
   const keys = (ex ? ['exam'] : []).concat(['yw','ls','dl','sw','df','sx','review']);
   return `<div class="chiprow">${keys.map(k => `<button class="chip ${k === cur ? 'on' : ''}" data-act="tingsubj" data-v="${k}">${TING_SUBJ[k]}${k === rota ? '<span class="chip-sub">今天</span>' : ''}</button>`).join('')}</div>`;
@@ -3914,13 +3917,13 @@ function vTing(){
   let h = `<div class="row">${fromToday ? '<button class="btn sm ghost" data-act="tab" data-v="today">‹ 今天</button>' : backBtn('home')}<h2 style="margin:0">听讲解</h2></div>` + tingPlayerHTML(true);
   if (TING.st !== 'ok') return h;
   const t = today(), list = tingList(t), L = tingLog(), wk = tingWeek(t), subj = tingSubjToday(t);
-  if (list.length) h += `<div style="margin-top:12px">` + list.map((s, i) => `<button class="ear-row ${TING.cur && TING.cur.id === s.id ? 'on' : ''}" data-act="tingpick" data-v="${i}"><span class="k">${TING_KIND[s.kind] || (L[s.id] ? '复习' : TING_SUBJ[s.subj])}</span><span style="flex:1;min-width:0">${esc(s.title)}${tingAnswered(s.id) === 'ok' ? ' <span class="small" style="color:var(--good,#2f7a66)">✓</span>' : tingAnswered(s.id) === 'no' ? ' <span class="small" style="color:var(--bad,#b5402a)">没答上</span>' : ''}</span><span class="small faint">${Math.round(s.dur / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div>`;
+  if (list.length) h += `<div style="margin-top:12px">` + list.map((s, i) => `<button class="ear-row ${TING.cur && TING.cur.id === s.id ? 'on' : ''}" data-act="tingpick" data-v="${i}"><span class="k">${TING_KIND[s.kind] || (s.rv ? '复习' : TING_SUBJ[s.subj])}</span><span style="flex:1;min-width:0">${esc(s.title)}${tingAnswered(s.id) === 'ok' ? ' <span class="small" style="color:var(--good,#2f7a66)">✓</span>' : tingAnswered(s.id) === 'no' ? ' <span class="small" style="color:var(--bad,#b5402a)">没答上</span>' : ''}</span><span class="small faint">${Math.round(s.dur / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div>`;
   // 设置和进度收在一行小字里，不占主视线
   const cnt = s => { const A = TING.idx.segs.filter(x => x.subj === s && x.week <= wk); return A.length ? `${A.filter(x => L[x.id]).length}/${A.length}` : ''; };
   h += `<details data-keep="tingS" ${(state.keep || {}).tingS ? 'open' : ''} style="margin-top:10px"><summary class="small muted">设置 · 第 ${wk} 周 · 已听 ${['yw','ls','dl','sw','df','sx'].filter(cnt).map(k => TING_SUBJ[k] + ' ' + cnt(k)).join('，')}</summary>
     <div class="row" style="gap:6px;margin-top:8px"><span class="small muted">每天约</span>${[5,8,12].map(m => `<button class="chip ${m === tingMin() ? 'on' : ''}" data-act="tingmin" data-v="${m}">${m} 分钟</button>`).join('')}</div></details></div>`;
   const s = TING.cur || list[0];
-  if (s) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${TING.cur ? '正在放' : '第一段'} · ${TING_KIND[s.kind] || TING_SUBJ[s.subj]}</div><h3 style="margin:0 0 10px">${esc(s.title)}</h3>${s.paras.map(p => `<p>${esc(p)}</p>`).join('')}${s.kind === 'recite' ? '' : `<p><b>问题：</b>${esc(s.q)}</p>`}<details data-keep="tingA" ${(state.keep || {}).tingA ? 'open' : ''}><summary class="small">看答案</summary><p style="margin-top:8px">${esc(s.a)}</p></details>${tingAskHTML(s.id, '这题答上了吗')}</div>`;
+  if (s) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${TING.cur ? '正在放' : '第一段'} · ${TING_KIND[s.kind] || TING_SUBJ[s.subj]}</div><h3 style="margin:0 0 10px">${esc(s.title)}</h3>${s.paras.map(p => `<p>${esc(p)}</p>`).join('')}${s.kind === 'recite' ? '' : `<p><b>问题：</b>${esc(s.q)}</p>`}${s.kind === 'recite' ? '' : `<details data-keep="tingA" ${(state.keep || {}).tingA ? 'open' : ''}><summary class="small">看答案</summary><p style="margin-top:8px">${esc(s.a)}</p></details>`}${tingAskHTML(s.id, s.kind === 'recite' ? '背下来了吗' : '这题答上了吗')}</div>`;
   h += `<p class="small faint" style="margin:0 4px 16px">按学校进度只放教到的内容。周一、四语文，周二历史，周三地理，周五生物，周六道法，周日复习加一段数学；语文日最后带一篇古诗文跟背。每段放完按「答上了 / 没答上」，没答上的课直接进「弄懂知识点」；期中、期末前 14 天改成错得多的课先放。锁屏也能放。</p>`;
   return h;
 }
@@ -5018,6 +5021,7 @@ const ACT = {
   tingplay: () => tingStart(0),
   tingpick: el => tingSeek(+el.dataset.v),
   tingpp: () => { const a = TING.a; if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
+    if (a.ended || (a.duration && a.currentTime >= a.duration - 0.3)) return tingSeek(0);   // 放完了：从头再放
     if (tingPlaying()) { a.pause(); TING.on = false; return; }
     TING.on = true; TING.err = ''; TING.lt = null; a.play().catch(() => tingStart(TING.i)); },
   tingnext: el => tingSeek(TING.i + (+el.dataset.v)),
