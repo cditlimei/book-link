@@ -786,6 +786,26 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 .tile .tbadge{background:linear-gradient(135deg,var(--vc),color-mix(in srgb,var(--vc) 70%,#fff));color:#fff;box-shadow:0 3px 8px color-mix(in srgb,var(--vc) 35%,transparent)}
 .wk .c{transition:transform .12s} .wk .c:not(.blank){background:color-mix(in srgb,var(--v1) 12%,var(--surface2))}
 .legend .sw,.pill .sw{border-radius:3px}
+
+/* ===== v6c 学习子页面：继承入口方块的颜色 ===== */
+#main[data-lv=card]{--vc:hsl(262 72% 60%);--vc2:hsl(300 70% 62%)} #main[data-lv=recite]{--vc:hsl(152 62% 42%);--vc2:hsl(190 62% 46%)}
+#main[data-lv=read]{--vc:hsl(180 62% 40%);--vc2:hsl(218 62% 50%)} #main[data-lv=kp]{--vc:hsl(42 92% 50%);--vc2:hsl(80 70% 46%)}
+#main[data-lv=speak]{--vc:hsl(335 72% 58%);--vc2:hsl(13 80% 60%)} #main[data-lv=pe]{--vc:hsl(4 78% 58%);--vc2:hsl(42 90% 55%)}
+#main[data-lv=books]{--vc:hsl(205 60% 48%);--vc2:hsl(243 60% 58%)} #main[data-lv=ear]{--vc:hsl(290 60% 58%);--vc2:hsl(328 70% 60%)}
+#main[data-lv=ting]{--vc:hsl(16 85% 56%);--vc2:hsl(54 85% 52%)} #main[data-lv=mix]{--vc:hsl(222 78% 56%);--vc2:hsl(262 72% 60%)}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]){--sub:linear-gradient(135deg,var(--vc,var(--v1)),var(--vc2,var(--v2)))}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) > .row:first-of-type{background:var(--sub);color:#fff;padding:12px 14px;border-radius:18px;margin:0 0 14px;box-shadow:0 10px 24px color-mix(in srgb,var(--vc,var(--v1)) 35%,transparent);position:relative;overflow:hidden;flex-wrap:wrap}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) > .row:first-of-type::before{content:'';position:absolute;right:-30px;top:-50px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.16);pointer-events:none}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) > .row:first-of-type h2{color:#fff;position:relative}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) > .row:first-of-type .btn.ghost{background:rgba(255,255,255,.2);color:#fff;position:relative}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) > .row:first-of-type .small,#main[data-lv]:not([data-lv=home]):not([data-lv=""]) > .row:first-of-type .faint,#main[data-lv]:not([data-lv=home]):not([data-lv=""]) > .row:first-of-type .muted{color:rgba(255,255,255,.85) !important;position:relative}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) > .row:first-of-type a{color:#fff}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) .btn.primary{background:var(--sub);border:0;box-shadow:0 8px 20px color-mix(in srgb,var(--vc,var(--v1)) 38%,transparent);font-weight:600}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) .chip.on,#main[data-lv]:not([data-lv=home]):not([data-lv=""]) .seg button.on{background:var(--sub);color:#fff}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) .pill.accent{background:color-mix(in srgb,var(--vc) 16%,var(--surface));color:var(--vc)}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) .card{border-top:3px solid transparent;border-image:var(--sub) 1;border-radius:var(--r)}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) .card{border-top:0;box-shadow:0 0 0 1.5px color-mix(in srgb,var(--vc) 14%,transparent) inset,var(--shadow)}
+#main[data-lv]:not([data-lv=home]):not([data-lv=""]) .ear-bar i,#main[data-lv]:not([data-lv=home]):not([data-lv=""]) div[style*="background:var(--accent)"]{background:var(--sub) !important}
 </style>
 </head>
 <body>
@@ -1794,6 +1814,7 @@ function render(){
   const exKey = el => el.id || ['ex', el.dataset.ex, el.dataset.s, el.dataset.t || ''].join(':');
   const exSnap = state.examEdit && $('.examform') ? {id: state.examEdit, v: [...document.querySelectorAll('.examform input, .examform textarea')].map(el => [exKey(el), el.value])} : null;
   $('#main').innerHTML = v();
+  $('#main').dataset.lv = state.tab === 'learn' && state.learn ? (state.learn.view || 'home') : '';
   { const L = state.learn || {}; document.body.classList.toggle('wide', (state.tab === 'today' && !!$('#main .tgrid')) || (state.tab === 'learn' && (!L.view || L.view === 'home'))); }   // iPad 横屏：这几页放宽，阅读类页面保持窄栏
   peSnap.forEach((v, k) => { const e = document.getElementById('pe-in-' + (k + 1)); if (e && v && !e.value) e.value = v; });
   if (exSnap && exSnap.id === state.examEdit) { const m = new Map(exSnap.v); document.querySelectorAll('.examform input, .examform textarea').forEach(el => { const k = exKey(el); if (m.has(k) && el.type !== 'file') el.value = m.get(k); }); }
