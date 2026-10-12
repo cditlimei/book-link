@@ -2521,9 +2521,10 @@ function vWiz(){
   const dots = w.list.map((sid, k) => `<i class="${k === w.i ? 'cur' : filledRec(dd.subj[sid]) ? 'done' : ''}"></i>`).join('');
   let h = `<div class="wiz" role="dialog" aria-label="一步一步填"><div class="wiz-top"><div class="wiz-dots">${dots}</div><span class="small faint num">${Math.min(w.i+1, w.list.length)}/${w.list.length}</span><button class="wiz-x" data-act="wizclose" aria-label="关闭">×</button></div><div class="wiz-body">`;
   if (w.i >= w.list.length) {
-    h += `<div class="wiz-q" style="margin-top:24px">${w.list.length ? '填完了 ✓' : '今天都没作业 ✓'}</div>`;
+    const miss = w.list.filter(x => !filledRec(dd.subj[x])).length;
+    h += `<div class="wiz-q" style="margin-top:24px">${!w.list.length ? '今天都没作业 ✓' : miss ? `还有 ${miss} 科没填` : '填完了 ✓'}</div>${miss ? `<p class="small faint" style="margin:-10px 0 12px">写完了点下面那科补上就行，其余已经记好。</p>` : ''}`;
     w.list.forEach((sid, k) => { const s = subjById(sid), r = dd.subj[sid], n = itemsOn(d, sid).length;
-      h += `<div class="wiz-sum" data-act="wizgo" data-v="${k}" style="cursor:pointer"><span class="dot" style="background:${s.color}"></span><b style="width:3em">${esc(s.name)}</b><span class="muted">${!r ? '没填' : r.none ? '没作业' : [r.min+' 分钟', n ? '记了 ' + n + ' 道题' : ''].filter(Boolean).join(' · ')}</span></div>`; });
+      h += `<div class="wiz-sum" data-act="wizgo" data-v="${k}" style="cursor:pointer"><span class="dot" style="background:${s.color}"></span><b style="width:3em">${esc(s.name)}</b><span class="muted">${!filledRec(r) ? '没填，点这里补' : r.none ? '没作业' : [r.min+' 分钟', n ? '记了 ' + n + ' 道题' : ''].filter(Boolean).join(' · ')}</span></div>`; });
     const left = redoLeftToday();
     h += `</div><div class="wiz-foot">${left ? `<button class="btn good" data-act="wizredo">去重做 ${left} 道错题</button>` : ''}<button class="btn ${left ? '' : 'primary'}" data-act="wizclose">完成</button></div></div>`;
     return h;
@@ -2554,7 +2555,8 @@ function vWiz(){
     for (const t of ET) { const n = its.filter(it => it.type === t.k).length;
       h += `<div class="cnt sm"><span class="nm"><i class="sw" style="background:${ET_COLOR[t.k]};width:12px;height:12px"></i>${typeNameS(sid, t.k)}</span><button data-act="wizerr" data-t="${t.k}" data-v="-1" aria-label="减少">−</button><span class="v">${n}</span><button data-act="wizerr" data-t="${t.k}" data-v="1" aria-label="增加">+</button></div>`; }
     h += `<button class="btn ghost" style="width:100%;margin-top:6px" data-act="wizmin" data-v="none">今天没有${esc(s.name)}作业</button>`;
-    foot += `<button class="btn primary" data-act="wiznext">${w.i + 1 < w.list.length ? '下一科 ›' : '完成'}</button>`;
+    const empty = !r.none && !(r.min > 0);
+    foot += `<button class="btn primary" data-act="wiznext">${empty ? (w.i + 1 < w.list.length ? '还没写，先跳过 ›' : '还没写，先跳过') : w.i + 1 < w.list.length ? '下一科 ›' : '完成'}</button>`;
     const rest = w.list.slice(w.i).filter(x => !filledRec(dd.subj[x])).length;
     if (rest > 1 && w.list.slice(0, w.i).some(x => filledRec(dd.subj[x]))) foot += `<button class="btn ghost" style="white-space:nowrap" data-act="wizrest">其余 ${rest} 科没作业</button>`;
   } else if (w.step === 'intr') {
@@ -5241,7 +5243,7 @@ const ACT = {
   wiznext: () => { const w = state.wiz, sid = w.list[w.i];
     const its = itemsOn(state.date, sid);
     if (w.step === 'min') { const r = (dayObj(state.date) || {subj:{}}).subj[sid] || {};
-      if (!r.none && !(r.min > 0)) return toast('先选做了多久');
+      if (!r.none && !(r.min > 0)) { toast(`${subjById(sid).name}先留着，写完再回来填`); return wizGo('next'); }
       if (its.length) return wizGo('detail');
       return r.intr && r.intr !== 'none' ? wizGo('stuck') : wizGo('next'); }
     if (w.step === 'detail') return wizGo('next');
