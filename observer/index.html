@@ -2513,9 +2513,13 @@ function wizStart(){
   const anyHist = subs.some(s => had(s.id));
   let list = subs.map(s => s.id);
   if (!fresh) { const act = list.filter(x => !((dd.subj[x] || {}).none)); if (act.length) list = act; i = Math.max(0, list.findIndex(x => !filledRec(dd.subj[x]))); }
-  state.wiz = {list, all: subs.map(s => s.id), i, step: fresh ? 'pick' : 'min', canPick: true, pick: fresh ? subs.filter(s => !anyHist || had(s.id)).map(s => s.id) : null}; render();
+  state.wiz = {list, all: subs.map(s => s.id), i, step: fresh ? 'pick' : 'min', canPick: true, skipFilled: !fresh, pick: fresh ? subs.filter(s => !anyHist || had(s.id)).map(s => s.id) : null}; render();
 }
-function wizGo(step){ const w = state.wiz; if (step === 'next') { w.i++; w.step = 'min'; } else w.step = step; render(); const b = $('.wiz-body'); if (b) b.scrollTop = 0; }
+function wizGo(step){ const w = state.wiz;
+  if (step === 'next') { w.i++; w.step = 'min';
+    // 接着填 / 从汇总页点回来补：后面已经填好的科目不用再过一遍，直接到下一个没填的，都填了就到汇总
+    if (w.skipFilled) { const dd = dayObj(state.date) || {subj:{}}; while (w.i < w.list.length && filledRec(dd.subj[w.list[w.i]])) w.i++; } }
+  else w.step = step; render(); const b = $('.wiz-body'); if (b) b.scrollTop = 0; }
 function vWiz(){
   const w = state.wiz, d = state.date, dd = dayObj(d) || {subj:{}};
   const dots = w.list.map((sid, k) => `<i class="${k === w.i ? 'cur' : filledRec(dd.subj[sid]) ? 'done' : ''}"></i>`).join('');
@@ -5229,7 +5233,7 @@ const ACT = {
       const r = rec(d, sid, true); if (o && !o.none && o.min > 0) { r.none = false; r.min = o.min; r.intr = 'none'; } else { r.none = true; r.min = 0; r.intr = 'none'; } }
     w.list = w.list.filter(x => manual.includes(x) || (lr[x] && !lr[x].none && lr[x].min > 0)); w.i = w.list.findIndex(x => manual.includes(x)); if (w.i < 0) w.i = w.list.length;
     w.step = 'min'; w.pick = null; save(); render(); toast(manual.length ? '其余按上周记好了，这几科自己填一下' : '按上周同一天记好了，哪科不一样点它改'); },
-  wizgo: el => { const w = state.wiz; w.i = +el.dataset.v; w.step = 'min'; render(); },
+  wizgo: el => { const w = state.wiz; w.i = +el.dataset.v; w.step = 'min'; w.skipFilled = true; render(); },
   wizpick: el => { const w = state.wiz, v = el.dataset.v; w.pick = w.pick.includes(v) ? w.pick.filter(x => x !== v) : w.pick.concat([v]); render(); },
   wizpicked: () => { const w = state.wiz;
     for (const sid of w.list) { const r = rec(state.date, sid, true); if (!w.pick.includes(sid)) { r.none = true; r.min = 0; r.intr = 'none'; } else if (r.none) r.none = false; }
