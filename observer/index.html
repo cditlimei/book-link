@@ -3570,7 +3570,9 @@ function extraTask(d){
 const EAR = {idx:null, st:'none', a:null, list:[], i:0, until:0, on:false, cur:null, keys:{}, dl:{}, url:null, err:'', lt:null};
 const EAR_KIND = {reading:'课文', culture:'阅读', words:'单词'};
 const EAR_SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-const earUnitAuto = () => enUnit(today()) || 1;
+// 她 2026-10-12 定：不要一个单元连放 16 天，要轮换。隔天放当前单元，另一天在已学过的前面单元里轮着放（Unit 1 期间只有 Unit 1）
+function earRota(t){ const cur = enUnit(t) || 1; if (cur <= 1) return 1; const k = dayDiff(t.slice(0, 4) + '-01-01', t); return k % 2 === 0 ? cur : (Math.floor(k / 2) % (cur - 1)) + 1; }
+const earUnitAuto = () => earRota(today());
 // 手动选的单元：自动进度往前走了就作废，回到按日期估的单元（免得一直停在老单元）
 const earUnit = () => { const o = lsGet('observer:earUnit'); return o && o.a === earUnitAuto() ? o.u : earUnitAuto(); };
 const earMin = () => lsGet('observer:earMin') || 15;
@@ -3692,7 +3694,7 @@ function vEar(){
   if (EAR.st === 'missing') return h + `<div class="card empty">课文音频还没传上去。</div>`;
   if (EAR.st !== 'ok') return h + `<div class="card empty">${EAR.st === 'err' ? '课文音频没加载到，联网后再打开。' : '加载中…'}</div>`;
   const u = earUnit(), auto = earUnitAuto(), list = earPlaylist(), n = earToday();
-  h += `<div class="card" id="earbox"><div class="small muted">${esc(EAR.idx.book || '')} · 按开学日期估计现在学到 Unit ${auto}${n ? ` · 今天听了 ${n} 分钟` : ''}</div>`;
+  h += `<div class="card" id="earbox"><div class="small muted">${esc(EAR.idx.book || '')} · 按开学日期估计学到 Unit ${enUnit(today()) || 1} · 今天轮到 Unit ${auto}（隔天放当前单元，另一天轮前面学过的）${n ? ` · 今天听了 ${n} 分钟` : ''}</div>`;
   h += `<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">${[1,2,3,4,5,6,7,8].map(k => `<button class="chip ${k === u ? 'on' : ''}" data-act="earunit" data-v="${k}">Unit ${k}</button>`).join('')}</div>`;
   const d = earDay(); h += `<div class="small faint" style="margin-top:8px">这一轮 ${Math.round(d.dur / 60)} 分钟${earHave(d) ? ' · 已下载，没网也能放' : ' · 第一次放要联网下载（约 ' + Math.max(1, Math.round((d.size || 0) / 1048576)) + ' MB）'}</div>`;
   h += `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">放多久</span>${[10,15,20,30].map(m => `<button class="chip ${m === earMin() ? 'on' : ''}" data-act="earmin" data-v="${m}">${m} 分钟</button>`).join('')}</div>`;
