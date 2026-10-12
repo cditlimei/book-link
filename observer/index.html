@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f1e8">
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://api.github.com https://open.bigmodel.cn; media-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://api.github.com https://open.bigmodel.cn; media-src 'self' blob: data:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
@@ -446,6 +446,7 @@ a{color:var(--accent);text-decoration:none}
 .tile[data-v=read]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z'/><path d='M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z'/></svg>");--ict:#e1f0ef;--icc:#2a7270}
 .tile[data-v=speak]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5 11a7 7 0 0 0 14 0M12 18v3'/></svg>");--ict:#f8e8ee;--icc:#a1476a}
 .tile[data-v=ear]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M4 15v-3a8 8 0 0 1 16 0v3'/><rect x='3' y='14' width='4' height='7' rx='1.5'/><rect x='17' y='14' width='4' height='7' rx='1.5'/></svg>");--ict:#e3f3ee;--icc:#2f7a66}
+.tile[data-v=ting]{--ic:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M4 5h7a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H4z'/><path d='M14 8a3 3 0 0 1 3-3h3v13h-5'/><path d='M17 9v3M20 8v5'/></svg>");--ict:#efe9f7;--icc:#6b4f9e}
 .ear-np{display:flex;align-items:center;gap:10px;margin-top:10px}.ear-np .t{flex:1;min-width:0}.ear-np .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ear-bar{height:4px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}.ear-bar i{display:block;height:100%;width:0;background:var(--accent)}
 .ear-row{display:flex;align-items:center;gap:10px;width:100%;padding:10px 0;border-top:1px solid var(--line);background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;color:var(--ink);font:inherit}
@@ -467,6 +468,7 @@ a{color:var(--accent);text-decoration:none}
 .tile[data-v=recite]{--ict:#18301f;--icc:#7ccfa5}
 .tile[data-v=read]{--ict:#15302f;--icc:#79cfcb}
 .tile[data-v=ear]{--ict:#18302b;--icc:#8fd3bf}
+.tile[data-v=ting]{--ict:#2a2238;--icc:#c3aee8}
 .tile[data-v=speak]{--ict:#3a1f2a;--icc:#eea3c0}
 .tile[data-v=pe]{--ict:#3a1f1c;--icc:#f0a098}
 .tile[href="../math/"]{--ict:#1f2b3d;--icc:#9dbdf0}
@@ -1661,6 +1663,7 @@ ${isToday ? `<button class="navbtn" data-act="wkshow" aria-label="看这周">${s
   if (isToday) {
     loadLib();
     h += earCard();
+    h += tingCard();
     const hr = new Date().getHours() + new Date().getMinutes()/60, late = hr >= 21.75;
     const wq = LIB.words ? wordQueue().length : 0;
     const wDone = Object.values(DB.words).filter(s => (s.hist||[]).some(x => x.d === today())).length;
@@ -3623,6 +3626,7 @@ function earAudio(){
 // 必须在点击里同步调用：先放一段静音把播放器「解锁」，iOS 才允许后面下载解密完再出声
 async function earStart(i){
   const d = earDay(); if (!d) return;
+  if (TING.on) tingStop();
   const a = earAudio(); if (!(EAR.day === d && EAR.url)) { a.src = EAR_SILENT; a.play().catch(() => {}); }
   EAR.list = earPlaylist(); EAR.until = Date.now() + earMin() * 60000; EAR.on = true; EAR.err = '';
   EAR.i = i || 0; EAR.cur = EAR.list[EAR.i]; EAR.loading = true; earUI();
@@ -3701,12 +3705,183 @@ function vEar(){
   return h;
 }
 
+/* ================= 碎片时间听讲解：语文（朝花夕拾 / 西游记 / 古诗文）、历史、地理、生物、道法 =================
+   她 2026-10-12 要的：利用碎片时间让孩子听各科知识讲解。查到的研究结论是被动反复听效果弱、听完自己回忆才有效，
+   所以每段是「讲 2 分钟 → 出一个问题 → 停 3 秒让他开口答 → 再说答案」。讲解是自写的（~/math-plan/tools/ting_src），
+   音频按段加密存私有仓库 ting/（publish_ting.py）。当天几段在本机按字节拼成一条 Blob 播放（裸 MP3 帧可直接拼），
+   播放中不换音频源，锁屏也能接着放。科目按星期轮换，进度按学校教学周门控不超前；听过的段 7 天后回放一次当复习。
+   听过记录只在本机（同磨耳朵），没网时放已下载的段。 */
+const TING = {idx:null, st:'none', a:null, list:[], i:0, on:false, cur:null, url:null, key:null, err:'', lt:null, dl:{}, loading:false, pick:null, marked:{}};
+const TING_SUBJ = {yw:'语文', ls:'历史', dl:'地理', sw:'生物', df:'道法', review:'复习'};
+const TING_ROTA = ['review', 'yw', 'ls', 'dl', 'yw', 'sw', 'df'];   // 周日复习，周一/四语文，周二历史，周三地理，周五生物，周六道法
+const tingMin = () => lsGet('observer:tingMin') || 8;
+// 教学周：秋季从 9-1、春季从寒假结束次日起算，扣掉假期天数；第 N 周只放教到第 N 周的内容
+function tingWeek(t){
+  const tk = termKey(t), y = +t.slice(0, 4), m = +t.slice(5, 7), hj = holList().find(p => p.name === '寒假' && p.to.startsWith(y + '-'));
+  const start = tk.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : hj ? addD(hj.to, 1) : y + '-03-01';
+  let days = dayDiff(start, t);
+  for (const h of holList()) { if (h.to < start || h.from > t) continue; const a = h.from < start ? start : h.from, b = h.to > t ? t : h.to; days -= dayDiff(a, b) + 1; }
+  return Math.max(1, Math.floor(days / 7) + 1);
+}
+const tingLog = () => lsGet('observer:tingLog') || {};
+const tingSubjToday = t => TING.pick && TING.pick.d === t ? TING.pick.s : TING_ROTA[P(t).getDay()];
+// 当天要放的段：本科目没听过的按课本顺序取到约定时长，再加一段 7 天前听过的当复习；复习日取听过最久的几段
+function tingPlan(t, subj){
+  const idx = TING.idx; if (!idx) return [];
+  const L = tingLog(), wk = tingWeek(t), tgt = tingMin() * 60, avail = idx.segs.filter(s => s.week <= wk);
+  const heard = s => L[s.id], old = s => heard(s) && dayDiff(L[s.id].d, t) >= 7, byOld = (a, b) => L[a.id].d < L[b.id].d ? -1 : 1;
+  let out = [], sum = 0;
+  const take = s => { if (out.includes(s)) return; out.push(s); sum += s.dur; };
+  if (subj === 'review') { for (const s of avail.filter(heard).sort(byOld)) { if (sum >= tgt) break; take(s); } if (out.length) return out; subj = 'yw'; }
+  for (const s of avail.filter(s => s.subj === subj && !heard(s))) { if (sum >= tgt - 100) break; take(s); }
+  const rv = avail.filter(s => old(s) && s.subj === subj).sort(byOld)[0] || avail.filter(old).sort(byOld)[0];
+  if (rv) take(rv);
+  if (!out.length) for (const s of avail.filter(s => s.subj === subj && heard(s)).sort(byOld)) { if (sum >= tgt) break; take(s); }   // 这科都听过了：从最早听的回放
+  return out;
+}
+// 当天的计划算一次就定住（存本机），放完以后不会因为「听过了」又换成新的一组；换科目 / 改时长才重算
+function tingList(t){
+  const subj = tingSubjToday(t), C = lsGet('observer:tingPlan'), byId = id => TING.idx.segs.find(s => s.id === id);
+  let L = C && C.d === t && C.s === subj && C.m === tingMin() ? C.ids.map(byId).filter(Boolean) : null;
+  if (!L || !L.length) { L = tingPlan(t, subj); if (L.length && t === today()) lsSet('observer:tingPlan', {d: t, s: subj, m: tingMin(), ids: L.map(s => s.id)}); }
+  let p = 0; return L.map(s => { const o = Object.assign({}, s, {start: p, end: p + s.dur}); p += s.dur; return o; });
+}
+const tingToday = () => Math.round(((lsGet('observer:tingTime') || {})[today()] || 0) / 60);
+async function loadTing(force){
+  if (!force && (TING.idx || ['loading','err','missing','nosync'].includes(TING.st))) return;
+  if (DEMO || !syncReady()) { TING.st = 'nosync'; return; }
+  TING.st = 'loading';
+  let idx = null, miss = false;
+  try { const r = await fetch(ghFileURL('ting/index.enc.json') + '?t=' + Date.now(), {headers: ghHeaders('application/vnd.github.raw+json'), cache:'no-store'});
+    if (r.ok) { idx = await decryptDB(await r.text(), SYNC.pass); IDB.set('observer:tingIdx', idx); } else if (r.status === 404) miss = true; } catch(e) {}
+  if (!idx) idx = await IDB.get('observer:tingIdx');
+  TING.idx = idx && idx.segs ? idx : null; TING.st = TING.idx ? 'ok' : miss ? 'missing' : 'err';
+  if (document.getElementById('tingbox') || (state.tab === 'learn' && (state.learn || {}).view === 'home')) render();
+  if (TING.idx) setTimeout(() => tingPrefetch().catch(() => {}), 2500);   // 提前把今天这几段下好，没网也能放
+}
+function tingSegBlob(s){
+  const ck = 'ting:' + s.id + ':' + s.ver;
+  if (TING.dl[ck]) return TING.dl[ck];
+  return TING.dl[ck] = (async () => {
+    const have = await IDB.get(ck); if (have) return have;
+    const r = await fetch(ghFileURL('ting/' + s.id + '.enc'), {headers: ghHeaders('application/vnd.github.raw+json'), cache:'no-store'});
+    if (!r.ok) throw new Error('GitHub 返回 ' + r.status);
+    const env = JSON.parse(await r.text());
+    const blob = new Blob([await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(env.iv)}, await earKey(env), b64d(env.ct))], {type:'audio/mpeg'});
+    await IDB.set(ck, blob);
+    const H = lsGet('observer:tingHave') || {}; if (H[s.id] && H[s.id] !== s.ver) IDB.del('ting:' + s.id + ':' + H[s.id]);
+    H[s.id] = s.ver; lsSet('observer:tingHave', H);
+    return blob; })().finally(() => { setTimeout(() => { delete TING.dl[ck]; }, 0); });
+}
+const tingHave = s => !!s && (lsGet('observer:tingHave') || {})[s.id] === s.ver;
+async function tingPrefetch(){ for (const s of tingList(today())) await tingSegBlob(s); if (document.getElementById('tingbox')) render(); }
+async function tingDayBlob(list){ const bs = []; for (const s of list) bs.push(await tingSegBlob(s)); return new Blob(bs, {type:'audio/mpeg'}); }
+function tingAudio(){
+  if (TING.a) return TING.a;
+  const a = TING.a = new Audio(); a.preload = 'auto';
+  a.addEventListener('ended', () => { if (a.src === EAR_SILENT || !TING.on) return; tingMark(); tingStop(true); });
+  a.addEventListener('timeupdate', tingTick);
+  a.addEventListener('play', tingUI); a.addEventListener('pause', tingUI);
+  if ('mediaSession' in navigator) { const ms = navigator.mediaSession, on = (k, f) => { try { ms.setActionHandler(k, f); } catch(e) {} };
+    on('play', () => { TING.on = true; a.play().catch(() => {}); }); on('pause', () => { a.pause(); TING.on = false; });
+    on('nexttrack', () => tingSeek(TING.i + 1)); on('previoustrack', () => tingSeek(TING.i - 1)); }
+  return a;
+}
+const tingKey = list => list.map(s => s.id + ':' + s.ver).join('|');
+// 必须在点击里同步调用：先放一段静音「解锁」播放器，iOS 才允许下载解密完再出声（同磨耳朵）
+async function tingStart(i){
+  if (EAR.on) earStop();
+  const list = tingList(today()); if (!list.length) return;
+  const a = tingAudio(), key = tingKey(list);
+  if (!(TING.key === key && TING.url)) { a.src = EAR_SILENT; a.play().catch(() => {}); }
+  TING.list = list; TING.on = true; TING.err = ''; TING.i = i || 0; TING.cur = list[TING.i]; TING.loading = true; tingUI();
+  try {
+    if (TING.key !== key || !TING.url) {
+      const b = await tingDayBlob(list); if (!TING.on) return;
+      const old = TING.url; TING.url = URL.createObjectURL(b); TING.key = key; a.src = TING.url; if (old) URL.revokeObjectURL(old);
+    }
+    await a.play(); a.currentTime = TING.cur.start; TING.lt = null; tingMeta();
+  } catch(e) { TING.on = false; TING.err = navigator.onLine === false ? '没网，今天这几段还没下载到这台设备' : '没放出来，再点一次试试'; logErr('听讲解: ' + ((e && e.message) || e), 'ting', 0, 0, e && e.stack); }
+  TING.loading = false; tingUI();
+}
+function tingSeek(i){
+  if (!TING.list.length) return;
+  const n = TING.list.length; i = (i + n) % n;
+  if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(i);
+  TING.i = i; TING.cur = TING.list[i]; TING.on = true; TING.err = ''; TING.lt = null;
+  TING.a.currentTime = TING.cur.start; TING.a.play().catch(() => {}); tingMeta(); tingUI();
+}
+function tingMeta(){ const t = TING.cur; if (t && 'mediaSession' in navigator && window.MediaMetadata) try { navigator.mediaSession.metadata = new MediaMetadata({title: t.title, artist: TING_SUBJ[t.subj] || '', album: '听讲解'}); } catch(e) {} }
+function tingStop(done){ TING.on = false; if (TING.a) TING.a.pause(); if (done) toast('今天的讲解放完了'); tingUI(); }
+// 一段听过 80% 才算听过（跳过的不算）；记最近一次日期和次数，7 天后进复习
+function tingMark(){ const t = TING.cur; if (!t || TING.marked[t.id] === today()) return; TING.marked[t.id] = today();
+  const L = tingLog(); L[t.id] = {d: today(), n: ((L[t.id] || {}).n || 0) + 1}; lsSet('observer:tingLog', L); }
+function tingTick(){
+  const a = TING.a; if (!a || a.src === EAR_SILENT || !TING.list.length) return;
+  const ct = a.currentTime;
+  if (TING.lt != null && !a.paused) { const dt = ct - TING.lt; if (dt > 0 && dt < 3) { const L = lsGet('observer:tingTime') || {}, k = today(); L[k] = (L[k] || 0) + dt; tingTick.n = (tingTick.n || 0) + 1; if (tingTick.n % 20 === 0) { for (const x of Object.keys(L)) if (x < addD(k, -60)) delete L[x]; } lsSet('observer:tingTime', L); } }
+  TING.lt = ct;
+  let i = 0; TING.list.forEach((t, k) => { if (ct >= t.start - 0.05) i = k; });
+  const t = TING.cur;
+  if (t && ct >= t.start + 0.8 * (t.end - t.start) && ct < t.end + 0.5) tingMark();   // 跳到别段去的不算听过
+  if (i !== TING.i && !TING.loading) { TING.i = i; TING.cur = TING.list[i]; tingMeta(); tingUI(); }
+  const bar = document.getElementById('ting-bar');
+  if (bar && t) bar.style.width = Math.min(100, Math.max(0, 100 * (ct - t.start) / Math.max(1, t.end - t.start))).toFixed(1) + '%';
+}
+function tingUI(){ if (document.getElementById('tingbox')) render(); }
+const tingPlaying = () => !!(TING.a && TING.on && (!TING.a.paused || TING.loading));
+function tingNowHTML(){
+  const t = TING.cur; if (!t) return '';
+  return `<div class="ear-np"><div class="t"><span class="small faint">${TING_SUBJ[t.subj] || ''} · 第 ${TING.i + 1}/${TING.list.length} 段</span><b>${esc(t.title)}</b><div class="ear-bar"><i id="ting-bar"></i></div></div>
+    <button class="btn sm ghost" data-act="tingnext" data-v="-1" aria-label="上一段">⏮</button><button class="btn sm primary" data-act="tingpp" aria-label="${tingPlaying() ? '暂停' : '继续'}">${TING.loading ? '…' : tingPlaying() ? '⏸' : '▶'}</button><button class="btn sm ghost" data-act="tingnext" data-v="1" aria-label="下一段">⏭</button></div>`;
+}
+const tingMins = list => Math.max(1, Math.round(list.reduce((a, s) => a + s.dur, 0) / 60));
+// 今天页：全天都在（上学路上、晚饭后都能点），放在磨耳朵卡片下面
+function tingCard(){
+  loadTing();
+  if (TING.st === 'nosync' || TING.st === 'missing') return '';
+  const t = today(), subj = tingSubjToday(t), n = tingToday();
+  let h = `<div class="card" id="tingbox"><div class="row"><h3 style="margin:0">听讲解</h3><span class="spacer"></span><span class="small muted">${TING_SUBJ[subj]}${n ? ` · 今天听了 ${n} 分钟` : ''}</span></div>`;
+  if (TING.st !== 'ok') return h + `<p class="small muted" style="margin:6px 0 0">${TING.st === 'err' ? '讲解音频没加载到，联网后再打开。' : '加载中…'}</p></div>`;
+  const list = tingList(t);
+  if (TING.cur) h += tingNowHTML();
+  else if (!list.length) h += `<p class="small muted" style="margin:6px 0 0">这周还没有新内容。</p>`;
+  else h += `<p class="small muted" style="margin:6px 0 10px">${list.map(s => esc(s.title)).join('、')}。约 ${tingMins(list)} 分钟，每段末尾有一个问题，先自己说再听答案。</p><button class="btn primary fillbtn" style="margin-bottom:0" data-act="tingplay">▶ 开始放</button>`;
+  if (TING.err) h += `<p class="small" style="color:var(--bad,#b5402a);margin:6px 0 0">${esc(TING.err)}</p>`;
+  return h + `<div style="text-align:right;margin-top:6px"><a href="#" class="small" data-act="golearn" data-v="ting">看文字 / 换科目</a></div></div>`;
+}
+function vTing(){
+  loadTing();
+  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">听讲解</h2></div>`;
+  if (TING.st === 'nosync') return h + `<div class="card empty">讲解音频存在家里的私有仓库，要先在「家长 → 设置」里开好同步才能放。</div>`;
+  if (TING.st === 'missing') return h + `<div class="card empty">讲解音频还没传上去。</div>`;
+  if (TING.st !== 'ok') return h + `<div class="card empty">${TING.st === 'err' ? '讲解音频没加载到，联网后再打开。' : '加载中…'}</div>`;
+  const t = today(), subj = tingSubjToday(t), list = tingList(t), n = tingToday(), L = tingLog(), wk = tingWeek(t);
+  const cnt = s => { const A = TING.idx.segs.filter(x => x.subj === s), a = A.filter(x => x.week <= wk); return `${a.filter(x => L[x.id]).length}/${a.length}`; };
+  h += `<div class="card" id="tingbox"><div class="small muted">按学校进度估计现在是第 ${wk} 周${n ? ` · 今天听了 ${n} 分钟` : ''}</div>`;
+  h += `<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">${['review','yw','ls','dl','sw','df'].map(k => `<button class="chip ${k === subj ? 'on' : ''}" data-act="tingsubj" data-v="${k}">${TING_SUBJ[k]}${k === 'review' ? '' : ' ' + cnt(k)}</button>`).join('')}</div>`;
+  h += `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">每天约</span>${[5,8,12].map(m => `<button class="chip ${m === tingMin() ? 'on' : ''}" data-act="tingmin" data-v="${m}">${m} 分钟</button>`).join('')}</div>`;
+  if (!list.length) h += `<p class="small muted" style="margin:10px 0 0">这科这周还没有新内容。</p>`;
+  else {
+    h += `<div class="small faint" style="margin-top:8px">今天 ${list.length} 段约 ${tingMins(list)} 分钟${list.every(tingHave) ? ' · 已下载，没网也能放' : ' · 第一次放要联网下载'}</div>`;
+    h += TING.cur ? tingNowHTML() : `<button class="btn primary fillbtn" style="margin:12px 0 0" data-act="tingplay">▶ 开始放</button>`;
+    if (TING.err) h += `<p class="small" style="color:var(--bad,#b5402a);margin:6px 0 0">${esc(TING.err)}</p>`;
+    h += `<div style="margin-top:12px">` + list.map((s, i) => `<button class="ear-row ${TING.cur && TING.cur.id === s.id ? 'on' : ''}" data-act="tingpick" data-v="${i}"><span class="k">${L[s.id] ? '复习' : TING_SUBJ[s.subj]}</span><span style="flex:1;min-width:0">${esc(s.title)}</span><span class="small faint">${Math.round(s.dur / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div>`;
+  }
+  h += `</div>`;
+  const s = TING.cur || list[0];
+  if (s) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${TING.cur ? '正在放' : '第一段'} · ${TING_SUBJ[s.subj]}</div><h3 style="margin:0 0 10px">${esc(s.title)}</h3>${s.paras.map(p => `<p>${esc(p)}</p>`).join('')}<p><b>问题：</b>${esc(s.q)}</p><details data-keep="tingA" ${(state.keep || {}).tingA ? 'open' : ''}><summary class="small">看答案</summary><p style="margin-top:8px">${esc(s.a)}</p></details></div>`;
+  h += `<p class="small faint" style="margin:0 4px 16px">讲解按七年级上册课本写，讲到学校教到的地方为止，不超前。周一、四语文，周二历史，周三地理，周五生物，周六道法，周日把听过的再放一遍。听过的段一周后会再放一次。</p>`;
+  return h;
+}
+
 function vLearn(){
   loadLib();
   const L = state.learn || (state.learn = {view:'home', book:null, unit:null});
   if (L.view === 'pe') return vPE();
   if (L.view === 'speak') return vSpeak();
   if (L.view === 'ear') return vEar();
+  if (L.view === 'ting') return vTing();
   if (L.view === 'words') return vWords();
   if (L.view === 'card') return vWordCard();
   if (L.view === 'recite') return vRecite();
@@ -3725,6 +3900,7 @@ function vLearn(){
   let h = `<h2>学习</h2><div class="tiles">` +
     tile('lv', 'card', '英语单词', !LIB.words ? '加载中…' : wq ? `今天 ${wq} 个` : '今天背完了', W.length ? `已掌握 ${mastered}/${W.length}` : '') +
     (() => { loadEar(); const n = earToday(); return EAR.st === 'nosync' ? '' : tile('lv', 'ear', '早上磨耳朵', EAR.st !== 'ok' ? (EAR.st === 'err' ? '没加载到' : '加载中…') : earPlaying() ? '正在放' : n ? `今天听了 ${n} 分钟` : `Unit ${earUnit()} 课文`, '课本课文 · 单词'); })() +
+    (() => { loadTing(); const n = tingToday(); return TING.st === 'nosync' ? '' : tile('lv', 'ting', '听讲解', TING.st !== 'ok' ? (TING.st === 'err' ? '没加载到' : '加载中…') : tingPlaying() ? '正在放' : n ? `今天听了 ${n} 分钟` : `今天 ${TING_SUBJ[tingSubjToday(today())]}`, '名著 · 古诗文 · 史地生道'); })() +
     tile('lv', 'recite', '语文背诵', RI.length ? `会背 ${can}/${cur.length}` : '加载中…', esc(termName(tk))) +
     (() => { const RP = readPlan(today()); return RP.recs.length ? tile('lv', 'read', '名著阅读', RP.cur ? `${RP.cur.nowp}/${RP.cur.r.total} 页` : RP.started ? '都读完了' : '还没开始', RP.cur ? `《${RP.cur.title}》` : esc(termName(RP.tk))) : ''; })() +
     (() => { const K = kpSubs().flatMap(kpAll), n = K.filter(k => k.st === 'todo' || k.due).length, un = kpSubs().reduce((a, s) => a + kpUnsorted(s).length, 0);
@@ -4789,6 +4965,14 @@ const ACT = {
   earnext: el => earSeek(EAR.i + (+el.dataset.v)),
   earunit: el => { lsSet('observer:earUnit', {u: +el.dataset.v, a: earUnitAuto()}); if (EAR.on) earStop(); EAR.cur = null; EAR.list = []; render(); const d = earDay(); if (d) earBlob(d).then(() => earUI()).catch(() => {}); },
   earmin: el => { lsSet('observer:earMin', +el.dataset.v); if (EAR.on) EAR.until = Date.now() + (+el.dataset.v) * 60000; render(); },
+  tingplay: () => tingStart(0),
+  tingpick: el => tingSeek(+el.dataset.v),
+  tingpp: () => { const a = TING.a; if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
+    if (tingPlaying()) { a.pause(); TING.on = false; return; }
+    TING.on = true; TING.err = ''; TING.lt = null; a.play().catch(() => tingStart(TING.i)); },
+  tingnext: el => tingSeek(TING.i + (+el.dataset.v)),
+  tingsubj: el => { TING.pick = {d: today(), s: el.dataset.v}; if (TING.on) tingStop(); TING.cur = null; TING.list = []; render(); tingPrefetch().catch(() => {}); },
+  tingmin: el => { lsSet('observer:tingMin', +el.dataset.v); if (TING.on) tingStop(); TING.cur = null; TING.list = []; render(); },
   wbook: el => { state.learn.book = el.dataset.v; state.learn.unit = null; render(); },
   wunit: el => { state.learn.unit = el.dataset.v || null; render(); },
   say: el => speak(el.dataset.v, 'en-US'),
