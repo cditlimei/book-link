@@ -3238,8 +3238,7 @@ const shortCn = cn => { const first = String(cn||'').split('；')[0]; const m = 
 function wordQueue(){ const L = state.learn || {}; return memo('wq|' + today() + '|' + L.book + '|' + L.unit, wordQueue0).slice(); }
 // 课本词跟进度：本学期课本（沪教版，书后各单元词表）已学到的单元先出，前面单元没背的在前；之后接中考词库。英语一学期 8 个单元，约 16 天一个
 const termBook = t => (((LIB.words && LIB.words.books) || []).find(b => b.term === termKey(t)) || {}).id || null;
-function enUnit(t){ const u = curUnit(termKey(t)); if (!u) return 0; const tk = termKey(t), y = +t.slice(0, 4), m = +t.slice(5, 7), hj = holList().find(p => p.name === '寒假' && p.to.startsWith(y + '-'));
-  const start = tk.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : hj ? addD(hj.to, 1) : y + '-03-01'; return Math.min(8, Math.max(1, Math.floor(dayDiff(start, t) / 16) + 1)); }
+function enUnit(t){ const u = curUnit(termKey(t)); if (!u) return 0; return Math.min(8, Math.max(1, Math.floor(dayDiff(termStart(t), t) / 16) + 1)); }
 function autoFresh(t){
   const tb = termBook(t), cu = enUnit(t), seen = new Set(), out = [];
   const push = w => { const k = wordKey(w); if (seen.has(k) || wState(w)) return; seen.add(k); out.push(w); };
@@ -3306,11 +3305,12 @@ const recStale = x => { const r = DB.recite[x.id]; return !!r && ['can','dict'].
 const rStateX = x => recStale(x) ? 'upd' : rState(x.id);
 const segDone = (x, k) => { const r = DB.recite[x.id]; return !!(r && r.segs && r.segRev === recRev(x) && r.segs[k]); };
 // 按日期估计课本进度：秋季 9/1 开学、春季按寒假结束第二天（无预设时 3/1），一学期 6 个单元约 3 周一个；只用来排序和标「最近要背」
+// 学期起点：秋季 9-1；春季是寒假结束第二天（深圳校历，2027-02-22），没填寒假就按 3-1。背单词 / 磨耳朵 / 听讲解三处共用
+function termStart(t){ const tk = termKey(t), y = +t.slice(0, 4), m = +t.slice(5, 7), hj = holList().find(p => p.name === '寒假' && p.to.startsWith(y + '-'));
+  return tk.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : hj ? addD(hj.to, 1) : y + '-03-01'; }
 function curUnit(term){
   if (term !== termKey(today())) return 0;
-  const t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7);
-  const hj = holList().find(p => p.name === '寒假' && p.to.startsWith(y + '-'));   // 深圳校历：寒假结束第二天开学（2027-02-22）
-  const start = term.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : hj ? addD(hj.to, 1) : y + '-03-01';
+  const t = today(), start = termStart(t);
   return Math.min(6, Math.max(1, Math.floor(dayDiff(start, t) / 21) + 1));
 }
 
@@ -3723,8 +3723,7 @@ const TING_ROTA = ['review', 'yw', 'ls', 'dl', 'yw', 'sw', 'df'];   // 周日复
 const tingMin = () => lsGet('observer:tingMin') || 8;
 // 教学周：秋季从 9-1、春季从寒假结束次日起算，扣掉假期天数；第 N 周只放教到第 N 周的内容
 function tingWeek(t){
-  const tk = termKey(t), y = +t.slice(0, 4), m = +t.slice(5, 7), hj = holList().find(p => p.name === '寒假' && p.to.startsWith(y + '-'));
-  const start = tk.endsWith('a') ? (m >= 8 ? y : y - 1) + '-09-01' : hj ? addD(hj.to, 1) : y + '-03-01';
+  const start = termStart(t);
   let days = dayDiff(start, t);
   for (const h of holList()) { if (h.to < start || h.from > t) continue; const a = h.from < start ? start : h.from, b = h.to > t ? t : h.to; days -= dayDiff(a, b) + 1; }
   return Math.max(1, Math.floor(days / 7) + 1);
@@ -3801,7 +3800,10 @@ function tingSegBlob(s){
 const tingHave = s => !!s && (lsGet('observer:tingHave') || {})[s.id] === s.ver;
 // 有网时把今天和后面 6 天轮到的段都下好（后面几天按现在的听过记录估，每天约 3 MB），上学路上没网也能放
 async function tingPrefetch(todayOnly){ for (const s of tingList(today())) await tingSegBlob(s); if (document.getElementById('tingbox')) render();
-  if (todayOnly || navigator.onLine === false) return; for (let i = 1; i <= 6; i++) { const t = addD(today(), i); for (const s of tingPlan(t, tingExam(t) ? 'exam' : TING_ROTA[P(t).getDay()])) { try { await tingSegBlob(s); } catch(e) { return; } } } }
+  if (todayOnly || navigator.onLine === false) return; const keep = new Set(tingList(today()).map(s => s.id));
+  for (let i = 1; i <= 6; i++) { const t = addD(today(), i); for (const s of tingPlan(t, tingExam(t) ? 'exam' : TING_ROTA[P(t).getDay()])) { keep.add(s.id); try { await tingSegBlob(s); } catch(e) { return; } } }
+  // 本周用不到的段从本机删掉，缓存稳定在 20 MB 左右，不让 iOS 因为占太多把整个库清掉
+  const H = lsGet('observer:tingHave') || {}; let changed = false; for (const id in H) if (!keep.has(id)) { IDB.del('ting:' + id + ':' + H[id]); delete H[id]; changed = true; } if (changed) lsSet('observer:tingHave', H); }
 async function tingDayBlob(list){ const bs = []; for (const s of list) bs.push(await tingSegBlob(s)); return new Blob(bs, {type:'audio/mpeg'}); }
 function tingAudio(){
   if (TING.a) return TING.a;
@@ -4718,9 +4720,9 @@ function attentionItems(){
   return A.slice(0, 3);
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
-const WHATS_NEW = {v: '2026-10-02',
-  kid: ['「学习」里有<b>弄懂知识点</b>了：错得多的知识点，先和 AI 聊聊卡在哪，再专门练 5 道。', '拍照可以<b>批改作业</b>了：写完拍一页，错的直接讲完整过程，改完每道再做一道同类题。', '「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。'],
-  parent: ['考前自测：期中、期末前 10 天，每科 8 道覆盖学过的知识点（薄弱的优先），没做对的直接排进「弄懂知识点」；考前 14 天复盘页出现「期中准备」，写各科自测情况、不稳的知识点和这周专项次数，不预测分数。', '弄懂知识点（七科都有，知识点按课本目录和课标整理）：错题归到知识点和错因（概念 / 计算 / 审题），「学习 → 弄懂知识点 → 整理」可以一次整理以前的错题，AI 先填好你确认；待攻克的知识点走四步：诊断对话找卡点 → 针对卡点讲解 → 按错因练 5 道 → 7 天后回查。复盘页有「最该补的知识点」。', '拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题直接讲完整解题过程（2026-10-11 起），自动进重做，每道再出一道同类题，同类题没对也能看讲解。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。']};
+const WHATS_NEW = {v: '2026-10-12',
+  kid: ['「学习」里有<b>听讲解</b>了：语文名著和古诗文、历史、地理、生物、道法，每天一科约 8 分钟，上学路上、吃饭时放着听。每段讲完会问你一个问题，先自己说，再听答案，然后按一下「答上了」或「没答上」。语文日最后一段是古诗文跟背，周日放数学概念问答。', '<b>早上磨耳朵</b>改成轮换了：一天放现在学的单元，一天放前面学过的，不再一个单元连放半个月。', '「学习」里有<b>弄懂知识点</b>了：错得多的知识点，先和 AI 聊聊卡在哪，再专门练 5 道。', '拍照可以<b>批改作业</b>了：写完拍一页，错的直接讲完整过程，改完每道再做一道同类题。', '「学习」里有<b>名著阅读</b>了：填好书的页数，每天自动算读几页；读完一章说一两句就行。'],
+  parent: ['听讲解（学习页）：五科自写讲解音频共 124 段，按学校进度只放教到的内容；每段末尾一问，孩子按「没答上」的课目自动进「弄懂知识点」待攻克；期中期末前 14 天改成错得多的课优先；周复盘里有听了多少分钟、答上几道。听过和答过的记录随同步走。', '考前自测：期中、期末前 10 天，每科 8 道覆盖学过的知识点（薄弱的优先），没做对的直接排进「弄懂知识点」；考前 14 天复盘页出现「期中准备」，写各科自测情况、不稳的知识点和这周专项次数，不预测分数。', '弄懂知识点（七科都有，知识点按课本目录和课标整理）：错题归到知识点和错因（概念 / 计算 / 审题），「学习 → 弄懂知识点 → 整理」可以一次整理以前的错题，AI 先填好你确认；待攻克的知识点走四步：诊断对话找卡点 → 针对卡点讲解 → 按错因练 5 道 → 7 天后回查。复盘页有「最该补的知识点」。', '拍照批改作业：AI（智谱免费模型，开深度思考）逐题判对错，拿不准的让孩子自己选，判错了能纠正；错题直接讲完整解题过程（2026-10-11 起），自动进重做，每道再出一道同类题，同类题没对也能看讲解。头两周请对照老师批改看几次，设置页有「被纠正几次」。', '名著阅读：按课本规定书目（七上《朝花夕拾》《西游记》），期末前读完、每天自动分页数，读完一章孩子说一两句，AI 只回一句不打分；周复盘有这周读了多少页。', '背诵篇目按教育部电子课本（修订版）逐字核对，课后要求背全文的都收了全文，清单按单元排、标「最近要背」。']};
 function whatsNew(who){
   let seen = ''; try { seen = localStorage.getItem('observer:new-' + who) || ''; } catch(e) { return ''; }
   if (seen >= WHATS_NEW.v) return '';
