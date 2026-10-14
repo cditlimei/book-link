@@ -1,5 +1,5 @@
 // 网络优先，离线时回退缓存；每次构建换缓存名
-const CACHE = 'jiushi-mv7pm8ro';
+const CACHE = 'jiushi-mv7r6r8u';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(
   caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
