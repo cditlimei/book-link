@@ -819,6 +819,34 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 .wiz textarea:focus,.wiz input[type=text]:focus,.wiz select:focus{box-shadow:0 0 0 2px var(--sc) inset}
 .wiz .mic{border:0;background:var(--grad);color:#fff;box-shadow:0 6px 14px color-mix(in srgb,var(--sc) 35%,transparent)}
 .wiz .card{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--sc) 14%,transparent) inset,var(--shadow)}
+/* ===== 英语听说 · 考试节奏 / 整套模拟 ===== */
+.ekcd{text-align:center;padding:16px 14px}
+.ekcd .ekl{font-size:15px;font-weight:600;color:var(--vc,var(--accent))}
+.ekcd .ekn{font-family:var(--mono);font-size:64px;font-weight:700;line-height:1.1;margin:4px 0}
+.ekcd .ekn small{font-size:18px;font-weight:500;margin-left:2px}
+.ekbar{height:8px;border-radius:4px;background:color-mix(in srgb,var(--vc,var(--accent)) 15%,transparent);overflow:hidden;margin:6px 0 10px}
+.ekbar i{display:block;height:100%;background:var(--sub,var(--accent));border-radius:4px;transition:width .2s linear}
+.ekbig{min-height:60px;font-size:19px;padding:0 28px}
+.ekopt{display:flex;gap:8px;align-items:baseline;margin:3px 0 3px 18px;font-size:15.5px}
+.ekopt b{font-family:var(--mono);flex:none}
+.ekopt.ok{color:var(--good);font-weight:600}
+.ekgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ekgrid>div{border-radius:12px;padding:8px 10px;background:color-mix(in srgb,var(--vc,var(--accent)) 9%,var(--surface));min-width:0;overflow-wrap:anywhere}
+.ekgrid .h{font-size:12.5px;font-weight:700;color:var(--vc,var(--accent));text-transform:uppercase;letter-spacing:.02em}
+.ekgrid .k{font-size:15.5px;margin-top:2px}
+.ekstart{font-family:Georgia,serif;font-size:18px;line-height:1.6;border-left:4px solid var(--vc,var(--accent));padding-left:10px}
+.ekq.on{box-shadow:0 0 0 2px var(--vc,var(--accent)) inset !important}
+.eksec{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center;margin-top:10px}
+.eksec>div{min-width:0}.eksec .v{font-family:var(--mono);font-size:18px;font-weight:700}.eksec .l{font-size:11.5px;color:var(--ink3)}
+.eksec{gap:8px}.eksec .v small{font-size:12px;font-weight:500;color:var(--ink3)}
+@media (max-width:430px){.eksec{grid-template-columns:repeat(6,1fr);row-gap:10px}.eksec>div{grid-column:span 2}.eksec>div:nth-child(n+4){grid-column:span 3}}
+body.ekrun #tabs{display:none}body.ekrun{padding-bottom:calc(env(safe-area-inset-bottom) + 20px)}
+.ekcd.sm{padding:10px 12px}.ekcd.sm .ekn{font-size:38px;margin:0}.ekcd.sm .ekbar{margin:4px 0 8px}
+.ekcd.go{animation:ekgo .6s ease-out 2}.ekcd.go .ekl{font-size:20px;font-weight:800}
+@keyframes ekgo{0%{background:color-mix(in srgb,var(--danger) 22%,var(--surface));transform:scale(1.02)}100%{transform:none}}
+@media (prefers-reduced-motion:reduce){.ekcd.go{animation:none;background:color-mix(in srgb,var(--danger) 10%,var(--surface))}}
+.mkset{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mkset .btn{display:flex;align-items:center;justify-content:center;flex-direction:column;min-height:64px;line-height:1.25;padding:6px 4px;white-space:normal;min-width:0}
 </style>
 </head>
 <body>
@@ -1008,14 +1036,14 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, reads:{}, kps:{}, kpTag:{}, extests:{}, peRecs:[], speakRecs:[], mixRecs:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, reads:{}, kps:{}, kpTag:{}, extests:{}, peRecs:[], speakRecs:[], mixRecs:[], mockRecs:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
   x.settings = Object.assign({}, f.settings, x.settings||{});
   x.settings.anchors = Object.assign({}, f.settings.anchors, x.settings.anchors||{});
   for (const k of ['days','weeks','months','del','extReview','words','recite','hol','reads','kps','kpTag','extests','ting']) x[k] = x[k] || {};
-  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs']) x[k] = x[k] || [];
+  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs','mockRecs']) x[k] = x[k] || [];
   x.aiMem = x.aiMem || {};
   // 科目：补默认字段与新科目（物理/化学），v1 的 hidden → mode
   const subs = x.settings.subjects || [];
@@ -1127,7 +1155,7 @@ function usageStats(from, to){
   for (const r of Object.values(DB.recite)) for (const h of r.hist || []) { add('recite', h.d); if (h.seg != null) add('seg', h.d); }
   for (const r of Object.values(DB.reads || {})) { for (const d of Object.keys(r.log || {})) add('read', d); for (const x of r.sums || []) add('readsum', x.d); }
   for (const h of holList()) for (const t of h.tasks) for (const d of Object.keys(t.done || {})) add('hol', d);
-  for (const x of DB.speakRecs || []) add('speak', x.d); for (const x of DB.peRecs || []) add('pe', x.d); for (const x of DB.exams || []) add('exam', x.date);
+  for (const x of DB.speakRecs || []) add('speak', x.d); for (const x of DB.mockRecs || []) add('speak', x.d); for (const x of DB.peRecs || []) add('pe', x.d); for (const x of DB.exams || []) add('exam', x.date);
   const N = [['hw','记作业'],['redo','重做'],['words','背单词'],['recite','语文背诵'],['seg','分段背'],['read','名著记页数'],['readsum','名著说一句'],['hol','假期作业'],['quick','随手记问题'],['photo','拍照识别'],['ai','AI 老师'],['hint','AI 提示'],['variant','同类题'],['mix','混合练习'],['speak','英语听说'],['pe','体育'],['exam','考试记录'],['praise','家长点赞'],['rest','请假']];
   return N.map(([k, n]) => ({k, n, days: S[k] ? S[k].size : 0}));
 }
@@ -1720,7 +1748,7 @@ function mergeDB(L, R){
       if (y && (!x || (y.u||0) > (x.u||0))) { rN = true; M[k][key] = clone(y); }
     }
   }
-  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs']) {
+  for (const k of ['items','exams','emotions','photos','aiS','peRecs','speakRecs','mixRecs','mockRecs']) {
     const a = new Map((L[k]||[]).map(x=>[x.id,x])), b = new Map((R[k]||[]).map(x=>[x.id,x]));
     const out = [];
     for (const id of new Set([...a.keys(), ...b.keys()])) {
@@ -1818,7 +1846,7 @@ function render(){
   RC = {};
   reindex();
   try { ensureAutoPlans(); } catch(e) {}
-  renderChrome();
+  renderChrome(); document.body.classList.toggle('ekrun', !!(state.ek && state.ek.ph !== 'done'));   // 考试 / 模拟进行中藏底部 tab，防误触作废
   if (state.tab === 'trends') { state.tab = 'me'; state.pv = 'grades'; state.gradeView = 'trends'; }
   if (state.tab === 'exams') { state.tab = 'me'; state.pv = 'grades'; }
   if (state.tab === 'review') { state.tab = 'me'; state.pv = 'review'; }
@@ -3188,15 +3216,16 @@ function extraWeek(mon, end){
   const inW = r => r.d >= mon && r.d <= end, pw = r => r.d >= addD(mon, -7) && r.d <= addD(mon, -1);
   const sp = DB.speakRecs.filter(inW), spp = DB.speakRecs.filter(pw), avg = a => a.length ? Math.round(a.reduce((x, r) => x + r.acc, 0) / a.length) : null;
   const pe = DB.peRecs.filter(inW), est = LIB.pe ? peEstimate(end) : {field: null};
-  const mx = DB.mixRecs.filter(inW);
-  if (!sp.length && !pe.length && est.field == null && !mx.length) return null;
+  const mx = DB.mixRecs.filter(inW), mk = mkSort((DB.mockRecs || []).filter(inW));   // mk：听说整套模拟（按时间排，两台设备合并后顺序不可靠）
+  if (!sp.length && !pe.length && est.field == null && !mx.length && !mk.length) return null;
   const kinds = {read: 0, listen: 0, retell: 0}; sp.forEach(r => kinds[r.kind || 'read']++);
-  return {n: sp.length, avg: avg(sp), pavg: avg(spp), kinds, pe: pe.length, est: est.field, mx};
+  return {n: sp.length, avg: avg(sp), pavg: avg(spp), kinds, pe: pe.length, est: est.field, mx, mk};
 }
 function extraWeekText(x){ if (!x) return ''; const a = [];
-  if (x.n) a.push(`英语听说练了 ${x.n} 次（朗读 ${x.kinds.read}、听后回答 ${x.kinds.listen}、复述提问 ${x.kinds.retell}），平均 ${x.avg}%${x.pavg != null ? `，上周 ${x.pavg}%` : ''}`); else a.push('英语听说这周没练');
+  if (x.n) a.push(`英语听说练了 ${x.n} 次（朗读 ${x.kinds.read}、听后回答 ${x.kinds.listen}、复述提问 ${x.kinds.retell}），平均 ${x.avg}%${x.pavg != null ? `，上周 ${x.pavg}%` : ''}`); else if (!(x.mk && x.mk.length)) a.push('英语听说这周没练');
   if (x.est != null) a.push(`体育现场分估 ${x.est}/36${x.pe ? `（这周测了 ${x.pe} 次）` : ''}`); else if (x.pe) a.push(`体育这周测了 ${x.pe} 次`);
   if (x.mx && x.mx.length) { const m = x.mx[x.mx.length - 1]; a.push(`数学混合练习 ${m.ok}/${m.n} 道做对，方法判断对 ${m.method} 道`); }
+  if (x.mk && x.mk.length) { const m = x.mk[x.mk.length - 1], b = Math.max(...x.mk.map(r => r.total)); a.push(`听说模拟估分 ${m.total}/25${x.mk.length > 1 ? `（这周做了 ${x.mk.length} 套，最好 ${b}）` : ''}`); }
   return a.join('；') + '。'; }
 function printWeek(mon){
   const sun = addD(mon,6), t = today(), end = sun < t ? sun : t, days = range(mon, sun);
@@ -3697,8 +3726,8 @@ async function enRecStart(maxSec, onTimeout){
     if (!SR) throw new Error('这台设备不能语音识别，在「家长 → 设置」填智谱密钥后再试');
     const sr = new SR(); sr.lang = 'en-US'; sr.continuous = true; sr.interimResults = false;
     const R = EREC = {sr, on: true, t0: Date.now(), said: ''}; sr.onresult = e => { for (let k = e.resultIndex; k < e.results.length; k++) if (e.results[k].isFinal) R.said += ' ' + e.results[k][0].transcript; };
-    sr.onerror = e => { if (/not-allowed|service-not-allowed|audio-capture|language-not-supported/.test(e.error)) { R.on = false; R.err = '浏览器不给用语音识别，在「家长 → 设置」填智谱密钥后再试'; } };
-    sr.onend = () => { if (R.on) { try { sr.start(); } catch(e) {} } }; sr.start();
+    sr.onerror = e => { if (/not-allowed|service-not-allowed|audio-capture|language-not-supported/.test(e.error)) { R.on = false; R.err = '浏览器不给用语音识别，在「家长 → 设置」填智谱密钥后再试'; } else { R.lastErr = e.error; if (/aborted|network/.test(e.error) && ++R.bad >= 3) R.dead = true; } };
+    R.bad = 0; sr.onend = () => { if (R.on) { try { sr.start(); } catch(e) { R.dead = true; } } }; sr.start();   // dead：识别其实停了（只给考试节奏看，练习不读）
   }
   const me = EREC; clearInterval(window.__erT);
   window.__erT = setInterval(() => { if (EREC !== me || !me.on) return clearInterval(window.__erT); const left = maxSec - Math.floor((Date.now() - me.t0) / 1000); const el = $('#er-left'); if (el) el.textContent = Math.max(0, left); if (left <= 0) { clearInterval(window.__erT); onTimeout && onTimeout(); } }, 300);
@@ -3724,22 +3753,25 @@ function stopAllEn(){
   if (SREC) { const R = SREC; SREC = null; R.on = false; clearTimeout(R.cut); try { R.sr ? R.sr.stop() : (R.mr && R.mr.state === 'recording' && R.mr.stop()); } catch(e) {} if (R.stream) R.stream.getTracks().forEach(t => t.stop()); }
   if (state.sp && ['rec','busy'].includes(state.sp.phase)) state.sp = null;
   if (state.ls) state.ls = null; if (state.rt) state.rt = null;
+  ekStop(); state.ekGone = null;   // 考试节奏 / 整套模拟：清倒计时，放弃不记
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden && (EREC || SREC)) { stopAllEn(); render(); } });
+document.addEventListener('visibilitychange', () => { const ek = state.ek && !['done', 'score'].includes(state.ek.ph) ? state.ek : null; if (document.hidden && (EREC || SREC || ek)) { stopAllEn(); if (ek) state.ekGone = ek.set ? '切出去了，这次模拟作废，重新开始吧。' : '切出去了，这一遍作废，再来一遍吧。'; render(); } });
 const keyNorm = k => enWords(k).join(' ');
+const EK_LW = [['a', 'ay', 'eh'], ['b', 'bee', 'be'], ['c', 'see', 'sea', 'si', 'cee']], EK_FILL = new Set('option answer choice the is it its i choose letter'.split(' '));
+const letterOk = (said, a) => { if (a == null || !EK_LW[a]) return false; const w = enWords(said); if (!w.length || w.length > 2) return false; const r = w.filter(x => !EK_FILL.has(x)); return r.length === 1 && EK_LW[a].includes(r[0]); };   // 只说字母（B / bee）也算对
 const hasKeys = (said, keys) => { const w = new Set(enWords(said)), t = ' ' + enWords(said).join(' ') + ' '; return keys.some(alt => alt.every(k0 => { const k = keyNorm(k0); return k.includes(' ') ? t.includes(' ' + k + ' ') : w.has(k); })); };
 /* 信息获取：听两遍 → 每题 8 秒口头回答 → 按关键词判对错 */
 function vListen(x){
   const S = state.ls && state.ls.id === x.id ? state.ls : (state.ls = {id: x.id, phase: 'intro', i: 0, ans: []});
   let h = `<div class="card"><div class="row"><h3 style="margin:0">${esc(x.title)}</h3><span class="spacer"></span><span class="small faint">${x.kind === 'dialogue' ? '对话' : '短文'} · ${x.qs.length} 题</span></div>`;
-  if (S.phase === 'intro' || S.phase === 'play') h += `<p class="small muted" style="margin:6px 0">先看问题，再听录音（放两遍），然后每题 8 秒内用英语口头回答。</p>` + x.qs.map((q, k) => `<p style="margin:4px 0">${k + 1}. ${esc(q.q)}</p>`).join('');
+  if (S.phase === 'intro' || S.phase === 'play') h += `<p class="small muted" style="margin:6px 0">先看问题，再听录音（放两遍），然后每题 8 秒内用英语口头回答。${x.qs.some(q => q.opts) ? '说出选项里的英文，不要只说 A/B/C。' : ''}</p>` + x.qs.map((q, k) => `<p style="margin:4px 0">${k + 1}. ${esc(q.q)}</p>` + ekOpts(q)).join('');
   h += `</div>`;
   if (S.phase === 'intro') h += `<div class="row"><button class="btn primary" data-act="lsplay">${SPK} 开始听（放两遍）</button></div>`;
   else if (S.phase === 'play') h += `<div class="card empty">正在播放…${S.n2 ? '第二遍' : '第一遍'}<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost sm" data-act="lsgo">听完了，开始回答</button></div></div>`;
-  else if (S.phase === 'q') h += `<div class="card"><div class="small faint">第 ${S.i + 1} / ${x.qs.length} 题</div><div style="font-size:19px;margin:6px 0">${esc(x.qs[S.i].q)}</div></div>` + (S.rec ? recUI(8, 'lsstop') : `<div class="card empty">正在识别…</div>`);
+  else if (S.phase === 'q') h += `<div class="card"><div class="small faint">第 ${S.i + 1} / ${x.qs.length} 题</div><div style="font-size:19px;margin:6px 0">${esc(x.qs[S.i].q)}</div>${ekOpts(x.qs[S.i])}</div>` + (S.rec ? recUI(8, 'lsstop') : `<div class="card empty">正在识别…</div>`);
   else if (S.phase === 'result') { const n = S.ans.filter(a => a.ok).length;
     h += `<div class="card" style="text-align:center"><div style="font-family:var(--mono);font-size:40px;font-weight:700;color:${n === x.qs.length ? 'var(--good)' : 'var(--amber)'}">${n}/${x.qs.length}</div><div class="muted">答对 ${n} 题</div></div>` +
-      x.qs.map((q, k) => { const a = S.ans[k] || {}; return `<div class="card"><div>${k + 1}. ${esc(q.q)}</div><div class="small" style="margin-top:4px">你说：${esc(a.said || '（没识别到）')} ${a.ok ? '<span class="pill good">对</span>' : '<span class="pill amber">再听听</span>'}</div><div class="small faint">参考：${esc(q.ans)}</div></div>`; }).join('') +
+      x.qs.map((q, k) => { const a = S.ans[k] || {}; return `<div class="card"><div>${k + 1}. ${esc(q.q)}</div>${ekOpts(q, true)}<div class="small" style="margin-top:4px">你说：${esc(a.said || '（没识别到）')} ${a.ok ? '<span class="pill good">对</span>' : '<span class="pill amber">再听听</span>'}</div><div class="small faint">参考：${esc(q.ans)}</div></div>`; }).join('') +
       `<details class="card"><summary class="small">看录音原文</summary>` + x.lines.map(([sp, t]) => `<p style="margin:4px 0">${x.kind === 'dialogue' ? `<b>${sp === 'M' ? 'M' : 'W'}:</b> ` : ''}${esc(t)}</p>`).join('') + `</details><div class="row"><button class="btn primary" data-act="lsagain">再做一遍</button></div>`; }
   if (S.err) h += `<div class="signal">${esc(S.err)}</div>`;
   return h;
@@ -3748,16 +3780,16 @@ async function lsAsk(){ const S = state.ls; if (!S) return; S.rec = true; S.err 
 async function lsStop(){ const S = state.ls; if (!S || !S.rec) return; S.rec = false; render();
   const x = LIB.speak2.listen.find(i => i.id === S.id); let said = ''; try { said = await enRecStop(); } catch(e) { S.err = e.message; }
   if (state.ls !== S) return;
-  S.ans[S.i] = {said: said.trim(), ok: hasKeys(said, x.qs[S.i].keys)};
+  S.ans[S.i] = {said: said.trim(), ok: hasKeys(said, x.qs[S.i].keys) || letterOk(said, x.qs[S.i].a)};
   if (S.i + 1 < x.qs.length) { S.i++; render(); lsAsk(); }
   else { S.phase = 'result'; DB.speakRecs.push({id: uid('sp'), d: today(), kind: 'listen', pid: x.id, acc: Math.round(S.ans.filter(a => a.ok).length / x.qs.length * 100), u: now()}); save(); render(); } }
 /* 信息复述及提问：听两遍 → 看导图 60 秒复述（按要点覆盖）→ 按中文提示提两个问题（AI 判断） */
 function vRetell(x){
   const S = state.rt && state.rt.id === x.id ? state.rt : (state.rt = {id: x.id, phase: 'intro', i: 0, asks: []});
-  let h = `<div class="card"><div class="row"><h3 style="margin:0">${esc(x.title)}</h3><span class="spacer"></span><span class="small faint">复述 + 提问 2 个</span></div><p class="small muted" style="margin:6px 0">要点提示：${esc(x.map)}</p></div>`;
-  if (S.phase === 'intro') h += `<div class="card"><p class="small muted" style="margin:0 0 8px">先听短文（放两遍），然后看着要点提示用 60 秒复述，再按中文提示用英语提两个问题。</p><button class="btn primary" data-act="rtplay">${SPK} 开始听（放两遍）</button></div>`;
+  let h = `<div class="card"><div class="row"><h3 style="margin:0">${esc(x.title)}</h3><span class="spacer"></span><span class="small faint">复述 + 提问 2 个</span></div>${ekGrid(x)}</div>`;   // 格子导图，没 grid 回退旧的一行 map
+  if (S.phase === 'intro') h += `<div class="card"><p class="small muted" style="margin:0 0 8px">先听短文（放两遍），然后看着要点提示用 60 秒复述，再按中文提示用英语提两个问题。</p>${x.start ? `<p class="small" style="margin:0 0 8px">开头：<i>${esc(x.start)} …</i></p>` : ''}<button class="btn primary" data-act="rtplay">${SPK} 开始听（放两遍）</button></div>`;
   else if (S.phase === 'play') h += `<div class="card empty">正在播放…<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost sm" data-act="rtgo">听完了，开始复述</button></div></div>`;
-  else if (S.phase === 'retell') h += S.rec ? recUI(60, 'rtstop') : `<div class="card empty">正在识别…</div>`;
+  else if (S.phase === 'retell') h = ekStartCard(x) + h + (S.rec ? recUI(60, 'rtstop') : `<div class="card empty">正在识别…</div>`);   // 起始句作答时置顶
   else if (S.phase === 'ask') h += `<div class="card"><div class="small faint">提问 ${S.i + 1} / ${x.asks.length}</div><div style="font-size:19px;margin:6px 0">${esc(x.asks[S.i].cn)}</div><div class="small faint">用英语提问，8 秒</div></div>` + (S.rec ? recUI(8, 'rtastop') : `<div class="card empty">正在判断…</div>`);
   else if (S.phase === 'result') { const hit = S.hit || [];
     h += `<div class="card"><h3>复述：讲到 ${hit.filter(Boolean).length}/${x.points.length} 个要点</h3>` + x.points.map((pt, k) => `<div class="row" style="margin:4px 0;flex-wrap:nowrap"><span style="width:20px;font-weight:700;color:${hit[k] ? 'var(--good)' : 'var(--ink3)'}">${hit[k] ? '✓' : '○'}</span><span>${esc(pt.p)}</span></div>`).join('') +
@@ -3860,13 +3892,17 @@ function vSpeak(){
   const P = LIB.speak, L = state.learn;
   let h = `<div class="row">${backBtn(L.sp ? 'speak' : 'home', L.sp ? '篇目' : '学习')}<h2 style="margin:0">英语听说</h2></div>`;
   if (!P) return h + `<div class="card empty">短文还没加载到，联网后再打开。</div>`;
+  if (state.ek) return (state.ek.ph === 'done' ? h : `<div class="row"><button class="btn sm ghost" data-act="ekquit">✕ 放弃</button><h2 style="margin:0">英语听说</h2></div>`) + vEk(state.ek);   // 考试节奏进行中：返回键换成「放弃」
+  if (state.ekGone) h += `<div class="signal">${esc(state.ekGone)}</div>`;
+  if (L.sp && /^mk\d$/.test(L.sp)) return h + vMock(+L.sp[2]);
+  if (L.sp && enMode() === 'exam' && !L.task && ekParts(L.sp).length) return h + enModeSeg() + ekIntro(L.sp);
   const best = id => Math.max(-1, ...DB.speakRecs.filter(r => r.pid === id).map(r => r.acc));
   const P2 = LIB.speak2;
   if (L.sp && L.sp[0] === 'l' && P2) { const x = P2.listen.find(i => i.id === L.sp); if (x) return h + vListen(x); }
   if (L.sp && L.sp[0] === 't' && P2) { const x = P2.retell.find(i => i.id === L.sp); if (x) return h + vRetell(x); }
   if (!L.sp) {
     const bestK = id => Math.max(-1, ...DB.speakRecs.filter(r => r.pid === id).map(r => r.acc));
-    const tp = (extraTask(today()) || {}).sp; h += `<p class="sub">中考听说 25 分。每天练一小项，敢开口、说完整就好。</p>`;
+    const tp = (extraTask(today()) || {}).sp; h += `<p class="sub">中考听说 25 分。每天练一小项，敢开口、说完整就好。</p>` + enModeSeg() + mkCard();
     if (P2) { h += `<h3 style="margin:14px 0 6px">信息获取：听后回答</h3><div class="splist">` + P2.listen.map(x => { const b = bestK(x.id); return `<button class="card ${x.id === tp ? 'due' : ''}" style="display:block;width:100%;text-align:left${x.id === tp ? ';border-color:var(--accent)' : ''}" data-act="spopen" data-v="${x.id}"><div class="row">${b >= 0 ? '<span class="spdone" aria-label="练过">✓</span>' : ''}<b>${esc(x.title)}</b>${x.id === tp ? '<i class="tbadge">今天练这篇</i>' : ''}<span class="spacer"></span><span class="small faint">${b >= 0 ? '最好 ' + b + '%' : (x.kind === 'dialogue' ? '对话' : '短文') + ' · ' + x.qs.length + ' 题'}</span></div></button>`; }).join('') + '</div>';
       h += `<h3 style="margin:14px 0 6px">信息复述及提问</h3><div class="splist">` + P2.retell.map(x => { const b = bestK(x.id); return `<button class="card ${x.id === tp ? 'due' : ''}" style="display:block;width:100%;text-align:left${x.id === tp ? ';border-color:var(--accent)' : ''}" data-act="spopen" data-v="${x.id}"><div class="row">${b >= 0 ? '<span class="spdone" aria-label="练过">✓</span>' : ''}<b>${esc(x.title)}</b>${x.id === tp ? '<i class="tbadge">今天练这篇</i>' : ''}<span class="spacer"></span><span class="small faint">${b >= 0 ? '最好 ' + b + '%' : '复述 + 提问'}</span></div></button>`; }).join('') + '</div>'; }
     h += `<h3 style="margin:14px 0 6px">模仿朗读</h3><div class="splist">`;
@@ -3892,6 +3928,171 @@ function vSpeak(){
   if (hist.length) h += `<div class="small" style="margin-top:4px">` + hist.map(r => `<span class="pill" style="margin:2px 4px 2px 0">${mdShort(r.d)} ${r.acc}% · ${r.sec} 秒</span>`).join('') + `</div>`;
   return h;
 }
+/* ===== 英语听说 · 考试节奏 + 整套模拟（家长 10-15 定）=====
+   练习模式＝原来那套，想听几遍听几遍；考试模式按深圳中考节奏一步步自动走：示范 / 录音只放规定遍数，到点自动开麦，准备时间能跳过、不能重听。
+   整套模拟＝朗读 1 + 对话 3 + 短文 1 + 复述 1 + 提问 2，按 4/6/4/8/3 估分，按套号固定切题库（不随机），成绩进 DB.mockRecs（会同步）。
+   自动开麦沿用「每题 8 秒」的做法（放完直接 enRecStart）；iOS 没手势开不了就给大按钮「开始说」兜底。window.__EKX：测试用时间倍率 */
+const K_ENMODE = 'observer:enMode';
+const enMode = () => lsGet(K_ENMODE) === 'exam' ? 'exam' : 'practice';
+const ekK = () => +window.__EKX > 0 ? +window.__EKX : 1;
+const ekL = k => 'ABC'[k] || '';
+const r1 = v => Math.round(v * 10) / 10;
+const EK_MAX = {read: 4, dlg: 6, psg: 4, rt: 8, ask: 3}, EK_N = {read: '朗读', dlg: '听选信息', psg: '回答问题', rt: '复述', ask: '提问'};
+const ekAu = x => x.audio || ('audio/en/' + x.id + '.mp3');
+// 单篇：朗读 r* / 听后回答 l* / 复述 t*（复述后面接它的 2 道提问）
+function ekParts(id){ const P2 = LIB.speak2 || {listen: [], retell: []};
+  if (id[0] === 'r') { const x = (LIB.speak || {items: []}).items.find(i => i.id === id); return x ? [{t: 'read', x}] : []; }
+  if (id[0] === 'l') { const x = P2.listen.find(i => i.id === id); return x ? [{t: x.kind === 'dialogue' ? 'dlg' : 'psg', x}] : []; }
+  if (id[0] === 't') { const x = P2.retell.find(i => i.id === id); return x ? [{t: 'rt', x}, {t: 'ask', x}] : []; }
+  return []; }
+// 第 k 套：按套号固定切片
+function mockParts(k){ if (!LIB.speak || !LIB.speak2) return [];
+  const I = LIB.speak.items, D = LIB.speak2.listen.filter(x => x.kind === 'dialogue'), G = LIB.speak2.listen.filter(x => x.kind !== 'dialogue'), T = LIB.speak2.retell, at = (a, i) => a[i % a.length], rt = at(T, k - 1);
+  return [{t: 'read', x: at(I, k - 1)}, ...[0, 1, 2].map(j => ({t: 'dlg', x: at(D, (k - 1) * 3 + j)})), {t: 'psg', x: at(G, k - 1)}, {t: 'rt', x: rt}, {t: 'ask', x: rt}]; }
+// 每部分的步骤：wait 倒计时 / play 放 n 遍 / rec 录音作答
+function ekSteps(parts){ const S = [];
+  parts.forEach((p, i) => { const x = p.x, au = ekAu(x);
+    if (p.t === 'read') S.push({p: i, k: 'play', n: 1, src: au, lab: '听示范'}, {p: i, k: 'wait', sec: 50, lab: '准备'}, {p: i, k: 'rec', sec: 50, q: 0, lab: '朗读'});
+    else if (p.t === 'dlg' || p.t === 'psg') { S.push({p: i, k: 'wait', sec: p.t === 'dlg' ? 10 : 15, lab: '读题'}, {p: i, k: 'play', n: 2, src: au, lab: '听录音'}); x.qs.forEach((q, j) => S.push({p: i, k: 'rec', sec: 8, q: j, lab: '回答'})); }
+    else if (p.t === 'rt') S.push({p: i, k: 'wait', sec: 15, lab: '看导图'}, {p: i, k: 'play', n: 2, src: au, lab: '听短文'}, {p: i, k: 'wait', sec: 60, lab: '准备复述'}, {p: i, k: 'rec', sec: 60, q: 0, lab: '复述'});
+    else if (p.t === 'ask') x.asks.forEach((a, j) => S.push({p: i, k: 'wait', sec: 15, q: j, lab: '准备提问'}, {p: i, k: 'rec', sec: 8, q: j, lab: '提问'})); });
+  return S; }
+const ekMin = parts => Math.round(ekSteps(parts).reduce((a, s) => a + (s.sec || (s.n * 40)), 0) / 60);   // 录音按 40 秒一遍粗估
+function ekClr(){ clearInterval(window.__ekT); window.__ekT = null; }
+// 防息屏：iPhone 30 秒自动锁屏会触发切后台、整套作废。iOS 16.4+ Safari 支持，主屏幕 PWA 18.4 起
+function ekWake(on){ const w = window.__ekWL; window.__ekWL = null; if (w) try { w.release().catch(() => {}); } catch(e) {}
+  if (on && navigator.wakeLock) try { navigator.wakeLock.request('screen').then(l => { if (state.ek) window.__ekWL = l; else l.release().catch(() => {}); }).catch(() => {}); } catch(e) {} }
+const ekTap = () => window.__EKTAP != null ? +window.__EKTAP : 700;   // 防连点：切换步骤后这段时间内的点击不算（测试可改）
+const ekFresh = E => Date.now() - (E.tap || 0) < ekTap();
+const mkSort = a => a.slice().sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : (x.u || 0) - (y.u || 0));
+const ekAwait = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error('识别超时')), ms * ekK()))]);   // 测试倍率同样缩短超时
+function ekStop(){ ekClr(); ekWake(false); if (state.ek) state.ek = null; }   // 放弃：不写任何记录
+function ekStart(parts, set){
+  stopAllEn(); if (!parts.length) return toast('题目还没加载到，联网后再试');
+  const E = state.ek = {parts: parts.map(p => Object.assign({}, p, {said: []})), si: -1, set: set || 0, ph: ''}; E.steps = ekSteps(E.parts);
+  // iOS：在这次点击里先把播放器「解锁」，后面读题倒计时到点再自动放录音才放得出声
+  if (E.steps[0].k !== 'play') { const a = amEl('__enAudio', 'en'); AM.claim('en'); const tok = window.__ekUnl = {}; try { a.muted = true; a.src = E.steps.find(s => s.k === 'play').src; a.play().then(() => { if (window.__ekUnl === tok) { a.pause(); a.muted = false; } }).catch(() => { a.muted = false; }); } catch(e) { a.muted = false; } }
+  ekWake(true); ekNext(E); window.scrollTo(0, 0); }
+function ekNext(E){ if (state.ek !== E) return; ekClr(); E.si++; E.err = ''; E.stopping = false; E.tap = Date.now();
+  if (E.si >= E.steps.length) return ekFinish(E);
+  const s = E.steps[E.si]; E.t0 = Date.now(); E.dur = (s.sec || 0) * 1000 * ekK();
+  if (s.k === 'wait') { E.ph = 'wait'; render(); ekTick(E); }
+  else if (s.k === 'play') { E.left = s.n; ekPlay(E); }
+  else ekRec(E); }
+function ekTick(E){ ekClr(); window.__ekT = setInterval(() => { if (state.ek !== E) return ekClr();
+  const el = Date.now() - E.t0, n = $('#ek-left'), b = $('#ek-bar'); if (n) n.textContent = Math.max(0, Math.ceil((E.dur - el) / 1000)); if (b) b.style.width = Math.max(0, 100 - el / E.dur * 100) + '%';
+  if (E.ph === 'wait' && el >= E.dur) ekNext(E);
+  else if (E.ph === 'rec') { if (E.mic && (E.mic.on === false || E.mic.dead) && !E.stopping && EREC === E.mic) ekMicFail(E, E.mic.err || '识别没开起来，点一下'); else if (el >= E.dur + 400) ekRecStop(E); } }, 200); }
+// 放录音：每次出声前 claim('en')；被打断 / 放不出来 → 大按钮「播放录音」接着放剩下的遍数（不多给）
+function ekPlay(E){ if (state.ek !== E) return; const s = E.steps[E.si], a = amEl('__enAudio', 'en'); AM.claim('en'); window.__ekUnl = null; a.muted = false; clearTimeout(window.__p2T);
+  E.ph = 'play'; render();
+  window.__p2Cancel = () => { if (state.ek === E && E.ph === 'play') { E.ph = 'needPlay'; setTimeout(render, 0); } };
+  const fail = err => { if ((err && err.name === 'AbortError') || state.ek !== E || E.ph !== 'play') return; E.ph = 'needPlay'; render(); };
+  a.onended = () => { if (state.ek !== E) return; E.left--; if (E.left > 0) { render(); clearTimeout(window.__p2T); window.__p2T = setTimeout(() => { if (state.ek !== E || E.ph !== 'play') return; AM.claim('en'); a.currentTime = 0; a.play().catch(fail); }, 1500); } else { a.onended = null; window.__p2Cancel = null; ekNext(E); } };
+  a.src = s.src; a.play().catch(fail); }
+async function ekRec(E){ if (state.ek !== E) return; const s = E.steps[E.si]; ekClr(); E.ph = 'rec'; E.err = ''; E.stopping = false; E.t0 = E.tap = Date.now(); E.dur = s.sec * 1000 * ekK(); E.mic = null; E.go = true; render(); E.go = false; ekGoView(); ekTick(E);
+  try { const pr = enRecStart(Math.max(1, Math.round(s.sec * ekK())), () => ekRecStop(E)); E.mic = EREC; await pr; } catch(e) { ekMicFail(E, e && e.message); } }
+const ekGoView = () => { const c = $('.ekcd'), q = $('.ekq.on'); try { c && c.scrollIntoView({block: 'nearest'}); q && q.scrollIntoView({block: 'nearest'}); } catch(e) {} };   // 开麦那一刻把倒计时和当前题拉进屏幕
+function ekMicFail(E, msg){ if (state.ek !== E || E.ph !== 'rec' || E.stopping) return; ekClr(); E.tap = Date.now(); if (EREC) enRecStop(true).catch(() => {}); E.ph = 'needMic'; E.err = msg || '麦克风没自动打开'; render(); }
+async function ekRecStop(E){ if (state.ek !== E || E.ph !== 'rec' || E.stopping) return; E.stopping = true; ekClr(); const s = E.steps[E.si], p = E.parts[s.p], si = E.si, sr = !!(EREC && EREC.sr);
+  if (p.t === 'read') p.sec = Math.round((Date.now() - E.t0) / 1000 / ekK());
+  const pr = ekAwait(enRecStop(), sr ? 15000 : 25000).then(t => String(t || '').trim(), e => { p.err = e.message; return ''; });   // 永不 reject
+  if (!sr) { p.said[s.q] = pr; return ekNext(E); }   // 云端识别：先往下走，计时不断
+  E.ph = 'busy'; E.tap = Date.now(); render(); const said = await pr;
+  if (state.ek !== E || E.si !== si || E.ph !== 'busy') return;   // 等的时候点了「跳过这题」/ 放弃
+  p.said[s.q] = said; ekNext(E); }
+// 复述要点覆盖（同 rtStop 的算法）
+function rtHits(x, said){ const t = ' ' + enWords(said).join(' ') + ' ', w = new Set(enWords(said)); return x.points.map(pt => pt.keys.some(k0 => { const k = keyNorm(k0); return k.includes(' ') ? t.includes(' ' + k + ' ') : w.has(k); })); }
+const EK_QW = new Set('what where when who whom whose why how which do does did is are was were can could will would have has should may'.split(' '));
+const askGuess = (said, expect) => { const w = enWords(said); return w.length >= 3 && EK_QW.has(w[0]) && expect.split('/').some(e => enWords(e)[0] === w[0]); };   // 没 AI 时粗判：疑问词开头且和参考问法同一个疑问词
+async function askJudge(a, x, said){ const r = {said}; if (!said) return Object.assign(r, {ok: false});
+  if (aiReady()) { try { const j = parseJSONObj(await Promise.race([aiChat([{role: 'system', content: '你是初中英语老师，检查学生的口头提问。语音识别会丢掉标点和大小写，忽略这些。只输出 JSON：{"ok":true 或 false,"hint":"一句中文点评：对的话说好在哪，不对的话指出问题（语序、助动词、疑问词、意思不符）","sample":"一个标准问法"}'},
+      {role: 'user', content: `情景要求：${a.cn}\n参考问法：${a.expect}\n短文：${x.text}\n学生说的：${said}`}], {temperature: 0.1}), new Promise((_, rej) => setTimeout(() => rej(new Error('超时')), 25000))]));
+      if (j) return Object.assign(r, {ok: !!j.ok, hint: String(j.hint || '').slice(0, 120), sample: String(j.sample || '').slice(0, 120)}); } catch(e) { r.hint = 'AI 没判断成：' + e.message; } }
+  return Object.assign(r, {ok: askGuess(said, a.expect), guess: true}); }
+function ekSecs(parts){ const sec = {};
+  for (const t in EK_MAX) { const ps = parts.filter(p => p.t === t); if (!ps.length) continue; let got = 0, all = 0;
+    for (const p of ps) { if (t === 'read') { got += p.res.score; all++; } else if (t === 'rt') { got += p.hit.filter(Boolean).length / p.x.points.length; all++; } else { const ok = t === 'ask' ? p.r.map(r => !!r.ok) : p.ok; got += ok.filter(Boolean).length; all += ok.length; } }
+    sec[t] = {pts: r1(all ? got / all * EK_MAX[t] : 0), max: EK_MAX[t]}; }
+  return sec; }
+function ekLost(parts){ const L = [];
+  for (const p of parts) { const x = p.x;
+    if (p.t === 'read' && p.res.score < 0.95) L.push(`朗读读对 ${Math.round(p.res.score * 100)}%：标黄的词跟着示范再读`);
+    if (p.t === 'dlg' || p.t === 'psg') x.qs.forEach((q, j) => { if (!p.ok[j]) L.push(`${esc(x.title)} 第 ${j + 1} 题：${q.opts && q.a != null ? `应选 ${ekL(q.a)}. ${esc(q.opts[q.a])}` : '参考 ' + esc(q.ans)}`); });
+    if (p.t === 'rt') { const miss = x.points.filter((pt, k) => !p.hit[k]).map(pt => pt.p); if (miss.length) L.push(`复述漏了：${esc(miss.join('、'))}`); }
+    if (p.t === 'ask') x.asks.forEach((a, j) => { if (!p.r[j].ok) L.push(`提问「${esc(a.cn)}」：可以问 ${esc(p.r[j].sample || a.expect.split(' / ')[0])}`); }); }
+  return L; }
+async function ekFinish(E){ ekClr(); E.ph = 'score'; render();
+  for (const p of E.parts) p.said = await Promise.all(p.said.map(v => Promise.resolve(v).then(t => t || '')));   // 等还在识别的录音
+  if (state.ek !== E) return;
+  for (const p of E.parts) { const x = p.x, sd = p.said;
+    if (p.t === 'read') p.res = alignWords(x.text, sd[0] || '');
+    else if (p.t === 'dlg' || p.t === 'psg') p.ok = x.qs.map((q, j) => !!sd[j] && (hasKeys(sd[j], q.keys) || letterOk(sd[j], q.a)));
+    else if (p.t === 'rt') p.hit = rtHits(x, sd[0] || ''); }
+  for (const p of E.parts) if (p.t === 'ask') p.r = await Promise.all(p.x.asks.map((a, j) => askJudge(a, p.x, p.said[j] || '')));
+  if (state.ek !== E) return;   // 打分途中退出：不记
+  E.sec = ekSecs(E.parts); E.lost = ekLost(E.parts); E.total = r1(Object.values(E.sec).reduce((a, b) => a + b.pts, 0));
+  const d = today(), u = now(), p = E.parts[0], x = p.x;
+  if (E.set) DB.mockRecs.push({id: uid('mk'), d, set: E.set, total: E.total, sec: Object.fromEntries(Object.entries(E.sec).map(([k, v]) => [k, v.pts])), u});
+  else if (p.t === 'read') DB.speakRecs.push({id: uid('sp'), d, pid: x.id, acc: Math.round(p.res.score * 100), sec: p.sec || 0, ex: 1, u});
+  else if (p.t === 'rt') { const q = E.parts[1], pts = p.hit.filter(Boolean).length / x.points.length, qs = q ? q.r.filter(r => r.ok).length / x.asks.length : 0; DB.speakRecs.push({id: uid('sp'), d, kind: 'retell', pid: x.id, acc: Math.round((pts * 0.6 + qs * 0.4) * 100), ex: 1, u}); }
+  else DB.speakRecs.push({id: uid('sp'), d, kind: 'listen', pid: x.id, acc: Math.round(p.ok.filter(Boolean).length / x.qs.length * 100), ex: 1, u});
+  E.ph = 'done'; ekWake(false); save(); render(); }
+const ekOpts = (q, mark) => q.opts ? q.opts.map((o, k) => `<div class="ekopt${mark && k === q.a ? ' ok' : ''}"><b>${ekL(k)}.</b><span>${esc(o)}${mark && k === q.a ? ' ✓' : ''}</span></div>`).join('') : '';
+const ekGrid = x => x.grid && x.grid.length ? `<div class="ekgrid">${x.grid.map(g => `<div><div class="h">${esc(g.h)}</div><div class="k">${esc(g.k)}</div></div>`).join('')}</div>` : `<p class="small muted" style="margin:6px 0">要点提示：${esc(x.map)}</p>`;
+const ekStartCard = x => x.start ? `<div class="card"><div class="small faint">用这句开头</div><div class="ekstart">${esc(x.start)} …</div></div>` : '';
+function ekRes(p){ const x = p.x, err = p.err ? `<div class="small faint">识别出错：${esc(p.err)}</div>` : '';
+  if (p.t === 'read') { const v = Math.round(p.res.score * 100); return `<div class="card"><div class="row"><h3 style="margin:0">朗读 · ${esc(x.title)}</h3><span class="spacer"></span><b style="font-family:var(--mono);font-size:20px;color:${v >= 95 ? 'var(--good)' : 'var(--amber)'}">${v}%</b></div><div style="font-family:Georgia,serif;font-size:17px;line-height:1.7;margin-top:8px">${markedEn(x.text, p.res.ok)}</div><details><summary class="small faint">识别到的</summary><p class="small muted">${esc(p.said[0] || '（没识别到）')}</p></details>${err}</div>`; }
+  if (p.t === 'dlg' || p.t === 'psg') return `<h3 style="margin:12px 0 6px">${EK_N[p.t]} · ${esc(x.title)}</h3>` + x.qs.map((q, j) => `<div class="card"><div>${j + 1}. ${esc(q.q)} ${p.ok[j] ? '<span class="pill good">对</span>' : '<span class="pill amber">再听听</span>'}</div>${ekOpts(q, true)}<div class="small" style="margin-top:4px">你说：${esc(p.said[j] || '（没识别到）')}</div><div class="small faint">参考：${esc(q.ans)}</div></div>`).join('') + err +
+    `<details class="card"><summary class="small">看录音原文</summary>` + x.lines.map(([sp, t]) => `<p style="margin:4px 0">${x.kind === 'dialogue' ? `<b>${sp === 'M' ? 'M' : 'W'}:</b> ` : ''}${esc(t)}</p>`).join('') + `</details>`;
+  if (p.t === 'rt') return `<div class="card"><h3>复述：讲到 ${p.hit.filter(Boolean).length}/${x.points.length} 个要点</h3>` + x.points.map((pt, k) => `<div class="row" style="margin:4px 0;flex-wrap:nowrap"><span style="width:20px;font-weight:700;color:${p.hit[k] ? 'var(--good)' : 'var(--ink3)'}">${p.hit[k] ? '✓' : '○'}</span><span>${esc(pt.p)}</span></div>`).join('') +
+    `<details style="margin-top:6px"><summary class="small faint">你说的</summary><p class="small muted">${esc(p.said[0] || '（没识别到）')}</p></details><details><summary class="small faint">看短文原文</summary><p class="small">${esc(x.text)}</p></details>${err}</div>`;
+  return x.asks.map((a, k) => { const r = p.r[k] || {}; return `<div class="card"><div>${esc(a.cn)}</div><div class="small" style="margin-top:4px">你问：${esc(r.said || '（没识别到）')} ${r.ok ? '<span class="pill good">对</span>' : '<span class="pill amber">再改改</span>'}${r.guess && r.said ? ' <span class="small faint">（粗判）</span>' : ''}</div>${r.hint ? `<div class="small" style="margin-top:2px">${esc(r.hint)}</div>` : ''}<div class="small faint">参考问法：${esc(r.sample || a.expect)}</div></div>`; }).join('') + err; }
+function ekDone(E){ const sec = E.sec, ks = Object.keys(EK_MAX).filter(t => sec[t]);
+  let h = E.set ? `<div class="card" style="text-align:center"><div class="small faint">第 ${E.set} 套 · 估分</div><div style="font-family:var(--mono);font-size:52px;font-weight:700;line-height:1.15;color:${E.total >= 20 ? 'var(--good)' : 'var(--amber)'}" id="mk-total">${E.total}<small style="font-size:20px">/25</small></div>`
+      + `<div class="eksec">${Object.keys(EK_MAX).map(t => `<div><div class="v">${sec[t] ? sec[t].pts : '–'}<small>/${EK_MAX[t]}</small></div><div class="l">${EK_N[t]}</div></div>`).join('')}</div><p class="small faint" style="margin:10px 0 0">机器按关键词估的，不是正式分。看失分点最有用。</p><div class="row" style="justify-content:center;margin-top:8px"><button class="btn sm primary" data-act="mkgo" data-v="${E.set}">再做一遍</button><button class="btn sm ghost" data-act="lv" data-v="speak">回列表</button></div></div>`
+    : `<div class="card" style="text-align:center"><div class="small faint">考试节奏 · 估分</div><div style="font-family:var(--mono);font-size:44px;font-weight:700;line-height:1.2">${ks.map(t => `${sec[t].pts}<small style="font-size:18px">/${sec[t].max}</small>`).join(' + ')}</div><div class="muted">${ks.map(t => EK_N[t]).join(' + ')}</div></div>`;
+  const li = l => `<div style="margin:5px 0">· ${l}</div>`;
+  h += E.lost.length ? `<div class="card"><h3>失分点</h3>${E.lost.slice(0, 5).map(li).join('')}${E.lost.length > 5 ? `<details><summary class="small faint">还有 ${E.lost.length - 5} 条</summary>${E.lost.slice(5).map(li).join('')}</details>` : ''}</div>` : `<div class="card"><b style="color:var(--good)">这一遍没有明显失分点</b></div>`;
+  h += (E.set ? `<h3 style="margin:14px 0 6px">逐题看</h3>` : '') + E.parts.map(ekRes).join('');
+  return h + `<div class="row"><button class="btn primary" data-act="${E.set ? 'mkgo' : 'ekgo'}" data-v="${E.set || E.parts[0].x.id}">再做一遍</button><button class="btn ghost" data-act="lv" data-v="speak">回列表</button></div>`; }
+function vEk(E){
+  if (E.ph === 'score') return `<div class="card empty">正在打分…</div>`;
+  if (E.ph === 'done') return ekDone(E);
+  const s = E.steps[E.si] || E.steps[0], p = E.parts[s.p], x = p.x, np = E.parts.length, qn = s.q != null && p.t !== 'read' && p.t !== 'rt' ? ` · 第 ${s.q + 1} 题` : '';
+  const left = Math.max(0, Math.ceil(((E.dur || 0) - (Date.now() - E.t0)) / 1000)), w = E.dur ? Math.max(0, 100 - (Date.now() - E.t0) / E.dur * 100) : 100;
+  const sm = p.t === 'rt' && (s.lab === '准备复述' || s.k === 'rec');   // 复述准备 / 作答：倒计时收小，给导图腾地方
+  const cd = (lab, col, btn) => `<div class="card ekcd${sm ? ' sm' : ''}${E.go ? ' go' : ''}"><div class="ekl"${col ? ` style="color:${col}"` : ''}>${lab}</div><div class="ekn"${col ? ` style="color:${col}"` : ''}><span id="ek-left">${left}</span><small>秒</small></div><div class="ekbar"><i id="ek-bar" style="width:${w}%"></i></div>${sm ? btn.replace('class="btn ', 'class="btn sm ') : btn}</div>`;
+  const big = svg => svg.replace('<svg', '<svg style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-5px"');
+  let st = '', ct = '';
+  if (E.ph === 'wait') st = cd(s.lab + qn, '', `<button class="btn ghost" data-act="ekskip">跳过等待 ›</button>`);
+  else if (E.ph === 'play') st = `<div class="card ekcd"><div class="ekl">${s.lab}</div><div style="font-size:20px;margin:12px 0 6px">${big(SPK)} 第 ${s.n - E.left + 1} / ${s.n} 遍</div><p class="small faint" style="margin:0">考试只放${s.n === 1 ? '一' : '两'}遍，认真听</p></div>`;
+  else if (E.ph === 'needPlay') st = `<div class="card ekcd"><div class="ekl">${s.lab}</div><p class="small muted" style="margin:6px 0 10px">录音没自动放出来，点一下</p><button class="btn primary ekbig" data-act="ekplay">${big(SPK)} 播放录音</button><div><button class="btn sm ghost" style="margin-top:10px" data-act="ekskip">放不出来，跳过</button></div></div>`;
+  else if (E.ph === 'rec') st = cd(s.lab + qn + ' · 开始说！', 'var(--danger)', `<button class="btn primary" data-act="ekdone">说完了</button>`);
+  else if (E.ph === 'busy') st = `<div class="card empty">正在识别…<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost sm" data-act="ekskip">跳过这题</button></div></div>`;
+  else if (E.ph === 'needMic') st = `<div class="card ekcd"><div class="ekl">${s.lab}${qn}</div><p class="small muted" style="margin:6px 0 10px">${esc(E.err || '麦克风没自动打开')}</p><button class="btn primary ekbig" data-act="ekmic">${big(MIC)} 开始说</button><div><button class="btn sm ghost" style="margin-top:10px" data-act="ekskip">跳过这题</button></div></div>`;
+  if (p.t === 'read') ct = `<div class="card"><h3 style="margin:0 0 6px">${esc(x.title)}</h3><div style="font-family:Georgia,serif;font-size:19px;line-height:1.8">${esc(x.text)}</div></div>`;
+  else if (p.t === 'dlg' || p.t === 'psg') ct = (p.t === 'dlg' ? `<p class="small muted" style="margin:0 0 6px">说出选项里的英文，不要只说 A/B/C</p>` : '') + x.qs.map((q, j) => `<div class="card ekq${s.k === 'rec' && s.q === j ? ' on' : ''}"><div style="font-size:16.5px">${j + 1}. ${esc(q.q)}</div>${ekOpts(q)}</div>`).join('');
+  else if (p.t === 'rt') { ct = `<div class="card"><h3 style="margin:0">${esc(x.title)}</h3>${ekGrid(x)}</div>`; if (s.lab === '准备复述' || s.k === 'rec') st = ekStartCard(x) + st; }   // 起始句：准备和作答时置顶
+  else ct = `<div class="card ekq on"><div class="small faint">提问 ${s.q + 1} / ${x.asks.length} · 用英语提问</div><div style="font-size:20px;margin:6px 0">${esc(x.asks[s.q].cn)}</div></div>`;
+  return `<div class="row" style="margin:0 0 8px"><span class="pill accent">${np > 1 ? `${s.p + 1}/${np} · ` : ''}${EK_N[p.t]}</span><span class="spacer"></span><span class="small faint">${E.set ? `第 ${E.set} 套模拟` : '考试节奏'}</span></div>` + st + ct; }
+// 考试模式下单篇的开始页
+function ekIntro(id){ const ps = ekParts(id); if (!ps.length) return '';
+  const p = ps[0], x = p.x, desc = {read: '听示范 1 遍 → 准备 50 秒 → 朗读 50 秒', dlg: '读题 10 秒 → 录音放 2 遍 → 每题 8 秒回答', psg: '读题 15 秒 → 录音放 2 遍 → 每题 8 秒回答', rt: '看导图 15 秒 → 放 2 遍 → 准备 60 秒 → 复述 60 秒 → 提问 2 个（各准备 15 秒、说 8 秒）'}[p.t];
+  return `<div class="card"><div class="row"><h3 style="margin:0">${esc(x.title)}</h3><span class="spacer"></span><span class="small faint">${EK_N[p.t]}</span></div><p class="small muted" style="margin:8px 0 0">${desc}</p><p class="small faint" style="margin:4px 0 0">到点自动往下走，准备时间能跳过，录音不能重听。${p.t === 'dlg' ? '回答说出选项里的英文，不要只说 A/B/C。' : ''}手机先把自动锁屏调长。</p></div>
+    <div class="row" style="justify-content:center;margin:10px 0"><button class="btn primary ekbig" data-act="ekgo" data-v="${x.id}">开始（考试节奏）</button></div>`; }
+const enModeSeg = () => { const m = enMode(); return `<div class="seg wide" style="margin:2px 0 10px" role="group" aria-label="练习方式"><button data-act="enmode" data-v="practice" class="${m === 'practice' ? 'on' : ''}">练习模式<span class="small" style="font-weight:400;opacity:.8;color:inherit">想听几遍都行</span></button><button data-act="enmode" data-v="exam" class="${m === 'exam' ? 'on' : ''}">考试模式<span class="small" style="font-weight:400;opacity:.8;color:inherit">按中考计时</span></button></div>`; };
+const mkRecs = k => mkSort((DB.mockRecs || []).filter(r => r.set === k));   // 按时间排：两台设备合并后数组顺序不可靠
+function mkCard(){ if (!LIB.speak || !LIB.speak2) return '';
+  return `<div class="card"><div class="row"><h3 style="margin:0">整套模拟</h3><span class="spacer"></span><span class="small faint">25 分 · 约 ${ekMin(mockParts(1))} 分钟</span></div><p class="small muted" style="margin:4px 0 10px">朗读 + 3 段对话 + 短文 + 复述 + 提问，按考试节奏连着做完，出估分。</p><div class="mkset">`
+    + [1, 2, 3].map(k => { const R = mkRecs(k), b = R.length ? Math.max(...R.map(r => r.total)) : null, last = R[R.length - 1]; return `<button class="btn" data-act="spopen" data-v="mk${k}"><b>第 ${k} 套</b><span class="small faint">${b != null ? `最好 ${b}` : '没做过'}</span>${last ? `<span class="small faint">最近 ${last.total}</span>` : ''}</button>`; }).join('') + `</div></div>`; }
+function vMock(k){ const ps = mockParts(k); if (!ps.length) return `<div class="card empty">题目还没加载到，联网后再打开。</div>`;
+  const R = mkRecs(k), b = R.length ? Math.max(...R.map(r => r.total)) : null, last = R[R.length - 1];
+  return `<div class="card"><h3 style="margin:0 0 8px">第 ${k} 套模拟 · 约 ${ekMin(ps)} 分钟</h3>` + ps.map((p, i) => `<div class="row" style="margin:5px 0;flex-wrap:nowrap"><span class="pill">${i + 1}</span><span style="flex:1;min-width:0">${EK_N[p.t]}${p.t === 'ask' ? ' 2 个' : ` · ${esc(p.x.title)}`}</span><span class="small faint">${p.t === 'dlg' ? 2 : EK_MAX[p.t]} 分</span></div>`).join('')
+    + `<p class="small faint" style="margin:8px 0 0">对话 3 段共 6 分，回答说出选项里的英文，别只说 A/B/C。中途别切出去，切出去这次就作废。手机先把自动锁屏调长。</p></div>`
+    + (b != null ? `<div class="card"><div class="sumk" style="grid-template-columns:1fr 1fr"><div class="sk"><div class="v">${b}<small>/25</small></div><div class="l">最好</div></div><div class="sk"><div class="v">${last.total}<small>/25</small></div><div class="l">最近 ${mdShort(last.d)}</div></div></div></div>` : '')
+    + `<div class="row" style="justify-content:center;margin:10px 0"><button class="btn primary ekbig" data-act="mkgo" data-v="${k}">开始模拟</button></div>`; }
+function ekQuit(){ const E = state.ek; if (E && E.ph !== 'done' && !confirm(E.set ? '放弃这次模拟？不记成绩' : '放弃这一遍？不记成绩')) return; stopAllEn(); render(); window.scrollTo(0, 0); }
 /* 加练：按星期自动排——一三五英语听说（朗读 / 听后回答 / 复述提问轮换），周六测一次体育；可选，不挡「今晚完成」 */
 function extraTask(d){
   const dow = P(d).getDay();
@@ -5343,7 +5544,9 @@ function methodCard(){
 }
 
 /* ================= 事件 ================= */
-function setTab(t){ const changed = t !== state.tab; if (changed) stopAllEn(); if (t === 'today') checkDay(); state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0);
+function setTab(t){ const changed = t !== state.tab, ek = state.ek && !['done', 'score'].includes(state.ek.ph) ? state.ek : null;
+  if (changed && ek && !confirm(ek.set ? '放弃这次模拟？不记成绩' : '放弃这一遍？不记成绩')) return;
+  const g = state.ekGone; if (changed) stopAllEn(); if (changed) state.ekGone = g; if (changed && ek) state.ekGone = ek.set ? '这次模拟放弃了，没记成绩。' : '这一遍放弃了，没记成绩。'; if (t === 'today') checkDay(); state.tab = t; state.examEdit = null; try { sessionStorage.setItem('obs-tab', t); } catch(e) {} render(); window.scrollTo(0,0);
   if (changed) { const m = $('#main'); m.classList.add('enter'); clearTimeout(setTab._t); setTab._t = setTimeout(() => m.classList.remove('enter'), 900); } }
 const ACT = {
   tab: el => { if (el.dataset.v === 'errors') state.errView = 'redo'; setTab(el.dataset.v); },
@@ -5415,10 +5618,10 @@ const ACT = {
     const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.adjust = m ? m[0] : t.slice(0, 60); w.u = now(); (w.fu = w.fu || {}).adjust = w.u; save(); toast('已写进「下周只调一件事」'); render(); },
   pet: el => { const pe = JSON.parse(JSON.stringify(DB.settings.pe || {})); pe.tests = pe.tests || {}; pe.tests[el.dataset.y] = pe.tests[el.dataset.y] === el.dataset.v ? '' : el.dataset.v; setSetting('pe', pe); save(); render(); },
   explain: el => { const dd = dayObj(today()) || {}; setDayField(today(), 'explain', (dd.explain || 0) + 1); save(); toast(el.dataset.v === '1' ? '好。只听不判，就是在帮他' : '让他换个说法再讲一遍'); render(); },
-  golearn: el => { stopAllEn(); const from = state.tab; state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.from = from; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.sp = null; state.ls = null; state.rt = null; } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
+  golearn: el => { stopAllEn(); const from = state.tab; state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.from = from; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.learn.task = !!el.dataset.s; state.sp = null; state.ls = null; state.rt = null; /* task：从今天页一三五加练进来，考试模式下也走练习页 */ } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
   toggleq: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.q = !queued(it); it.u = now(); save(); render(); },
   pv: el => { state.pv = el.dataset.v; state.examEdit = null; render(); window.scrollTo(0,0); },
-  lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { stopAllEn(); state.learn.sp = null; state.sp = null; } if (el.dataset.v === 'speak' && el.dataset.s) state.learn.sp = el.dataset.s; render(); window.scrollTo(0,0); },
+  lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; state.learn.task = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { stopAllEn(); state.learn.sp = null; state.sp = null; } if (el.dataset.v === 'speak' && el.dataset.s) state.learn.sp = el.dataset.s; render(); window.scrollTo(0,0); },
   earplay: () => earStart(0),
   earpick: el => earSeek(+el.dataset.v),
   earpp: () => { if (!EAR.url || EAR.day !== earDay()) return earStart(EAR.cur ? EAR.i : 0);
@@ -5539,7 +5742,7 @@ const ACT = {
     if (V.final) { if (ok) redoItem(id, true, true); else finalMiss(id); } else if (ok) redoItem(id, true, true); else render(); },
   varself: () => { const id = state.variant.iid; state.variant = null; finalMiss(id, true); },
   memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
-  spopen: el => { stopAllEn(); state.learn.sp = el.dataset.v; state.sp = null; render(); window.scrollTo(0,0); },
+  spopen: el => { stopAllEn(); state.learn.sp = el.dataset.v; state.learn.task = false; state.sp = null; render(); window.scrollTo(0,0); },
   lsplay: () => { const S = state.ls; S.phase = 'play'; S.n2 = false; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.ls === S && S.phase === 'play' && state.tab === 'learn') { S.phase = 'q'; S.i = 0; lsAsk(); } }, () => { if (state.ls === S && S.phase === 'play') { S.phase = 'intro'; if (state.tab === 'learn') setTimeout(render, 0); } }); },
   lsgo: () => { stopAudio(); const S = state.ls; S.phase = 'q'; S.i = 0; lsAsk(); },
   lsstop: () => lsStop(),
@@ -5552,6 +5755,15 @@ const ACT = {
   spplay: () => { const x = LIB.speak.items.find(i => i.id === state.learn.sp); const a = amEl('__enAudio', 'en'); if (!a.paused) { a.pause(); return; } AM.claim('en'); a.src = x.audio; a.play().catch(e => { if ((e && e.name === 'AbortError') || AM.cur !== 'en') return; speak(x.text, 'en-US'); }); },
   spstart: () => { state.sp = {id: state.learn.sp, phase: 'ready'}; spStart(); },
   spcheck: () => spCheck(),
+  enmode: el => { stopAllEn(); lsSet(K_ENMODE, el.dataset.v === 'exam' ? 'exam' : 'practice'); render(); },
+  ekgo: el => ekStart(ekParts(el.dataset.v)),
+  mkgo: el => { const k = +el.dataset.v; state.learn.sp = 'mk' + k; ekStart(mockParts(k), k); },
+  ekskip: () => { const E = state.ek; if (!E || ekFresh(E)) return; if (E.ph === 'busy') { const s = E.steps[E.si]; E.parts[s.p].said[s.q] = ''; return ekNext(E); }   // 识别卡住：这题按空答
+    if (E.ph === 'needPlay') { window.__p2Cancel = null; stopAudio(); } if (E.ph === 'needMic') { const s = E.steps[E.si]; E.parts[s.p].said[s.q] = ''; } if (['wait', 'needPlay', 'needMic'].includes(E.ph)) ekNext(E); },
+  ekplay: () => { const E = state.ek; if (E && E.ph === 'needPlay') ekPlay(E); },
+  ekmic: () => { const E = state.ek; if (E && E.ph === 'needMic') ekRec(E); },
+  ekdone: () => { const E = state.ek; if (E && !ekFresh(E)) ekRecStop(E); },   // 刚开麦就点（连点「跳过等待」的第二下）不算
+  ekquit: () => ekQuit(),
   spstop: () => spStop(),
   peaddall: () => { const ch = peChoice(); let n = 0, bad = '', msg = [];
     let badIt = null;

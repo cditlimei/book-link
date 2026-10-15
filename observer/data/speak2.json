@@ -38,7 +38,13 @@
 "bus"
 ]
 ],
-"ans": "By bus."
+"ans": "By bus.",
+"opts": [
+"On foot.",
+"By bus.",
+"By car."
+],
+"a": 1
 },
 {
 "q": "What time does the library close?",
@@ -50,7 +56,13 @@
 "6"
 ]
 ],
-"ans": "At six o'clock."
+"ans": "At six o'clock.",
+"opts": [
+"At five o'clock.",
+"At seven o'clock.",
+"At six o'clock."
+],
+"a": 2
 }
 ]
 },
@@ -91,7 +103,13 @@
 "10"
 ]
 ],
-"ans": "Ten."
+"ans": "Ten.",
+"opts": [
+"Ten.",
+"Eight.",
+"Twelve."
+],
+"a": 0
 },
 {
 "q": "How much is the football shirt?",
@@ -103,7 +121,13 @@
 "80"
 ]
 ],
-"ans": "Eighty yuan."
+"ans": "Eighty yuan.",
+"opts": [
+"Ten yuan.",
+"Eighteen yuan.",
+"Eighty yuan."
+],
+"a": 2
 }
 ]
 },
@@ -141,7 +165,13 @@
 "piano"
 ]
 ],
-"ans": "A piano lesson."
+"ans": "A piano lesson.",
+"opts": [
+"A science project.",
+"A visit to Longgang.",
+"A piano lesson."
+],
+"a": 2
 },
 {
 "q": "Who will Amy visit on Saturday afternoon?",
@@ -162,7 +192,13 @@
 "grandpa"
 ]
 ],
-"ans": "Her grandparents."
+"ans": "Her grandparents.",
+"opts": [
+"Her parents.",
+"Her grandparents.",
+"Her classmates."
+],
+"a": 1
 }
 ]
 },
@@ -200,7 +236,13 @@
 "yesterday"
 ]
 ],
-"ans": "Yesterday afternoon."
+"ans": "Yesterday afternoon.",
+"opts": [
+"This morning.",
+"Yesterday afternoon.",
+"Two days ago."
+],
+"a": 1
 },
 {
 "q": "How long should he stay in bed?",
@@ -220,7 +262,13 @@
 "2"
 ]
 ],
-"ans": "For two days."
+"ans": "For two days.",
+"opts": [
+"For one day.",
+"For a week.",
+"For two days."
+],
+"a": 2
 }
 ]
 },
@@ -377,7 +425,13 @@
 "drama"
 ]
 ],
-"ans": "The drama club."
+"ans": "The drama club.",
+"opts": [
+"The drama club.",
+"The chess club.",
+"The art club."
+],
+"a": 0
 },
 {
 "q": "When does the club meet?",
@@ -386,7 +440,13 @@
 "thursday"
 ]
 ],
-"ans": "Every Thursday after school."
+"ans": "Every Thursday after school.",
+"opts": [
+"Every Tuesday after school.",
+"Every Friday after school.",
+"Every Thursday after school."
+],
+"a": 2
 }
 ]
 },
@@ -424,7 +484,13 @@
 "running"
 ]
 ],
-"ans": "Running shoes."
+"ans": "Running shoes.",
+"opts": [
+"Football shoes.",
+"Running shoes.",
+"Basketball shoes."
+],
+"a": 1
 },
 {
 "q": "How much are the shoes?",
@@ -437,7 +503,13 @@
 "200"
 ]
 ],
-"ans": "Two hundred yuan."
+"ans": "Two hundred yuan.",
+"opts": [
+"Two hundred yuan.",
+"Forty yuan.",
+"Four hundred yuan."
+],
+"a": 0
 }
 ]
 },
@@ -471,7 +543,13 @@
 "dentist"
 ]
 ],
-"ans": "To the dentist."
+"ans": "To the dentist.",
+"opts": [
+"To the football match.",
+"To the doctor's.",
+"To the dentist."
+],
+"a": 2
 },
 {
 "q": "When is the football match now?",
@@ -480,7 +558,13 @@
 "sunday"
 ]
 ],
-"ans": "On Sunday morning."
+"ans": "On Sunday morning.",
+"opts": [
+"On Sunday morning.",
+"On Saturday morning.",
+"On Saturday afternoon."
+],
+"a": 0
 }
 ]
 },
@@ -524,7 +608,13 @@
 "raining"
 ]
 ],
-"ans": "Rainy."
+"ans": "Rainy.",
+"opts": [
+"Rainy.",
+"Cloudy.",
+"Sunny."
+],
+"a": 0
 },
 {
 "q": "What time will the girl get up?",
@@ -536,7 +626,13 @@
 "6"
 ]
 ],
-"ans": "At six."
+"ans": "At six.",
+"opts": [
+"At seven.",
+"At five.",
+"At six."
+],
+"a": 2
 }
 ]
 },
@@ -578,7 +674,13 @@
 "black"
 ]
 ],
-"ans": "Black."
+"ans": "Black.",
+"opts": [
+"Brown.",
+"Black.",
+"White."
+],
+"a": 1
 },
 {
 "q": "Where was the schoolbag found?",
@@ -591,7 +693,13 @@
 "dining"
 ]
 ],
-"ans": "In the dining hall."
+"ans": "In the dining hall.",
+"opts": [
+"In the dining hall.",
+"In the classroom.",
+"In the library."
+],
+"a": 0
 }
 ]
 },
@@ -632,7 +740,13 @@
 "hamburgers"
 ]
 ],
-"ans": "Hamburgers."
+"ans": "Hamburgers.",
+"opts": [
+"Rice.",
+"Noodles.",
+"Hamburgers."
+],
+"a": 2
 },
 {
 "q": "What should Tom drink instead of cola?",
@@ -641,7 +755,13 @@
 "water"
 ]
 ],
-"ans": "Water."
+"ans": "Water.",
+"opts": [
+"Water.",
+"Milk.",
+"Juice."
+],
+"a": 0
 }
 ]
 },
@@ -826,6 +946,33 @@
 "cn": "询问 Jack 在哪里练习游泳",
 "expect": "Where does he practise swimming? / Where did he practise?"
 }
+],
+"start": "Jack is a middle school student. Last year he started to",
+"grid": [
+{
+"h": "Hobby",
+"k": "learn to swim"
+},
+{
+"h": "Why",
+"k": "be healthier"
+},
+{
+"h": "Difficulty",
+"k": "afraid of water"
+},
+{
+"h": "Practice",
+"k": "three times a week"
+},
+{
+"h": "Result",
+"k": "six months, 200 metres"
+},
+{
+"h": "Plan",
+"k": "competition, next summer"
+}
 ]
 },
 {
@@ -894,6 +1041,29 @@
 "cn": "询问你还想换什么东西",
 "expect": "What else do you want to exchange? / What do you want to get next time?"
 }
+],
+"start": "Every Saturday morning, there is a special market in the writer's community.",
+"grid": [
+{
+"h": "What",
+"k": "books, toys, clothes"
+},
+{
+"h": "How",
+"k": "exchange, no money"
+},
+{
+"h": "The writer",
+"k": "storybooks, model plane"
+},
+{
+"h": "Benefits",
+"k": "save money, less waste"
+},
+{
+"h": "Neighbours",
+"k": "meet and talk"
+}
 ]
 },
 {
@@ -961,6 +1131,33 @@
 {
 "cn": "询问 Tina 怎么去奶奶家",
 "expect": "How does Tina get to her grandma's home?"
+}
+],
+"start": "Tina's grandma lives alone in an old building,",
+"grid": [
+{
+"h": "Building",
+"k": "no lift"
+},
+{
+"h": "Difficulty",
+"k": "weak legs, heavy things"
+},
+{
+"h": "Every Sunday",
+"k": "shopping, clean kitchen"
+},
+{
+"h": "Last month",
+"k": "video calls, smartphone"
+},
+{
+"h": "Now",
+"k": "every evening"
+},
+{
+"h": "Feeling",
+"k": "much happier"
 }
 ]
 },
@@ -1031,6 +1228,33 @@
 "cn": "询问她最喜欢种哪种蔬菜",
 "expect": "Which vegetable does she like growing best?"
 }
+],
+"start": "Lily lives in a flat without a garden,",
+"grid": [
+{
+"h": "Hobby",
+"k": "loves plants"
+},
+{
+"h": "Start",
+"k": "balcony, vegetables"
+},
+{
+"h": "Preparation",
+"k": "pots, seeds, books"
+},
+{
+"h": "Problem",
+"k": "too much water"
+},
+{
+"h": "Now",
+"k": "tomatoes, peppers, lettuce"
+},
+{
+"h": "Share",
+"k": "neighbours"
+}
 ]
 },
 {
@@ -1098,6 +1322,33 @@
 {
 "cn": "询问 Mark 当时有没有害怕",
 "expect": "Was Mark afraid at that time?"
+}
+],
+"start": "Last Tuesday, Mark was riding his bike home when",
+"grid": [
+{
+"h": "What happened",
+"k": "Tuesday, old man fell"
+},
+{
+"h": "Others & Mark",
+"k": "people walked past, stopped"
+},
+{
+"h": "Help",
+"k": "sit up, hurt"
+},
+{
+"h": "Call",
+"k": "daughter, man's phone"
+},
+{
+"h": "Result",
+"k": "20 minutes, hospital"
+},
+{
+"h": "Next day",
+"k": "school, thank"
 }
 ]
 },
@@ -1167,6 +1418,33 @@
 "cn": "询问下一本要读什么书",
 "expect": "What book will you read next?"
 }
+],
+"start": "Last month, the writer's class started",
+"grid": [
+{
+"h": "What",
+"k": "reading club"
+},
+{
+"h": "Books",
+"k": "one book, two weeks"
+},
+{
+"h": "Meeting",
+"k": "Friday afternoon, ideas"
+},
+{
+"h": "Task",
+"k": "learned, ask a question"
+},
+{
+"h": "Problem",
+"k": "shy, teacher encouraged"
+},
+{
+"h": "The writer",
+"k": "three books, writing improved"
+}
 ]
 },
 {
@@ -1235,6 +1513,33 @@
 "cn": "询问 Amy 最喜欢哪张照片",
 "expect": "Which photo does Amy like best?"
 }
+],
+"start": "During the National Day holiday, Amy and her parents",
+"grid": [
+{
+"h": "When & Where",
+"k": "National Day, Huangshan"
+},
+{
+"h": "Transport",
+"k": "high-speed train, evening"
+},
+{
+"h": "Next morning",
+"k": "four o'clock, sunrise"
+},
+{
+"h": "Weather & View",
+"k": "cold, windy, amazing"
+},
+{
+"h": "Photos",
+"k": "clouds, pine trees"
+},
+{
+"h": "Feeling",
+"k": "legs hurt, best trip"
+}
 ]
 },
 {
@@ -1302,6 +1607,33 @@
 {
 "cn": "询问他接下来想存钱买什么",
 "expect": "What does he want to save money for next?"
+}
+],
+"start": "Ben used to spend all his pocket money",
+"grid": [
+{
+"h": "Before",
+"k": "snacks, games"
+},
+{
+"h": "Idea",
+"k": "mother, save"
+},
+{
+"h": "At first",
+"k": "boring"
+},
+{
+"h": "Goal",
+"k": "new bike"
+},
+{
+"h": "How",
+"k": "20 yuan, write down"
+},
+{
+"h": "Result",
+"k": "bought bike, proud, plans"
 }
 ]
 }
