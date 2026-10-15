@@ -831,7 +831,7 @@ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.o
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v78';
+const APP_V = 'v79';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -2485,6 +2485,7 @@ function startMic(btn){
   const fallback = () => { el.focus(); toast('点键盘左下角或空格旁的 🎤 麦克风，直接说话'); };
   if (!SR) return fallback();
   if (recog) { recog.stop(); return; }
+  AM.stopAll();   // 磨耳朵 / 听讲解还在响会被一起识别进文本框
   recog = new SR(); recog.lang = 'zh-CN'; recog.interimResults = true; recog.continuous = false;
   const base = el.value ? el.value.replace(/\s+$/,'') + (/[。，,.！？]$/.test(el.value.trim()) ? '' : '，') : '';
   btn.classList.add('rec');
@@ -3524,7 +3525,11 @@ const WORDS_PER_NIGHT = 15;             // 一晚最多背 15 个（新词 + 到
 const wordKey = w => w.w.toLowerCase();
 const wState = w => DB.words[wordKey(w)] || null;
 function speak(text, lang){
-  try { const u = new SpeechSynthesisUtterance(text); u.lang = lang || 'en-US'; u.rate = lang === 'zh-CN' ? 0.9 : 0.85; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+  // 点读一个词会先停掉磨耳朵 / 听讲解，念完如果没别的声音接手就接着放（不然背单词翻一张卡磨耳朵就永久停了）
+  const prev = EAR.a && EAR.on && !EAR.a.paused ? 'ear' : TING.a && TING.on && !TING.a.paused ? 'ting' : null;
+  try { AM.claim('tts'); const u = new SpeechSynthesisUtterance(text); u.lang = lang || 'en-US'; u.rate = lang === 'zh-CN' ? 0.9 : 0.85;
+    if (prev) u.onend = () => { if (AM.cur === 'tts' && !speechSynthesis.speaking) prev === 'ear' ? earResume() : tingResume(); };
+    speechSynthesis.cancel(); speechSynthesis.speak(u); }
   catch(e) { toast('这个浏览器不能朗读'); }
 }
 const SPK = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>';
@@ -3676,6 +3681,7 @@ let SREC = null;
 /* 通用英语录音识别：enRecStart(秒数上限, 到时回调) → enRecStop() 返回识别到的文字 */
 let EREC = null;
 async function enRecStart(maxSec, onTimeout){
+  AM.stopAll();   // 开麦前停掉磨耳朵 / 听讲解等，免得被录进识别
   if (aiReady() && !asrPaused() && window.MediaRecorder && navigator.mediaDevices) {
     const R = EREC = {blobs: [], on: true, t0: Date.now()};             // 先占位：麦克风还没开好时点「说完了」也能正确停
     let stream; R.ready = navigator.mediaDevices.getUserMedia({audio: true}); try { stream = await R.ready; } catch(e) { if (EREC === R) EREC = null; throw new Error('没拿到麦克风权限'); }
@@ -3709,11 +3715,11 @@ async function enRecStop(discard){
 }
 const recUI = (sec, label) => `<div class="card" style="text-align:center"><div class="mic rec" style="margin:6px auto;width:80px;height:80px;border-radius:50%;background:var(--danger);display:flex;align-items:center;justify-content:center">${MIC.replace('<svg','<svg style="width:36px;height:36px;stroke:#fff;fill:none;stroke-width:1.8"')}</div><div class="muted">正在听…还剩 <b id="er-left">${sec}</b> 秒</div><button class="btn primary" style="margin-top:10px" data-act="${label}">说完了</button></div>`;
 /* 播放材料两遍（考试就是放两遍） */
-function playTwice(src, done){ const a = window.__enAudio || (window.__enAudio = new Audio()); let n = 0; a.onended = () => { n++; if (n < 2) { clearTimeout(window.__p2T); window.__p2T = setTimeout(() => { a.currentTime = 0; a.play().catch(() => {}); }, 1500); } else { a.onended = null; done && done(); } }; a.src = src; a.play().catch(() => {}); }
-function stopAudio(){ clearTimeout(window.__p2T); const a = window.__enAudio; if (a) { a.onended = null; try { a.pause(); } catch(e) {} } }
+function playTwice(src, done, cancel){ const a = amEl('__enAudio', 'en'); AM.claim('en'); clearTimeout(window.__p2T); window.__p2Cancel = cancel || null; let n = 0; a.onended = () => { n++; if (n < 2) { clearTimeout(window.__p2T); window.__p2T = setTimeout(() => { a.currentTime = 0; a.play().catch(() => {}); }, 1500); } else { a.onended = null; window.__p2Cancel = null; done && done(); } }; a.src = src; a.play().catch(() => {}); }
+function stopAudio(){ clearTimeout(window.__p2T); const a = window.__enAudio, c = window.__p2Cancel; window.__p2Cancel = null; if (a) { a.onended = null; try { a.pause(); } catch(e) {} } c && c(); }   // 放两遍被打断：让页面回到「开始听」，不卡在「正在播放…」
 /* 离开听说页 / 切 tab / 切到后台：停掉所有录音、倒计时、播放，免得麦克风一直开着、后台自己答题 */
 function stopAllEn(){
-  stopAudio(); clearInterval(window.__spT); clearInterval(window.__erT);
+  stopAudio(); AM.release('en'); clearInterval(window.__spT); clearInterval(window.__erT);   // 只放掉英语听说，不碰后台在放的磨耳朵 / 听讲解
   if (EREC) enRecStop(true).catch(() => {});
   if (SREC) { const R = SREC; SREC = null; R.on = false; clearTimeout(R.cut); try { R.sr ? R.sr.stop() : (R.mr && R.mr.state === 'recording' && R.mr.stop()); } catch(e) {} if (R.stream) R.stream.getTracks().forEach(t => t.stop()); }
   if (state.sp && ['rec','busy'].includes(state.sp.phase)) state.sp = null;
@@ -3787,6 +3793,7 @@ async function spStart(){
 }
 async function spStart2(S){
   try { window.__enAudio && window.__enAudio.pause(); } catch(e) {}
+  AM.stopAll();   // 开麦前停掉磨耳朵 / 听讲解等
   if (SREC) { const R = SREC; SREC = null; R.on = false; clearTimeout(R.cut); try { R.sr ? R.sr.stop() : (R.mr && R.mr.state === 'recording' && R.mr.stop()); } catch(e) {} if (R.stream) R.stream.getTracks().forEach(t => t.stop()); }
   if (aiReady() && !asrPaused() && window.MediaRecorder && navigator.mediaDevices) {
     try { const stream = await navigator.mediaDevices.getUserMedia({audio: true});
@@ -3899,6 +3906,53 @@ function extraTask(d){
   if (dow === 6 && LIB.pe) { const done = DB.peRecs.some(r => r.d === d); return {t: '测一次体育', s: done ? '测过了' : '一项就行 · 可选', done, opt: true, act: 'golearn', v: 'pe', go: ''}; }
   return null;
 }
+/* ================= 全局音频：同一时间只让一路出声 =================
+   磨耳朵 / 听讲解 / 语文背诵朗读 / 英语听说 / 系统朗读互斥（以前只有「开始放」会停对方，继续、跳段、锁屏按钮都不停，语文英语会一起响）。
+   claim(谁) 同步停掉其他几路，必须在点击里、静音解锁 play 之前调；每个播放器的 play 事件再兜底 claim 一次，漏掉的入口一出声也会停掉别人。
+   锁屏 / 耳机按钮只注册一次，按当前占用方分发（以前两个播放器各注册一遍，后建的覆盖先建的） */
+const AM = {cur: null};
+const AM_N = {ear: '磨耳朵', ting: '听讲解', poem: '背诵朗读', en: '英语听说'};
+const amMS = () => 'mediaSession' in navigator ? navigator.mediaSession : null;
+const amA = w => w === 'ear' ? EAR.a : w === 'ting' ? TING.a : w === 'poem' ? window.__poemAudio : w === 'en' ? window.__enAudio : null;
+const amErr = w => e => { if (e && e.name === 'AbortError') return; logErr((AM_N[w] || w) + ': ' + ((e && e.message) || e), w, 0, 0, e && e.stack); };   // 换源打断上一次 play 是正常的，不记
+// 等音频知道时长再跳段（最多 3 秒，等不到就照旧先放再跳）
+const amReady = a => new Promise(r => { let t; const f = () => { clearTimeout(t); a.removeEventListener('loadedmetadata', f); r(); }; a.addEventListener('loadedmetadata', f); t = setTimeout(f, 3000); });
+AM.claim = w => {
+  AM.cur = w || null;
+  if (w !== 'ear' && EAR.a && (EAR.on || !EAR.a.paused)) earStop();       // earStop/tingStop 先把 on 置 false 再 pause；不带 done，不弹「放完了」
+  if (w !== 'ting' && TING.a && (TING.on || !TING.a.paused)) tingStop();
+  if (w !== 'poem') try { window.__poemAudio && window.__poemAudio.pause(); } catch(e) {}
+  if (w !== 'en' && window.__enAudio) stopAudio();                       // 顺带清掉「放两遍」的 1.5 秒重放定时器
+  if (w !== 'tts') try { window.speechSynthesis && speechSynthesis.cancel(); } catch(e) {}
+  amMeta();
+};
+AM.stopAll = () => AM.claim(null);   // 开麦前：什么都别响，免得被录进识别
+AM.release = w => { if (AM.cur === w) { AM.cur = null; amMeta(); } };
+// 给播放器挂兜底：一出声就 claim 自己；被别人停掉后才到的旧 play 事件（此时已 paused）不算
+AM.hook = (a, w) => { a.addEventListener('play', () => { if (!a.paused) AM.claim(w); });
+  a.addEventListener('loadedmetadata', () => { if (AM.cur === w) amPos(); });   // 新源知道时长后补一次锁屏进度
+  a.addEventListener('pause', () => { if (AM.cur !== w) return; const ms = amMS(); try { if (ms) ms.playbackState = 'paused'; } catch(e) {} amPos(); });
+  return a; };
+const amEl = (k, w) => window[k] || (window[k] = AM.hook(new Audio(), w));
+function amMeta(){ const ms = amMS(); if (!ms) return; const w = AM.cur, seg = w === 'ear' || w === 'ting', on = (k, f) => { try { ms.setActionHandler(k, f); } catch(e) {} };
+  on('nexttrack', seg ? () => amGo(1) : null); on('previoustrack', seg ? () => amGo(-1) : null);   // 朗读 / 听说这类短音不给上下段，免得锁屏按钮把磨耳朵拉起来
+  if (w === 'ear') earMeta(); else if (w === 'ting') tingMeta();
+  else try { ms.metadata = AM_N[w] && window.MediaMetadata ? new MediaMetadata({title: AM_N[w], album: '每日观察'}) : null; } catch(e) {}
+  const a = amA(w); try { ms.playbackState = a ? (a.paused ? 'paused' : 'playing') : 'none'; } catch(e) {}
+  amPos(); }
+// 锁屏进度条按当前这一段算（整条拼接音频太长），老 iPadOS 没有 setPositionState 就跳过
+function amPos(){ const ms = amMS(); if (!ms || !ms.setPositionState) return; const w = AM.cur, a = amA(w), clr = () => { try { ms.setPositionState(); } catch(e) {} };   // 拿不到合法进度就清掉，别留着上一路的
+  if (!a || a.src === EAR_SILENT) return clr();
+  const t = w === 'ear' ? EAR.cur : w === 'ting' ? TING.cur : null, s = t ? t.start : 0, d = t ? t.end - t.start : a.duration;
+  if (!(d > 0) || !isFinite(d)) return clr();
+  try { ms.setPositionState({duration: d, playbackRate: a.playbackRate || 1, position: Math.min(d, Math.max(0, a.currentTime - s))}); } catch(e) {} }
+function amGo(n){ if (AM.cur === 'ear') earSeek(EAR.i + n); else if (AM.cur === 'ting') tingSeek(TING.i + n); }
+(() => { const ms = amMS(); if (!ms) return; const on = (k, f) => { try { ms.setActionHandler(k, f); } catch(e) {} };
+  on('play', () => { const w = AM.cur; if (w === 'ear') earResume(); else if (w === 'ting') tingResume(); else { const a = amA(w); if (a) { AM.claim(w); a.play().catch(amErr(w)); } } });   // 和页面上 ▶ 走同一套恢复（含磨耳朵到点后重新计时）
+  on('pause', () => { const w = AM.cur; if (w === 'ear') earPause(); else if (w === 'ting') tingPause(); else { const a = amA(w); if (a) a.pause(); } });
+  on('stop', () => { const w = AM.cur; if (w === 'ear') earStop(); else if (w === 'ting') tingStop(); else { const a = amA(w); if (a) a.pause(); } });
+  on('seekto', ev => { const w = AM.cur, a = amA(w); if (!a || !ev || !(ev.seekTime >= 0)) return; const t = w === 'ear' ? EAR.cur : w === 'ting' ? TING.cur : null, s = t ? t.start : 0, d = t ? t.end - t.start : a.duration;
+    try { a.currentTime = s + (d > 0 ? Math.min(ev.seekTime, d - 0.1) : ev.seekTime); } catch(e) {} if (w === 'ear') EAR.lt = null; if (w === 'ting') TING.lt = null; amPos(); }); })();
 /* ================= 早上磨耳朵：英语课本课文音频（沪教版七上每单元 Reading + Focusing on culture + 单词跟读） =================
    她 2026-10-11 要的：每天早上给孩子放初中英语课文。课文有版权，音频在私有仓库 ear/ 加密存放（Claude 用 ~/math-plan/tools/publish_ear.py 发布），
    用同步口令解密；下载过的存本机，没网也能放。网页不能到点自己出声，所以是早上点一下开始：本单元课文 → 单词 → 上一单元课文，循环到定时（默认 15 分钟）放完当前这段再停，锁屏也能继续 */
@@ -3949,48 +4003,63 @@ function earBlob(d){
 const earHave = d => !!d && (lsGet('observer:earHave') || {})[d.id] === d.ver;
 function earAudio(){
   if (EAR.a) return EAR.a;
-  const a = EAR.a = new Audio(); a.preload = 'auto';
-  a.addEventListener('ended', () => { if (a.src === EAR_SILENT || !EAR.on) return;
+  const a = EAR.a = AM.hook(new Audio(), 'ear'); a.preload = 'auto';
+  a.addEventListener('ended', () => { if (a.src === EAR_SILENT || !EAR.on) return;   // 现在正式源开了 loop，正常不会走到这里，留作兜底
     if (Date.now() >= EAR.until) return earStop(true);
-    a.currentTime = 0; a.play().catch(() => {}); });   // 一轮放完、时间还没到：从头再来一遍
+    a.currentTime = 0; a.play().catch(amErr('ear')); });   // 一轮放完、时间还没到：从头再来一遍
   a.addEventListener('timeupdate', earTick);
-  a.addEventListener('play', earUI); a.addEventListener('pause', earUI);
-  if ('mediaSession' in navigator) { const ms = navigator.mediaSession, on = (k, f) => { try { ms.setActionHandler(k, f); } catch(e) {} };
-    on('play', () => { EAR.on = true; a.play().catch(() => {}); }); on('pause', () => { a.pause(); EAR.on = false; });
-    on('nexttrack', () => earSeek(EAR.i + 1)); on('previoustrack', () => earSeek(EAR.i - 1)); }
+  a.addEventListener('play', earUI); a.addEventListener('pause', earUI);   // 锁屏按钮改由 AM 统一注册
   return a;
 }
 // 必须在点击里同步调用：先放一段静音把播放器「解锁」，iOS 才允许后面下载解密完再出声
 async function earStart(i){
   const d = earDay(); if (!d) return;
-  if (TING.on) tingStop();
-  const a = earAudio(); if (!(EAR.day === d && EAR.url)) { a.src = EAR_SILENT; a.play().catch(() => {}); }
+  AM.claim('ear');   // 停掉听讲解 / 朗读 / 听说（以前只停听讲解）
+  const a = earAudio(); if (!(EAR.day === d && EAR.url)) { a.loop = false; a.src = EAR_SILENT; a.play().catch(amErr('ear')); }
   EAR.list = earPlaylist(); EAR.until = Date.now() + earMin() * 60000; EAR.on = true; EAR.err = '';
   EAR.i = i || 0; EAR.cur = EAR.list[EAR.i]; EAR.loading = true; earUI();
   try {
     if (EAR.day !== d || !EAR.url) {
-      const b = await earBlob(d); if (!EAR.on) return;
+      const b = await earBlob(d); if (!EAR.on) { EAR.loading = false; earUI(); return; }
       const old = EAR.url; EAR.url = URL.createObjectURL(b); EAR.day = d; a.src = EAR.url; if (old) URL.revokeObjectURL(old);
     }
-    await a.play(); a.currentTime = EAR.cur.start; EAR.lt = null; earMeta();
-  } catch(e) { EAR.on = false; EAR.err = navigator.onLine === false && !earHave(d) ? '没网，这一轮还没下载到这台设备' : '没放出来，再点一次试试'; logErr('磨耳朵: ' + ((e && e.message) || e), 'ear', 0, 0, e && e.stack); }
+    a.loop = true;   // 一轮放完由浏览器自己从头接着放，不再靠 ended 里重新 play()（锁屏时可能被拒，错误还被吞掉）；到点停在 earTick / earGuard
+    if (a.readyState < 1) { await amReady(a); if (!EAR.on) { EAR.loading = false; earUI(); return; } }
+    try { a.currentTime = EAR.cur.start; } catch(e) {}   // 先跳到这一段再出声，免得开头先从 0 秒响一下
+    await a.play(); if (Math.abs(a.currentTime - EAR.cur.start) > 2) a.currentTime = EAR.cur.start;
+    EAR.lt = null; earMeta(); earGuard();
+  } catch(e) { if (!EAR.on || AM.cur !== 'ear' || (e && e.name === 'AbortError')) { EAR.loading = false; earUI(); return; }   // 被暂停 / 别的音源抢占，不算没放出来
+    EAR.on = false; EAR.err = navigator.onLine === false && !earHave(d) ? '没网，这一轮还没下载到这台设备' : '没放出来，再点一次试试'; logErr('磨耳朵: ' + ((e && e.message) || e), 'ear', 0, 0, e && e.stack); }
   EAR.loading = false; earUI();
 }
 function earSeek(i){
   if (!EAR.list.length) return;
   const n = EAR.list.length; i = (i + n) % n;
   if (!EAR.url || EAR.day !== earDay()) return earStart(i);
+  AM.claim('ear');
   if (Date.now() >= EAR.until) EAR.until = Date.now() + earMin() * 60000;
   EAR.i = i; EAR.cur = EAR.list[i]; EAR.on = true; EAR.err = ''; EAR.lt = null;
-  EAR.a.currentTime = EAR.cur.start; EAR.a.play().catch(() => {}); earMeta(); earUI();
+  EAR.a.currentTime = EAR.cur.start; EAR.a.play().catch(amErr('ear')); earMeta(); earUI(); earGuard();
 }
-function earMeta(){ const t = EAR.cur; if (t && 'mediaSession' in navigator && window.MediaMetadata) try { navigator.mediaSession.metadata = new MediaMetadata({title: t.title, artist: `Unit ${t.unit} · ${EAR_KIND[t.kind] || ''}`, album: '早上磨耳朵'}); } catch(e) {} }
+// ▶ 继续 / 锁屏播放共用：到点后再放重新计时；音频没了就重新开始
+function earResume(){ const a = EAR.a; if (!a || !EAR.url || EAR.day !== earDay() || !EAR.list.length || !EAR.cur) return earStart(EAR.cur ? EAR.i : 0);   // 换过单元 list 被清空：重建，不然到点检测全失效会一直循环
+  AM.claim('ear');
+  if (Date.now() >= EAR.until) EAR.until = Date.now() + earMin() * 60000;
+  EAR.on = true; EAR.err = ''; EAR.lt = null; a.play().catch(e => { if ((e && e.name === 'AbortError') || !EAR.on || AM.cur !== 'ear') return; amErr('ear')(e); earStart(EAR.i); }); earGuard(); }   // 被暂停 / 抢占时别重启，免得把别人或暂停顶掉
+function earPause(){ EAR.on = false; if (EAR.a) EAR.a.pause(); }
+// 定时兜底：锁屏后 timeupdate 可能被节流，到点 + 最长一段还没停就直接停
+function earGuard(){ clearTimeout(EAR.gT); if (!EAR.on || !EAR.list.length) return;
+  const mx = Math.max(60, ...EAR.list.map(t => t.end - t.start)) * 1000 + 5000;
+  EAR.gT = setTimeout(() => { if (!EAR.on) return; if (Date.now() >= EAR.until + mx) { EAR.lt = null; earStop(true); } else earGuard(); }, Math.max(1000, EAR.until + mx - Date.now())); }
+function earMeta(){ if (AM.cur !== 'ear') return; const t = EAR.cur; if (t && 'mediaSession' in navigator && window.MediaMetadata) try { navigator.mediaSession.metadata = new MediaMetadata({title: t.title, artist: `Unit ${t.unit} · ${EAR_KIND[t.kind] || ''}`, album: '早上磨耳朵'}); } catch(e) {} amPos(); }
 function earStop(done){ EAR.on = false; if (EAR.a) EAR.a.pause(); if (done) toast(`磨耳朵 ${earMin()} 分钟放完了`); earUI(); }
 function earTick(){
   const a = EAR.a; if (!a || a.src === EAR_SILENT || !EAR.list.length) return;
   const ct = a.currentTime;
   if (EAR.lt != null && !a.paused) { const dt = ct - EAR.lt; if (dt > 0 && dt < 3) { const L = lsGet('observer:earLog') || {}, k = today(); L[k] = (L[k] || 0) + dt; earTick.n = (earTick.n || 0) + 1; if (earTick.n % 20 === 0) { for (const x of Object.keys(L)) if (x < addD(k, -60)) delete L[x]; } lsSet('observer:earLog', L); } }
+  const wrapped = EAR.lt != null && ct + 1 < EAR.lt;   // loop 从尾回到头（跳段 / 锁屏拖动都会先把 lt 清空，不会误判）
   EAR.lt = ct;
+  if (wrapped && EAR.on && !EAR.loading && Date.now() >= EAR.until) { EAR.lt = null; EAR.i = 0; EAR.cur = EAR.list[0]; return earStop(true); }   // 停在第 0 段，锁屏再按播放时标题和进度对得上   // 定时到了、一轮刚放完：不再从头放
   let i = 0; EAR.list.forEach((t, k) => { if (ct >= t.start - 0.05) i = k; });
   if (i !== EAR.i && !EAR.loading) {
     if (EAR.on && Date.now() >= EAR.until && i > EAR.i) { EAR.lt = null; return earStop(true); }   // 定时到了：放完这一段再停，不在半句话中间断
@@ -4038,7 +4107,7 @@ function vEar(){
   h += `<div style="margin-top:12px">` + list.map((t, i) => `<button class="ear-row ${EAR.cur && EAR.cur.id === t.id ? 'on' : ''}" data-act="earpick" data-v="${i}"><span class="k">${t.unit === u ? EAR_KIND[t.kind] : '复习'}</span><span style="flex:1;min-width:0">${esc(t.title)}</span><span class="small faint">${Math.round((t.end - t.start) / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div></div>`;
   const t = EAR.cur || list[0];
   if (t) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${EAR.cur ? '正在放' : '第一段'} · Unit ${t.unit} · ${EAR_KIND[t.kind]}${t.page ? ` · 课本第 ${t.page} 页` : ''}</div>${t.paras.map((p, i) => i === 0 && t.kind !== 'words' ? `<h3 style="margin:0 0 10px">${esc(p.replace(/\.$/, ''))}</h3>` : `<p>${esc(p)}</p>`).join('')}</div>`;
-  h += `<p class="small faint" style="margin:0 4px 16px">课文按课本原文朗读（美音，略慢于正常语速），不是课本配套录音。网页不能到点自己出声，早上点一下「开始放」；放的时候锁屏也会接着放。</p>`;
+  h += `<p class="small faint" style="margin:0 4px 16px">课文按课本原文朗读（美音，略慢于正常语速），不是课本配套录音。网页不能到点自己出声，早上点一下「开始放」；放的时候锁屏一般也会接着放；个别 iPad 从主屏幕图标打开、锁屏就停的，先别锁屏，告诉家长。</p>`;
   return h;
 }
 
@@ -4146,40 +4215,48 @@ async function tingPrefetch(todayOnly){ for (const s of tingList(today())) await
 async function tingDayBlob(list){ const bs = []; for (const s of list) bs.push(await tingSegBlob(s)); return new Blob(bs, {type:'audio/mpeg'}); }
 function tingAudio(){
   if (TING.a) return TING.a;
-  const a = TING.a = new Audio(); a.preload = 'auto';
+  const a = TING.a = AM.hook(new Audio(), 'ting'); a.preload = 'auto';
   a.addEventListener('ended', () => { if (a.src === EAR_SILENT || !TING.on) return; tingMark(); if (TING.cur) TING.ask = TING.cur.id; tingStop(true); });
   a.addEventListener('timeupdate', tingTick);
-  a.addEventListener('play', tingUI); a.addEventListener('pause', () => { tingFlush(); tingUI(); });   // 暂停 / 放完都会触发 pause
-  if ('mediaSession' in navigator) { const ms = navigator.mediaSession, on = (k, f) => { try { ms.setActionHandler(k, f); } catch(e) {} };
-    on('play', () => { TING.on = true; a.play().catch(() => {}); }); on('pause', () => { a.pause(); TING.on = false; });
-    on('nexttrack', () => tingSeek(TING.i + 1)); on('previoustrack', () => tingSeek(TING.i - 1)); }
+  a.addEventListener('play', tingUI); a.addEventListener('pause', () => { tingFlush(); tingUI(); });   // 暂停 / 放完都会触发 pause；锁屏按钮改由 AM 统一注册
   return a;
 }
 const tingKey = list => list.map(s => s.id + ':' + s.ver).join('|');
 // 必须在点击里同步调用：先放一段静音「解锁」播放器，iOS 才允许下载解密完再出声（同磨耳朵）
 async function tingStart(i){
-  if (EAR.on) earStop();
   const list = tingList(today()); if (!list.length) return;
+  AM.claim('ting');   // 停掉磨耳朵 / 朗读 / 听说（以前只停磨耳朵）
   const a = tingAudio(), key = tingKey(list);
-  if (!(TING.key === key && TING.url)) { a.src = EAR_SILENT; a.play().catch(() => {}); }
+  if (!(TING.key === key && TING.url)) { a.src = EAR_SILENT; a.play().catch(amErr('ting')); }
   TING.list = list; TING.on = true; TING.err = ''; TING.i = i || 0; TING.cur = list[TING.i]; TING.loading = true; tingUI();
   try {
     if (TING.key !== key || !TING.url) {
       const b = await tingDayBlob(list); if (!TING.on) { TING.loading = false; tingUI(); return; }
       const old = TING.url; TING.url = URL.createObjectURL(b); TING.key = key; a.src = TING.url; if (old) URL.revokeObjectURL(old);
     }
-    await a.play(); a.currentTime = TING.cur.start; TING.lt = null; tingMeta();
-  } catch(e) { TING.on = false; TING.err = navigator.onLine === false ? '没网，今天这几段还没下载到这台设备' : '没放出来，再点一次试试'; logErr('听讲解: ' + ((e && e.message) || e), 'ting', 0, 0, e && e.stack); }
+    if (a.readyState < 1) { await amReady(a); if (!TING.on) { TING.loading = false; tingUI(); return; } }
+    try { a.currentTime = TING.cur.start; } catch(e) {}   // 先跳到这一段再出声，免得开头先从 0 秒响一下
+    await a.play(); if (Math.abs(a.currentTime - TING.cur.start) > 2) a.currentTime = TING.cur.start;
+    TING.lt = null; tingMeta();
+  } catch(e) { if (!TING.on || AM.cur !== 'ting' || (e && e.name === 'AbortError')) { TING.loading = false; tingUI(); return; }
+    TING.on = false; TING.err = navigator.onLine === false ? '没网，今天这几段还没下载到这台设备' : '没放出来，再点一次试试'; logErr('听讲解: ' + ((e && e.message) || e), 'ting', 0, 0, e && e.stack); }
   TING.loading = false; tingUI();
 }
 function tingSeek(i){
   if (!TING.list.length) return;
   const n = TING.list.length; i = (i + n) % n;
   if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(i);
+  AM.claim('ting');
   TING.i = i; TING.cur = TING.list[i]; TING.on = true; TING.err = ''; TING.lt = null;
-  TING.a.currentTime = TING.cur.start; TING.a.play().catch(() => {}); tingMeta(); tingUI();
+  TING.a.currentTime = TING.cur.start; TING.a.play().catch(amErr('ting')); tingMeta(); tingUI();
 }
-function tingMeta(){ const t = TING.cur; if (t && 'mediaSession' in navigator && window.MediaMetadata) try { navigator.mediaSession.metadata = new MediaMetadata({title: t.title, artist: TING_SUBJ[t.subj] || '', album: '听讲解'}); } catch(e) {} }
+// ▶ 继续 / 锁屏播放共用：放完了从头放；音频没了就重新开始
+function tingResume(){ const a = TING.a; if (!a || !TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
+  if (a.ended || (a.duration && a.currentTime >= a.duration - 0.3)) return tingSeek(0);
+  AM.claim('ting');
+  TING.on = true; TING.err = ''; TING.lt = null; a.play().catch(e => { if ((e && e.name === 'AbortError') || !TING.on || AM.cur !== 'ting') return; amErr('ting')(e); tingStart(TING.i); }); }
+function tingPause(){ TING.on = false; if (TING.a) TING.a.pause(); }
+function tingMeta(){ if (AM.cur !== 'ting') return; const t = TING.cur; if (t && 'mediaSession' in navigator && window.MediaMetadata) try { navigator.mediaSession.metadata = new MediaMetadata({title: t.title, artist: TING_SUBJ[t.subj] || '', album: '听讲解'}); } catch(e) {} amPos(); }
 function tingStop(done){ TING.on = false; if (TING.a) TING.a.pause(); tingFlush(); if (done) toast('今天的讲解放完了'); tingUI(); }
 // 一段听过 80% 才算听过（跳过的不算）；记最近一次日期和次数，7 天后进复习
 function tingMark(){ const t = TING.cur; if (!t || TING.marked[t.id] === today()) return; TING.marked[t.id] = today();
@@ -4790,7 +4867,7 @@ function alignText(lines, said, strict){
 function markedLines(lines, miss){ return lines.map((l, li) => `<div>${[...l].map((c, ci) => miss.has(li + ':' + ci) ? `<span style="background:var(--amber-bg);color:var(--amber);border-bottom:2px solid var(--amber)">${esc(c)}</span>` : esc(c)).join('')}</div>`).join(''); }
 let REC = null;
 async function recStart(){
-  const R = state.rcheck; R.said = ''; R.err = '';
+  const R = state.rcheck; R.said = ''; R.err = ''; AM.stopAll();   // 开麦前停掉磨耳朵 / 听讲解等
   if (aiReady() && !asrPaused() && window.MediaRecorder && navigator.mediaDevices) {   // 智谱余额不足后 10 分钟内改用设备自带识别（充值后点设置里的「测试」立即恢复）
     try { const stream = await navigator.mediaDevices.getUserMedia({audio: true});
       const type = ['audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
@@ -5344,19 +5421,18 @@ const ACT = {
   lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { stopAllEn(); state.learn.sp = null; state.sp = null; } if (el.dataset.v === 'speak' && el.dataset.s) state.learn.sp = el.dataset.s; render(); window.scrollTo(0,0); },
   earplay: () => earStart(0),
   earpick: el => earSeek(+el.dataset.v),
-  earpp: () => { const a = EAR.a; if (!EAR.url || EAR.day !== earDay()) return earStart(EAR.cur ? EAR.i : 0);
-    if (earPlaying()) { a.pause(); EAR.on = false; return; }
-    if (Date.now() >= EAR.until) EAR.until = Date.now() + earMin() * 60000;
-    EAR.on = true; EAR.err = ''; EAR.lt = null; a.play().catch(() => earStart(EAR.i)); },
+  earpp: () => { if (!EAR.url || EAR.day !== earDay()) return earStart(EAR.cur ? EAR.i : 0);
+    if (earPlaying()) return earPause();
+    earResume(); },   // 继续：先 claim 停掉听讲解等，再接着放
   earnext: el => earSeek(EAR.i + (+el.dataset.v)),
-  earunit: el => { lsSet('observer:earUnit', {u: +el.dataset.v, a: enUnit(today()) || 1}); if (EAR.on) earStop(); EAR.cur = null; EAR.list = []; render(); const d = earDay(); if (d) earBlob(d).then(() => earUI()).catch(() => {}); },
-  earmin: el => { lsSet('observer:earMin', +el.dataset.v); if (EAR.on) EAR.until = Date.now() + (+el.dataset.v) * 60000; render(); },
+  earunit: el => { lsSet('observer:earUnit', {u: +el.dataset.v, a: enUnit(today()) || 1}); if (EAR.on) earStop(); AM.release('ear'); EAR.cur = null; EAR.list = []; render(); const d = earDay(); if (d) earBlob(d).then(() => earUI()).catch(() => {}); },
+  earmin: el => { lsSet('observer:earMin', +el.dataset.v); if (EAR.on) { EAR.until = Date.now() + (+el.dataset.v) * 60000; earGuard(); } render(); },
   tingplay: () => tingStart(0),
   tingpick: el => tingSeek(+el.dataset.v),
   tingpp: () => { const a = TING.a; if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
-    if (a.ended || (a.duration && a.currentTime >= a.duration - 0.3)) return tingSeek(0);   // 放完了：从头再放
-    if (tingPlaying()) { a.pause(); TING.on = false; return; }
-    TING.on = true; TING.err = ''; TING.lt = null; a.play().catch(() => tingStart(TING.i)); },
+    if (a.ended || (a.duration && a.currentTime >= a.duration - 0.3)) return tingSeek(0);   // 放完了：从头再放（tingSeek 里会 claim）
+    if (tingPlaying()) return tingPause();
+    tingResume(); },
   tingnext: el => tingSeek(TING.i + (+el.dataset.v)),
   tingans: el => tingAnswer(el.dataset.s, el.dataset.v === 'ok'),
   tingsubj: el => { if (el.dataset.v === tingSubjToday(today())) return; const was = tingPlaying(); TING.pick = {d: today(), s: el.dataset.v}; if (TING.on) tingStop(); TING.cur = null; TING.list = []; TING.ask = null; render(); if (was) tingStart(0); else tingPrefetch(true).catch(() => {}); },   // 正在放就直接接着放新的一科
@@ -5380,7 +5456,7 @@ const ACT = {
   preveal: el => { state.learn.reveal[el.dataset.v] = true; render(); },
   rset: el => { setRecite(state.learn.poem, el.dataset.v); toast('记下了'); render(); },
   sayzh: () => { const x = LIB.recite.items.find(i => i.id === state.learn.poem); if (!x || !x.text) return;
-    if (x.audio) { try { speechSynthesis.cancel(); } catch(e) {} const a = window.__poemAudio || (window.__poemAudio = new Audio()); if (!a.paused && a.dataset.id === x.id) { a.pause(); return; } a.src = 'audio/' + x.id + '.mp3'; a.dataset.id = x.id; a.play().catch(() => speak(x.title + '。' + x.text.join(''), 'zh-CN')); }
+    if (x.audio) { try { speechSynthesis.cancel(); } catch(e) {} const a = amEl('__poemAudio', 'poem'); if (!a.paused && a.dataset.id === x.id) { a.pause(); return; } AM.claim('poem'); a.src = 'audio/' + x.id + '.mp3'; a.dataset.id = x.id; a.play().catch(e => { if ((e && e.name === 'AbortError') || AM.cur !== 'poem' || a.dataset.id !== x.id) return; speak(x.title + '。' + x.text.join(''), 'zh-CN'); }); }   // 被别人抢占 / 换了一首不算失败，别用系统朗读顶回去
     else speak(x.title + '。' + x.text.join(''), 'zh-CN'); },
   rprint: el => printRecite(el.dataset.v),
   gv: el => { state.gradeView = el.dataset.v; render(); },
@@ -5464,16 +5540,16 @@ const ACT = {
   varself: () => { const id = state.variant.iid; state.variant = null; finalMiss(id, true); },
   memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
   spopen: el => { stopAllEn(); state.learn.sp = el.dataset.v; state.sp = null; render(); window.scrollTo(0,0); },
-  lsplay: () => { const S = state.ls; S.phase = 'play'; S.n2 = false; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.ls === S && S.phase === 'play' && state.tab === 'learn') { S.phase = 'q'; S.i = 0; lsAsk(); } }); },
+  lsplay: () => { const S = state.ls; S.phase = 'play'; S.n2 = false; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.ls === S && S.phase === 'play' && state.tab === 'learn') { S.phase = 'q'; S.i = 0; lsAsk(); } }, () => { if (state.ls === S && S.phase === 'play') { S.phase = 'intro'; if (state.tab === 'learn') setTimeout(render, 0); } }); },
   lsgo: () => { stopAudio(); const S = state.ls; S.phase = 'q'; S.i = 0; lsAsk(); },
   lsstop: () => lsStop(),
   lsagain: () => { state.ls = null; render(); },
-  rtplay: () => { const S = state.rt; S.phase = 'play'; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.rt === S && S.phase === 'play' && state.tab === 'learn') rtRec('retell', 60); }); },
+  rtplay: () => { const S = state.rt; S.phase = 'play'; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.rt === S && S.phase === 'play' && state.tab === 'learn') rtRec('retell', 60); }, () => { if (state.rt === S && S.phase === 'play') { S.phase = 'intro'; if (state.tab === 'learn') setTimeout(render, 0); } }); },
   rtgo: () => { stopAudio(); rtRec('retell', 60); },
   rtstop: () => rtStop(),
   rtastop: () => rtAskStop(),
   rtagain: () => { state.rt = null; render(); },
-  spplay: () => { const x = LIB.speak.items.find(i => i.id === state.learn.sp); const a = window.__enAudio || (window.__enAudio = new Audio()); if (!a.paused) { a.pause(); return; } a.src = x.audio; a.play().catch(() => speak(x.text, 'en-US')); },
+  spplay: () => { const x = LIB.speak.items.find(i => i.id === state.learn.sp); const a = amEl('__enAudio', 'en'); if (!a.paused) { a.pause(); return; } AM.claim('en'); a.src = x.audio; a.play().catch(e => { if ((e && e.name === 'AbortError') || AM.cur !== 'en') return; speak(x.text, 'en-US'); }); },
   spstart: () => { state.sp = {id: state.learn.sp, phase: 'ready'}; spStart(); },
   spcheck: () => spCheck(),
   spstop: () => spStop(),
