@@ -4100,7 +4100,7 @@ function extraTask(d){
     const kind = {1: 'r', 3: 'l', 5: 't'}[dow], pool = kind === 'r' ? LIB.speak.items : kind === 'l' ? LIB.speak2.listen : LIB.speak2.retell;
     const cnt = id => DB.speakRecs.filter(r => r.pid === id).length, best = id => Math.max(-1, ...DB.speakRecs.filter(r => r.pid === id).map(r => r.acc));
     const pick = pool.slice().sort((a, b) => cnt(a.id) - cnt(b.id) || best(a.id) - best(b.id))[0];
-    const done = DB.speakRecs.some(r => r.d === d);
+    const done = DB.speakRecs.some(r => r.d === d) || (DB.mockRecs || []).some(r => r.d === d);   // 做完一整套模拟也算今天练过（她 10-15 定）
     return {t: '英语听说', s: done ? '练过了' : ({r: '模仿朗读', l: '听后回答', t: '复述提问'})[kind] + ' · 可选', done, opt: true, act: 'golearn', v: 'speak', sp: pick.id, go: ''};
   }
   if (dow === 0 && aiReady() && mixPool().length >= 3) { const done = mixDoneThisWeek(); return {t: '数学混合练习', s: done ? '这周练过了' : '5 道 · 可选', done, opt: true, act: 'mixstart', v: '', go: ''}; }
