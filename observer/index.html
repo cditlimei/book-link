@@ -1036,7 +1036,7 @@ function fresh(){
     settings:{u:0, child:'儿子', startYear:2026, pin:'', lastBackup:null, useExt:true,
       subjects: DEF_SUBJ.map(a=>({id:a[0],name:a[1],color:a[2],zk:a[4],from:a[5],to:a[6],inTotal:a[7],mode:'auto'})),
       anchors: Object.fromEntries(DEF_SUBJ.map(a=>[a[0],a[3]]))},
-    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, reads:{}, kps:{}, kpTag:{}, extests:{}, peRecs:[], speakRecs:[], mixRecs:[], mockRecs:[], del:{}, timer:null};
+    days:{}, weeks:{}, months:{}, extReview:{}, words:{}, recite:{}, items:[], exams:[], emotions:[], photos:[], aiS:[], aiMem:{}, hol:{}, reads:{}, kps:{}, kpTag:{}, extests:{}, ting:{}, peRecs:[], speakRecs:[], mixRecs:[], mockRecs:[], del:{}, timer:null};
 }
 function migrate(x){
   const f = fresh();
@@ -1366,10 +1366,12 @@ function stats(from, to){
   return {S, days, recDays, mood, errByDay, errs, errN: sum(Object.values(errs)), tagsByType, conf, from, to, dayMin, redoN, redoOk};
 }
 
+// 单词先表态这一行（findings 用；这周没记作业也照样出）
+function wordPjLine(st){ const wp = wordPjStat(addD(st.to, -13), st.to); return wp.n >= 10 ? [{k: 'info', t: `单词先表态：这两周先说「想出来了」${wp.n} 次，其中 ${wp.k} 次后来拼过，拼对 ${wp.m} 次${wp.k ? `（${pct(wp.m, wp.k)}%，分母是拼过的 ${wp.k} 次；连着几次说想出来了、中间没拼的，只算离拼写最近的一次）` : ''}。「想出来了」占表态的 ${pct(wp.n, wp.n + wp.n0)}%（分母是表态 ${wp.n + wp.n0} 次），偏到 90% 以上或 10% 以下要留意。`}] : []; }
 /* 观察发现：只描述模式不下判决；基准是孩子自己的锚点和上一周期 */
 function findings(st, prev, anchors, nDays, monthly){
   const out = [];
-  if (st.recDays === 0) return [{k:'info', t:'这段时间还没有记录。'}];
+  if (st.recDays === 0) return [{k:'info', t:'这段时间还没有记录。'}].concat(wordPjLine(st));   // 这周没记作业、只背了单词，单词这行照样给家长看
   if (st.recDays < Math.ceil(nDays * 4/7)) out.push({k:'info', t:`只记了 ${st.recDays} 天，下面的发现样本少，先当线索看，别当结论。`});
   for (const s of subjects(st.to)) {
     const x = st.S[s.id]; if (!x) continue;
@@ -1424,6 +1426,7 @@ function findings(st, prev, anchors, nDays, monthly){
   if (st.redoN >= 3) out.push({k: st.redoOk/st.redoN >= 0.6 ? 'good' : 'info', t:`重做了 ${st.redoN} 次，做对 ${st.redoOk} 次（${pct(st.redoOk, st.redoN)}%）。` + (st.redoOk/st.redoN < 0.5 ? ' 重做正确率偏低，说明这些题的概念还没补上，先回课本，别急着再做。' : '')});
   { const rw = readWeek(st.from, st.to); if (rw.pages || rw.sums) out.push({k: 'info', t: `名著阅读：读了 ${rw.pages} 页${rw.sums ? `，读完说了 ${rw.sums} 次` : ''}`}); }
   { const tw = tingWeekStat(st.from, st.to); if (tw.min || tw.ok || tw.no) out.push({k: tw.ok + tw.no >= 3 && tw.no > tw.ok ? 'signal' : 'info', t: `听讲解：听了 ${tw.min} 分钟${tw.ok + tw.no ? `，问题答上 ${tw.ok} 道、没答上 ${tw.no} 道` : ''}。` + (tw.ok + tw.no >= 3 && tw.no > tw.ok ? '没答上的课目已经在「弄懂知识点」里，这周挑一两个聊聊卡在哪。' : '')}); }
+  out.push(...wordPjLine(st));
   { const hs = hintStats(st.from, st.to); if (hs.n >= 2) out.push({k: hs.ok / hs.n >= 0.6 ? 'good' : 'info', t: `AI 提示之后自己再做：${hs.n} 次里做对 ${hs.ok} 次（${pct(hs.ok, hs.n)}%）。看的是提示有没有帮他自己做出来，不是用了多久`}); }
   const tired = st.mood.tired, others = st.days.filter(d => d in st.errByDay && !tired.includes(d));
   if (tired.length >= 2 && others.length >= 2) {
@@ -1551,20 +1554,20 @@ function dueList(t){
 }
 function doneToday(){ const t = today(); return allItems().filter(it => (it.hist||[]).some(h => h.d === t)).length; }
 /* 最后一关没过（同类题做错，或 AI 出不了题）：不清零，停在最后一格，2 天后再验 */
-function finalMiss(id, selfOk){
+function finalMiss(id, selfOk, pk){
   const ext = id.startsWith('m:'), it = ext ? extItems().find(x => x.id === id) : DB.items.find(x => x.id === id); if (!it) return;
-  const t = today(); it.hist = (it.hist || []).concat([{d: t, ok: !!selfOk, pend: true}]); it.box = BOXES.length - 1; it.due = addD(t, 2); it.u = now();
+  const t = today(); it.hist = (it.hist || []).concat([Object.assign({d: t, ok: !!selfOk, pend: true}, pk ? {pk: 1} : {})]); it.box = BOXES.length - 1; it.due = addD(t, 2); it.u = now();
   if (ext) DB.extReview[id] = {box: it.box, due: it.due, hist: it.hist, done: it.done, hints: it.hints, u: it.u};
   save(); render(); toast(selfOk ? '先记下了，2 天后再过最后一关' : '差一点，2 天后再来一次最后一关');
 }
-function redoItem(id, ok, verified){
+function redoItem(id, ok, verified, meta){
   const ext = id.startsWith('m:');
   const it = ext ? extItems().find(x => x.id === id) : DB.items.find(x => x.id === id); if (!it) return;
   const t = today(), sureOnce = it.conf === 'sure' && !(it.hist || []).length, last = ok && !it.done && !sureOnce && (it.box || 0) + 1 >= BOXES.length;
   // 最后一关不靠自评：有 AI 时要做对一道同类题才算掌握
-  if (last && !verified && aiReady() && (it.stem || it.tag)) { toast('最后一关：做对一道同类题才算掌握'); state.variant = {iid: id, final: true}; varGen(); return; }
+  if (last && !verified && aiReady() && (it.stem || it.tag)) { toast('最后一关：做对一道同类题才算掌握'); state.variant = Object.assign({iid: id, final: true}, meta && meta.pk ? {pk: 1} : {}); varGen(); return; }   // pk 带进同类题，最后一关写 hist 时再记
   if (it.done && examSeason(t)) setSetting('examRv', t);
-  it.hist = (it.hist || []).slice(); it.hist.push({d:t, ok}); it.u = now();
+  it.hist = (it.hist || []).slice(); it.hist.push(meta && meta.pk ? {d:t, ok, pk: 1} : {d:t, ok}); it.u = now();   // pk：作答前展开过讲解或答案（只记录，第 5 条第 0 步）
   if (ok && (it.done || sureOnce)) { it.done = true; it.box = BOXES.length; toast(sureOnce ? '回检做对了，这道结束' : '还记得，很好'); }
   else if (ok) { it.box = (it.box||0) + 1; if (it.box >= BOXES.length) { it.done = true; toast('这道算掌握了'); } else { it.due = addD(t, BOXES[it.box]); toast(BOXES[it.box]+' 天后再做一次'); } }
   else { it.box = 0; it.done = false; it.due = addD(t, 1); toast('明天再来一次，不着急'); }
@@ -2352,13 +2355,98 @@ function gradeStat(){ const from = addD(today(), -30), P = DB.photos.filter(p =>
   if (!P.length) return '';
   return `近 30 天 AI 批改了 ${P.length} 页，孩子当场纠正「AI 判错了」${P.reduce((a, p) => a + (p.grade.disp || 0), 0)} 次` +
     (C.length ? `；和老师对照过 ${C.length} 页，一致 ${C.filter(p => p.tcmp === 'same').length} 页（老师多批出错题 ${C.filter(p => p.tcmp === 'more').length} 页，AI 冤枉 ${C.reduce((a, p) => a + (p.tless || 0), 0)} 道）` : '') + '。不一致多的话告诉开发，调一下批改方式。'; }
+/* 同类题、专项换问法（第 9 章③）：数学在正常求解和「找错步」之间换，英语在翻译、改错、造句、语境填空之间轮换。
+   默认关（DB.settings.varForm），家长在 AI 卡片里打开；关着时出题和记录跟以前一样。最后一关、考前自测一律正常求解 */
+const FORMS = {sx: ['solve', 'finderr'], yy: ['trans', 'fix', 'make', 'cloze']};
+const FORM_N = {solve: '正常求解', finderr: '找错步', trans: '翻译', fix: '改错', make: '造句', cloze: '语境填空'};
+const FORM_ERR = ['finderr', 'fix'];   // 找错改错类，专项 5 道里最多 1 道
+const FORM_HOW = {
+  solve: '正常出题，让学生自己求解。',
+  finderr: '出成「找错步」题：先写一道考同一个易错点的新题，再给一份分步解答，每步用「第1步」「第2步」……开头，一共 3 到 5 步；其中恰好有一步是错的，错法就是这个易错的地方，其余每一步都必须完全正确；最后问：「这段解答错在第几步？把这一步改对，再写出正确答案。」',
+  trans: '出成翻译题：给一句中文，让学生翻译成英文，这句话里必须用到这个易错的单词或语法点。',
+  fix: '出成改错题：给一句英文，里面恰好有一处错误，错法就是这个易错的地方，让学生找出错误并改正。',
+  make: '出成造句题：给出必须用到的单词或句型，再给一个简单情境，让学生写一句完整的英文句子。',
+  cloze: '出成语境填空题：给 2 到 3 句连在一起的英文小语境，挖一个空，空后括号里给提示词，让学生填出正确形式。'};
+const FORM_TIP = {finderr: '先读懂这段解答，找出错的那一步，写出改对的这一步和最后答案。', trans: '把中文翻成英文，写完整的一句。', fix: '找出句子里错的地方，写出改正后的写法。', make: '用题目给的词或句型写一句完整的英文。', cloze: '读懂上下文，写出空里该填的正确形式。'};
+const varFormOn = () => DB.settings.varForm === true;
+// 避开 avoid 里用过的问法；全都用过就只避开最近那一个
+function nextForm(sid, avoid){
+  const F = (FORMS[sid] || []).filter(f => f === 'solve' || !featRetreat('var:' + f)); if (!F.length) return 'solve'; const A = [].concat(avoid || []);   // 退回中的问法先不出
+  let pool = F.filter(f => !A.includes(f)); if (!pool.length) pool = F.filter(f => f !== A[A.length - 1]); if (!pool.length) pool = F;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+const lastVarForm = it => { const h = (it.vh || []).filter(x => !x.mix).pop(); return h ? h.f || 'solve' : 'solve'; };   // 老记录没有 f，当正常求解
+// 这次同类题用什么问法：开关关着返回 undefined（和以前完全一样）；第一次练、最后一关、批改后第一道用正常求解
+function varFormFor(it, V, gen){
+  if (!varFormOn()) return undefined;
+  if (!FORMS[it.sid] || V.final || (V.from === 'grade' && gen === 1) || !(it.vh || []).some(x => !x.mix)) return 'solve';
+  return nextForm(it.sid, [lastVarForm(it)]);
+}
+// 模型常在 JSON 字符串里直接换行（不写成 \\n），JSON.parse 会失败。只把字符串字面量里的换行/制表符转义后再试一次；只给换问法的新路径用，不动 parseJSONObj/parseJSONList
+function jsonEscCtl(s){
+  let o = '', inS = false, bs = false;
+  for (let i = 0; i < s.length; i++) { const c = s[i];
+    if (!inS) { if (c === '"') inS = true; o += c; continue; }
+    if (bs) { bs = false; o += c; continue; }
+    if (c === '\\') { bs = true; o += c; continue; }
+    if (c === '"') { inS = false; o += c; continue; }
+    if (c === '\n') o += '\\n'; else if (c === '\r') { if (s[i + 1] !== '\n') o += '\\n'; } else if (c === '\t') o += '\\t'; else o += c; }
+  return o;
+}
+function parseJSONLoose(t, open, close, good){
+  t = String(t || '').replace(/```(json)?/g, '').trim(); const a = t.indexOf(open), b = t.lastIndexOf(close); if (a < 0 || b < a) return null;
+  const s = t.slice(a, b + 1); for (const x of [s, jsonEscCtl(s)]) { try { const v = JSON.parse(x); if (good(v)) return v; } catch(e) {} } return null;
+}
+const parseJSONObjLoose = t => parseJSONLoose(t, '{', '}', v => !!v && typeof v === 'object' && !Array.isArray(v));
+const parseJSONListLoose = t => parseJSONLoose(t, '[', ']', v => Array.isArray(v));
+// 找错步题的回包：{"q":"题目+分步解答+问题","bad":错的那一步}；bad 必须真的出现在题里的「第N步」，否则当没出成
+function parseFinderr(out){
+  const j = parseJSONObjLoose(out); if (!j || !j.q) return null; const q = String(j.q).slice(0, 900), bad = parseInt(j.bad, 10);
+  if (!(bad >= 1 && bad <= 9) || !new RegExp('第\\s*' + bad + '\\s*步').test(q)) return null;
+  return {q, bad};
+}
+function varFormSys(sbName, f){
+  return `你是有经验的初中${sbName}老师。根据学生做错的题，出一道「同类题」：考同一个知识点、同一个容易错的地方，换数字或换情境，难度相当，七年级学生 5 分钟内能做完。${FORM_HOW[f]}数学公式用普通文字写，比如 x^2、3/4。` +
+    (f === 'finderr' ? '题目里那段解答之外，不要写正确答案、提示和解析。只输出 JSON：{"q":"题目、分步解答和最后的问题，全部写在这里，用换行分开，换行写成 \\n","bad":错的那一步的编号（只写数字）}' : '只输出题目本身，不要答案、不要提示、不要解析。');
+}
+async function varGenForm(it, sb, f){
+  const out = (await aiChat([{role: 'system', content: varFormSys(sb.name, f)},
+    {role: 'user', content: `原题：${it.stem || '（没有原文）'}\n知识点：${it.tag || '—'}\n错因：${typeName(it)}${subName(it) ? ' · ' + subName(it) : ''}`}], {temperature: 0.7})).trim();
+  if (f === 'finderr') return parseFinderr(out);
+  return out ? {q: out.slice(0, 600)} : null;
+}
+// 自检用：给一份「找错步」题，独立检查解答里到底有没有错的一步
+async function finderrVerify(q){
+  const j = parseJSONObj(await aiChat([{role: 'system', content: '你是初中数学老师。下面是一道「找错步」题，题目给了一份分步解答，说其中有一步是错的。先自己把题独立做一遍，再逐步检查这份解答。只输出 JSON：{"err":true 或 false（解答里确实有算错或推错的一步写 true，每一步都对写 false）,"step":错的那一步的编号，没有错写 0}'},
+    {role: 'user', content: q}], {temperature: 0.1}));
+  if (!j) throw new Error('返回的不是 JSON');
+  return {err: jOk(j.err), step: parseInt(j.step, 10) || 0};
+}
+// 专项：这一轮的问法要求（开关关着或这科不轮换返回空串）。回查只出 1 道，用上一轮没用过的问法
+const kpLastForms = k => { const h = (k.r.hist || []).filter(x => (x.k === 'drill' || x.k === 'check') && x.forms).pop(); return h ? h.forms : ['solve']; };
+function kpFormReq(X, k, n){
+  if (!varFormOn() || !FORMS[X.sid]) return '';
+  const F = FORMS[X.sid].filter(f => f === 'solve' || !featRetreat('var:' + f)); if (n > 1 && F.length < 2) return '';   // 退回后剩不到两种问法：这轮按以前出
+  if (n <= 1) { const f = X.cf = nextForm(X.sid, kpLastForms(k)); return `\n问法：这道题用「${FORM_N[f]}」。${FORM_HOW[f]}每道标出问法 f，写 "${f}"。题目里要换行就写成 \\n。只输出 JSON 数组：[{"q":"题目","f":"${f}"}]`; }
+  return `\n问法：这 ${n} 道至少用 2 种不同的问法，从下面选（f 写英文 key）：\n` + F.map(f => `${f}=${FORM_N[f]}：${FORM_HOW[f]}`).join('\n') +
+    `\n${F.filter(f => FORM_ERR.includes(f)).map(f => '「' + FORM_N[f] + '」').join('')}最多 1 道。每道标出问法 f。题目里要换行就写成 \\n。只输出 JSON 数组：[{"q":"题目","f":"${F[0]}"}]`;
+}
+// 专项出的题是否满足「至少 2 种、找错改错最多 1 道」
+const kpFormsOk = (qs, n, sid) => { if (n <= 1) return true; const fs = qs.map(q => q.f).filter(f => (FORMS[sid] || []).includes(f));   // 'unk'（没标或标了不认识的）不算一种问法
+  return new Set(fs).size >= 2 && fs.filter(f => FORM_ERR.includes(f)).length <= 1 && fs.every(f => f === 'solve' || !featRetreat('var:' + f)); };
 /* 同类题：换数字换情境、考同一个易错点，防止重做原题变成背答案。判对错只给提示，不给答案 */
 const findItem = id => DB.items.find(x => x.id === id) || EXT.find(x => x.id === id);
 async function varGen(){
   const V = state.variant, it = findItem(V.iid); if (!it) return;
   const sb = subjById(it.sid), gen = V.gen = (V.gen || 0) + 1; V.busy = true; V.q = ''; V.ans = ''; V.res = null; V.tries = 0; V.logged = false; V.sol = ''; V.sawSol = false; render();
+  const f = varFormFor(it, V, gen); if (f === undefined) delete V.f; else V.f = f; delete V.bad;
   try {
-    V.q = (await aiChat([{role: 'system', content: `你是有经验的初中${sb.name}老师。根据学生做错的题，出一道「同类题」：考同一个知识点、同一个容易错的地方，但换数字或换情境，难度相当，七年级学生 5 分钟内能做完。只输出题目本身，不要答案、不要提示、不要解析。数学公式用普通文字写，比如 x^2、3/4。`},
+    if (V.f && V.f !== 'solve') {   // 换问法没出成（格式不对、没标错步）就退回正常求解
+      let r = null; try { r = await varGenForm(it, sb, V.f); } catch(e) { r = null; }
+      if (state.variant !== V || V.gen !== gen) return;
+      if (r) { V.q = r.q; if (r.bad) V.bad = r.bad; } else V.f = 'solve';
+    }
+    if (!V.q) V.q = (await aiChat([{role: 'system', content: `你是有经验的初中${sb.name}老师。根据学生做错的题，出一道「同类题」：考同一个知识点、同一个容易错的地方，但换数字或换情境，难度相当，七年级学生 5 分钟内能做完。只输出题目本身，不要答案、不要提示、不要解析。数学公式用普通文字写，比如 x^2、3/4。`},
       {role: 'user', content: `原题：${it.stem || '（没有原文）'}\n知识点：${it.tag || '—'}\n错因：${typeName(it)}${subName(it) ? ' · ' + subName(it) : ''}`}], {temperature: 0.7})).trim().slice(0, 600);
     if (state.variant !== V || V.gen !== gen) return;
     if (!V.q) throw new Error('AI 没出题');
@@ -2375,7 +2463,7 @@ async function varCheck(){
     if (state.variant !== V || V.gen !== gen || V.q !== q) return;
     const j = parseJSONObj(out); if (!j) throw new Error('判断结果看不懂');
     V.res = {ok: !!j.ok, hint: String(j.hint || '').slice(0, 160)}; V.tries++;
-    if (!V.logged && !it.ext) { it.vh = (it.vh || []).concat([{d: today(), ok: V.res.ok}]).slice(-10); it.u = now(); V.logged = true; save(); }
+    if (!V.logged && !it.ext) { it.vh = (it.vh || []).concat([V.f ? {d: today(), ok: V.res.ok, f: V.f} : {d: today(), ok: V.res.ok}]).slice(-10); it.u = now(); V.logged = true; save(); }
     if (V.res.ok && !it.ext && it.vok !== today()) { it.vok = today(); it.u = now(); save(); }   // 第几次做对都算「今天同类题做对了」
   } catch(e) { V.err = '判断失败：' + e.message; }
   V.busy = false; render();
@@ -2387,9 +2475,10 @@ function vVariant(){
   if (V.err) h += `<div class="signal">${esc(V.err)}</div>`;
   if (V.busy && !V.q) return h + `<div style="text-align:center;margin-top:60px"><div class="wiz-q">AI 正在出题…</div></div></div></div>`;
   if (!V.q) return h + (V.final ? `<p class="small muted" style="margin-top:10px">AI 现在出不了题（可能没网或额度用完）。可以先按你自己做对记下，下次再过这一关。</p>` : '') + `</div><div class="wiz-foot">${V.final ? '<button class="btn ghost" data-act="varself">先按自己做对记下</button>' : ''}<button class="btn primary" data-act="vargen">再出一道</button></div></div>`;
-  h += `<p class="small faint" style="margin:4px 0 8px">和原题考的是同一个地方，换了数字。先在纸上做，再把答案（最好带关键步骤）写下来。</p>
+  h += V.f && V.f !== 'solve' ? `<p class="small faint varform" style="margin:4px 0 8px">这次：${FORM_N[V.f]}。${FORM_TIP[V.f] || ''}</p>` : `<p class="small faint" style="margin:4px 0 8px">和原题考的是同一个地方，换了数字。先在纸上做，再把答案（最好带关键步骤）写下来。</p>`;
+  h += `
     <div class="card" style="font-size:18px;line-height:1.7;white-space:pre-wrap">${esc(V.q)}</div>
-    <label class="f">我的答案</label><textarea id="var-ans" class="wiz-in" style="min-height:90px" placeholder="比如：x = 3（先去括号，再移项）" ${V.res && V.res.ok ? 'disabled' : ''}>${esc(V.ans || '')}</textarea>`;
+    <label class="f">我的答案</label><textarea id="var-ans" class="wiz-in" style="min-height:90px" placeholder="${V.f === 'finderr' ? '第几步错了，改成什么，答案是……' : V.f && V.f !== 'solve' ? '写你的答案' : '比如：x = 3（先去括号，再移项）'}" ${V.res && V.res.ok ? 'disabled' : ''}>${esc(V.ans || '')}</textarea>`;
   if (V.busy) h += `<p class="muted">AI 正在看…</p>`;
   if (V.res) h += `<div class="signal ${V.res.ok ? 'good' : ''}" style="margin-top:12px"><span class="k">${V.res.ok ? '做对了' : '还不对'}</span>${esc(V.res.hint)}</div>`;
   let foot;
@@ -2958,7 +3047,7 @@ function vRedo(){
       ${it.stem ? `<div class="q" style="font-size:17px;line-height:1.6;white-space:pre-wrap">${esc(it.stem)}</div>${it.tag ? `<div class="small faint">知识点：${esc(it.tag)}</div>` : ''}` : `<div class="q">${it.tag ? esc(it.tag) : `${md(it.d)}${esc(s.name)}作业里的一题`}</div>`}
       ${it.photoId && DB.photos.some(p => p.id === it.photoId) ? `<img data-pid="${it.photoId}" data-act="photoview" data-v="${it.photoId}" alt="原题照片" style="display:block;max-width:100%;max-height:180px;margin:8px 0;border-radius:10px;object-fit:contain;background:var(--surface2);cursor:zoom-in">` : ''}
       <div class="small muted">${md(it.d)}的${esc(s.name)}${it.src === '随手记' ? '（自己记的问题）' : it.src === '拍照识别' ? '（拍照识别）' : '作业'}${it.conf && it.conf!=='sure' ? ' · '+CONFN[it.conf] : ''}${r && r.stuck && it.src !== '随手记' && it.src !== '拍照识别' ? ' · 当时说：「'+esc(r.stuck)+'」' : ''}</div>
-      ${it.exp ? `<details class="small" style="margin-top:8px"><summary style="color:var(--accent);cursor:pointer">看批改时的讲解</summary><div style="white-space:pre-wrap;line-height:1.6;margin-top:6px">${esc(it.exp)}</div></details>` : ''}
+      ${it.exp ? `<details class="small" data-pk="${esc(it.id)}" style="margin-top:8px"><summary style="color:var(--accent);cursor:pointer">看批改时的讲解</summary><div style="white-space:pre-wrap;line-height:1.6;margin-top:6px">${esc(it.exp)}</div></details>` : ''}
       <div class="row" style="margin-top:12px"><button class="btn good" data-act="redo" data-v="${it.id}" data-ok="1">做对了</button><button class="btn" data-act="redo" data-v="${it.id}" data-ok="0">还是不会</button></div><div class="row" style="margin-top:8px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="tuask" data-v="${esc(it.id)}">卡住了？问 AI 老师</a>${(it.stem || it.tag) && aiReady() ? `<a href="#" class="small" style="color:var(--accent)" data-act="varopen" data-v="${esc(it.id)}">练一道同类题</a>` : ''}<a href="#" class="small faint" data-act="skipitem" data-v="${it.id}">找不到原题</a></div></div>`;
   }
   if (!state.showAllDue && shown.length && due.length > shown.length) h += `<p class="small faint">今天就这些。</p>`;
@@ -2975,7 +3064,7 @@ function extCard(it, s){
   return `<div class="card redo" style="--c:${vivid(s.color)}"><div class="row"><span class="dot" style="background:${s.color}"></span><b>${esc(s.name)}</b><span class="pill accent">拍照错题本</span><span class="pill"><i class="sw" style="background:${ET_COLOR[it.type]}"></i> ${typeName(it)}${subName(it) ? ' · ' + esc(subName(it)) : ''}</span><span class="spacer"></span><span class="small faint">第 ${nth} 次</span></div>
     <div class="q" style="font-family:var(--mono);font-size:17px">${esc(it.stem)}</div>
     <div class="small muted">${esc(it.src)}${it.tag ? ' · '+esc(it.tag) : ''}</div>
-    <details style="margin-top:8px"><summary class="small" style="color:var(--accent)">做完再点开看答案</summary>
+    <details data-pk="${esc(it.id)}" style="margin-top:8px"><summary class="small" style="color:var(--accent)">做完再点开看答案</summary>
       <div class="signal good" style="margin-top:6px"><span class="k">正确答案</span>${esc(it.answer)}</div>
       ${it.kidAnswer ? `<div class="small muted">上次写的：${esc(it.kidAnswer)}</div>` : ''}
       ${it.note ? `<div class="signal info"><span class="k">错在哪（给家长了解，不用讲题）</span>${esc(it.note)}</div>` : ''}</details>
@@ -3161,6 +3250,7 @@ function vWeek(){
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">` +
     subjects(addD(mon,7)).map(s => `<div class="row" style="gap:6px;flex-wrap:nowrap"><span class="dot" style="background:${s.color}"></span><span style="width:36px">${esc(s.name)}</span><input type="number" inputmode="numeric" min="0" step="5" data-in="anchor" data-s="${s.id}" value="${next[s.id]||0}" style="width:70px;padding:6px 8px"></div>`).join('') + `</div>
     <p class="small faint" style="margin:8px 0 0">锚点改动从下周开始生效。每次最多动一科，才看得出是哪个调整起了作用。</p></details>`;
+  h += practiceCard(mon, end);
   // 调整的迭代记录：每一轮试了什么、效果如何
   const hist = Object.keys(DB.weeks).filter(k => DB.weeks[k].auto || DB.weeks[k].adjust).sort().reverse().slice(0, 12);
   if (hist.length) h += `<div class="card"><h3>调整记录</h3><p class="small faint" style="margin:0 0 6px">每周试一件事，下一周看数据有没有变化。没效果的会自动换下一条。</p>` + hist.map(k => { const a = DB.weeks[k].auto, man = DB.weeks[k].adjust;
@@ -3541,6 +3631,76 @@ function fsReplay(hist, rate){
   let c = null; for (const d of Object.keys(byDay).sort()) { const n = fsStep(c, d, byDay[d]); if (!n) return null; c = n; } return c;
 }
 const wordRate = h => h.ok ? (h.known || h.sp ? 4 : 3) : 1;
+/* 单词评分（markWord 实时评分和 fsReplay 回放共用）：错 1；先说「想不起来」但其实对了 2（吃力）；拼对 4；自评对 3。
+   手滑（slip：拼错了但说看清了，等会儿再拼）不动记忆状态，回放跳过；手滑之后当晚重拼对了（af）按 3 不按 4。没有新字段的老记录结果和 wordRate 一样 */
+const rateOf = h => h.slip ? 0 : !h.ok ? 1 : h.pj === 0 ? 2 : h.k === 'cloze' ? 3 : (h.known || h.sp) && !h.af ? 4 : 3;   // 课文填空有句子和首字母提示，拼对按 3（第 4 条）
+/* 这一轮必须拼：记住两轮了（box≥2）；或先说「想出来了」结果不对（sm，拼对一次才解除）；或今晚手滑过。只要求认识的课本词不强制 */
+const needSpell = (w, s) => !!s && ((s.box || 0) >= 2 || !!s.sm || s.slipD === today()) && !w.u;
+/* ===== 单词换问法（第 9 章方案第 4 条）：同一个词不总用一种问法考 =====
+   三种题面：cloze 课文原句挖空（给首字母）/ ear 只听发音拼写，翻面再看中文 / cn 看中文拼。从易到难 cloze → ear → cn，每答对一次换下一种，
+   答错（或手滑）重考换线索更多的那种；新词第一轮、作业重的晚上、考前 3 天一律 cn；只要求认识的词和三个词以上的短语只用 cn。
+   FSRS 判掌握前最后一次必须是看中文拼对（fin）。原句只取早上磨耳朵的课文（私有仓库解密后在内存里用），不写进记录、不发给 AI，记录里只存句子编号 cs；
+   没有磨耳朵数据就不出挖空；没有英文语音、或念了 1.5 秒还没出声，就不出听写 */
+const WF = {noVoice: false, ci: null, cidx: null, t: 0};
+const wLong = w => String(w.w).trim().split(/\s+/).length >= 3;
+function wVoiceOK(){ try { if (WF.noVoice || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return false; return speechSynthesis.getVoices().some(v => /^en/i.test(v.lang || '')); } catch(e) { return false; } }
+try { if (window.speechSynthesis) { speechSynthesis.getVoices(); if (speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', () => {}); } } catch(e) {}   // 有的浏览器要先问一次才开始加载语音列表
+const wReEsc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const wRe = w => new RegExp('(^|[^A-Za-z\'’-])(' + String(w.w).trim().split(/\s+/).map(wReEsc).join('\\s+') + ')(?=$|[^A-Za-z\'’-])', 'i');
+// 课文句子索引：reading / culture 两类（不含单词跟读），跳过第一段标题；只收 4–20 个词的句子；每个课本词找原形精确出现的句子
+function clozeIdx(){
+  if (!EAR.idx || !LIB.words) return null;
+  const tb = termBook(today()); if (WF.ci === EAR.idx && WF.cb === tb) return WF.cidx;
+  const sents = [];
+  for (const t of EAR.idx.tracks || []) { if (t.kind !== 'reading' && t.kind !== 'culture') continue;
+    // 断句前先护住缩写里的点：a.m. / p.m.（后面接小写或数字时句子没完）、Mr. / Mrs. / Ms. / Dr.，切完再换回来；仍以单个字母加句点结尾的残句不收
+    (t.paras || []).slice(1).forEach((p, pi) => (String(p).replace(/\b(Mr|Mrs|Ms|Dr)\./g, '$1\uE000').replace(/\b([apAP])\.([mM])\.(\s+[a-z0-9])?/g, (x, a, m, nx) => a + '\uE000' + m + (nx ? '\uE000' + nx : '.'))
+      .match(/[^.!?]+[.!?]+["'”’]?/g) || []).forEach((x, si) => { const s = x.trim().replace(/\uE000/g, '.'), n = s.split(/\s+/).length;
+      if (n >= 4 && n <= 20 && !/(^|\s)[A-Za-z]\.["'”’]?$/.test(s)) sents.push({id: t.id + ':' + (pi + 1) + ':' + si, s, unit: +String(t.unit).replace(/\D/g, '') || 0, ws: []}); })); }
+  const m = {}, seen = new Set();
+  for (const w of (LIB.words.words || [])) { if (w.book !== tb) continue; const k = wordKey(w); if (seen.has(k)) continue; seen.add(k);
+    const re = wRe(w), ok = !w.u && !wLong(w), reG = new RegExp(re.source, 'gi'),
+      reInf = new RegExp('(^|[^A-Za-z\'’-])' + String(w.w).trim().split(/\s+/).map(wReEsc).join('\\s+') + '[A-Za-z]', 'i');
+    // 挖空句里这个词只能出现一次（第二次出现等于把答案印在题面上），也不能带着同根变形（parts / insects 露出大半个词）
+    for (const x of sents) if (re.test(x.s)) { x.ws.push(k); if (ok && (x.s.match(reG) || []).length === 1 && !reInf.test(x.s)) (m[k] = m[k] || []).push(x); } }
+  WF.ci = EAR.idx; WF.cb = tb; WF.cidx = {m, sents}; return WF.cidx;
+}
+// 这个词今天能用的原句：单元不超过现在学到的、句中别的没背过的课本词最多 1 个、前 14 天用过的句子不再用（当晚重考可以再用）
+function clozeOf(w, s){
+  const I = clozeIdx(), L = I && I.m[wordKey(w)]; if (!L) return null;
+  const t = today(), cu = enUnit(t) || 8, from = addD(t, -14), k = wordKey(w), used = new Set(((s && s.hist) || []).filter(h => h.cs && h.d >= from && h.d < t).map(h => h.cs));
+  return L.find(x => x.unit <= cu && !used.has(x.id) && x.ws.filter(y => y !== k && !DB.words[y]).length <= 1) || null;
+}
+const clozeSent = id => { const I = clozeIdx(); return I && id ? I.sents.find(x => x.id === id) || null : null; };
+function wForm(w, s){
+  const H = ((s && s.hist) || []).filter(h => !h.known);
+  if (!H.length || w.u || wLong(w) || s.fin || heavyNight() || examCram(today())) return {f: 'cn'};
+  const c = !featRetreat('word:cloze') && clozeOf(w, s), lad = (c ? ['cloze'] : []).concat(wVoiceOK() && !featRetreat('word:ear') ? ['ear'] : [], ['cn']);   // 退回中的形态先不出
+  if (lad.length === 1) return {f: 'cn'};
+  const last = H[H.length - 1], i = lad.indexOf(last.k || 'cn');
+  const f = last.ok && !last.slip ? lad[(i + 1) % lad.length] : lad[Math.max(0, (i < 0 ? lad.length - 1 : i) - 1)];
+  return f === 'cloze' ? {f, cs: c.id} : {f};
+}
+// 一张卡显示期间题面定住（中途加载完磨耳朵、重绘都不换）；换了词或过了一天才重新选
+function wCardForm(w, s){ const L = state.learn, k = wordKey(w), t = today();
+  if (!L.wf || L.wf.w !== k || L.wf.d !== t) { L.wf = Object.assign({w: k, d: t}, wForm(w, s)); if (!EAR.idx && EAR.st === 'none') loadEar(); }
+  return L.wf; }
+// 记录里写题面：k 形态（cloze / ear；看中文不写，和老记录一样按 cn 算）、cs 句子编号。没出声退回看中文的这一张不记 k
+const wfK = w => { const f = state.learn && state.learn.wf; return f && f.w === wordKey(w) && !f.fb && f.f !== 'cn' ? Object.assign({k: f.f}, f.cs && f.f === 'cloze' ? {cs: f.cs} : {}) : {}; };
+function wNoVoice(){ const L = state.learn; WF.noVoice = true; if (!L || !L.wf || L.wf.f !== 'ear' || L.flip) return;
+  const sp = $('#w-spell'), foc = !!sp && document.activeElement === sp, pos = foc ? sp.selectionStart : null; if (sp) L.typed = sp.value; L.wf.f = 'cn'; L.wf.fb = 1; render();
+  if (foc) { const n = $('#w-spell'); if (n) try { n.focus(); if (pos != null) n.setSelectionRange(pos, pos); } catch(e) {} }   // 孩子正在打字：重绘后把光标放回去
+  const w = uniqWords().find(x => wordKey(x) === L.wf.w); toast(w && needSpell(w, wState(w)) ? '没有声音，这次看中文拼' : '没有声音，这次看中文想英文'); }
+// 听写念词：必须在点击里同步调（iOS 手势限制）；1.5 秒内没开始出声就退回看中文
+function wSay(w){ const L = state.learn; if (L.wf) L.wf.said = 1; const u = speak(w.w, 'en-US'); if (!u) return wNoVoice();
+  u.onstart = () => { if (L.wf && L.wf.w === wordKey(w)) L.wf.heard = 1; };
+  clearTimeout(WF.t); WF.t = setTimeout(() => { if (L.wf && L.wf.w === wordKey(w) && L.wf.f === 'ear' && !L.wf.heard && !L.flip) wNoVoice(); }, 1500); }
+// 每次点击之后：当前是还没念过的听写卡就念一遍（换卡发生在点击里，算用户手势）
+function wAuto(){ const L = state.learn; if (state.tab !== 'learn' || !L || L.view !== 'card' || L.flip || !L.wf || L.wf.f !== 'ear' || L.wf.said) return;
+  const w = uniqWords().find(x => wordKey(x) === L.wf.w); if (w) wSay(w); }
+// 听写时拼成了同音的另一个词（词库里有、音标一样）：提示换个写法，不判错
+function wHomo(w, typed){ const t = String(typed || '').trim().toLowerCase(); if (!t || t === w.w.toLowerCase() || !w.p) return false;
+  const o = uniqWords().find(x => wordKey(x) === t); return !!o && !!o.p && o.p === w.p; }
 const NEW_PER_DAY = 10;
 /* 新词数量跟着孩子走：近 7 天复习正确率 ≥ 85%（至少背了 3 晚）→ 每天 15 个；低于 60% → 5 个，先把旧的记牢 */
 function newPerDay(){
@@ -3558,14 +3718,18 @@ function speak(text, lang){
   const prev = EAR.a && EAR.on && !EAR.a.paused ? 'ear' : TING.a && TING.on && !TING.a.paused ? 'ting' : null;
   try { AM.claim('tts'); const u = new SpeechSynthesisUtterance(text); u.lang = lang || 'en-US'; u.rate = lang === 'zh-CN' ? 0.9 : 0.85;
     if (prev) u.onend = () => { if (AM.cur === 'tts' && !speechSynthesis.speaking) prev === 'ear' ? earResume() : tingResume(); };
-    speechSynthesis.cancel(); speechSynthesis.speak(u); }
-  catch(e) { toast('这个浏览器不能朗读'); }
+    speechSynthesis.cancel(); speechSynthesis.speak(u); return u; }
+  catch(e) { toast('这个浏览器不能朗读'); return null; }
 }
 const SPK = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>';
 function uniqWords(){ if (!LIB.words) return []; if (!LIB._uniq) { const m = new Map(); for (const w of LIB.words.words) if (!m.has(wordKey(w))) m.set(wordKey(w), w); LIB._uniq = [...m.values()]; } return LIB._uniq; }
 function wordsOf(book, unit){ return (LIB.words && LIB.words.words || []).filter(w => (!book || w.book === book) && (!unit || w.unit === unit)); }
 const shortCn = cn => { const first = String(cn||'').split('；')[0]; const m = first.match(/^([a-z]+\.\s*)?(.*)$/); const parts = m[2].split('，').slice(0, 2).join('，'); return (m[1] || '') + parts; };
 function wordQueue(){ const L = state.learn || {}; return memo('wq|' + today() + '|' + L.book + '|' + L.unit, wordQueue0).slice(); }
+// 卡片上实际显示的队列：今晚的量背够之后只留当晚要重考的词。显示和记分（wflip / wmark / wslip / wknown）都按它取当前词，免得记到没显示的词上
+function wordCardQueue(){ const q0 = wordQueue(), t = today(), isRetry = w => { const s = wState(w); return s && s.triesD === t && s.due === t && !s.done; };
+  return wordsDoneToday() >= wordsTonight() ? q0.filter(isRetry) : q0; }
+const curWord = () => wordCardQueue()[0] || null;
 // 课本词跟进度：本学期课本（沪教版，书后各单元词表）已学到的单元先出，前面单元没背的在前；之后接中考词库。英语一学期 8 个单元，约 16 天一个
 const termBook = t => (((LIB.words && LIB.words.books) || []).find(b => b.term === termKey(t)) || {}).id || null;
 function enUnit(t){ const u = curUnit(termKey(t)); if (!u) return 0; return Math.min(8, Math.max(1, Math.floor(dayDiff(termStart(t), t) / 16) + 1)); }
@@ -3586,23 +3750,118 @@ function wordQueue0(){
   const reviews = due.filter(w => !isRetry(w)), retries = due.filter(isRetry);
   return reviews.concat(fresh.slice(0, 3), retries, fresh.slice(3));   // 当晚没想起来的词，隔 3 张再考
 }
+// 第三个参数：老调用传布尔（拼对了没有）；新调用传 {sp 拼对, pj 先表态 1 想出来了 / 0 想不起来, ty 这次按拼写判}
 function markWord(w, ok, sp){
-  const k = wordKey(w), t = today(), s = DB.words[k] || {box:-1, hist:[], first:t}, retry = s.triesD === t;
-  if (FS && s.fs == null && (s.hist || []).length) s.fs = fsReplay(s.hist, wordRate);
-  s.hist = (s.hist || []).concat([Object.assign({d:t, ok}, sp ? {sp: true} : {})]).slice(-12);
-  if (ok) { s.box = (s.box || 0) + 1; const n = fsStep(s.fs, t, sp ? 4 : 3);
-    if (n) { s.fs = n; if (n.days >= FS_MASTER) { s.done = true; s.due = null; } else s.due = n.due; }
-    else if (s.box >= WBOX.length) { s.done = true; s.due = null; } else s.due = addD(t, WBOX[s.box]); }
-  else { s.box = 0; s.done = false; if (!retry) { const n = fsStep(s.fs, t, 1); if (n) s.fs = n; }   // 当晚重考又错不重复记遗忘
+  const o = sp && typeof sp === 'object' ? sp : {sp: !!sp};
+  const k = wordKey(w), t = today(), s = DB.words[k] || {box:-1, hist:[], first:t};
+  const retry = s.triesD === t && (s.hist || []).some(h => h.d === t && !h.ok && !h.slip);   // 今晚真记过一次没想起来（手滑不算）
+  if (FS && s.fs == null && (s.hist || []).length) s.fs = fsReplay(s.hist, rateOf);
+  const e = Object.assign({d:t, ok}, o.sp ? {sp: true} : {}, o.pj === 0 || o.pj === 1 ? {pj: o.pj} : {}, o.ty ? {ty: 1} : {}, ok && o.sp && s.slipD === t ? {af: 1} : {}, o.k ? {k: o.k} : {}, o.cs ? {cs: o.cs} : {}, o.ms !== undefined ? {ms: o.ms, del: o.del || 0, spR: o.spR == null ? null : o.spR} : {});   // 用时只记录，不参与评分
+  s.hist = (s.hist || []).concat([e]).slice(-20);
+  if (e.pj === 1 && !ok) s.sm = 1; else if (ok && o.sp) delete s.sm;   // 说想出来了其实不对 → 下一轮必须拼，拼对一次才解除
+  if (ok) { s.box = (s.box || 0) + 1; const n = fsStep(s.fs, t, rateOf(e));
+    const notCn = !!o.k && o.k !== 'cn';   // 换问法：填空 / 听写对了不直接算掌握，留到下一次看中文拼对（fin）
+    if (n) { s.fs = n; if (n.days >= FS_MASTER) { if (notCn) { s.fin = 1; s.due = n.due; } else { s.done = true; s.due = null; s.fin = 0; } } else s.due = n.due; }
+    else if (s.box >= WBOX.length) { if (notCn) { s.fin = 1; s.due = addD(t, WBOX[WBOX.length - 1]); } else { s.done = true; s.due = null; s.fin = 0; } } else s.due = addD(t, WBOX[s.box]); }
+  else { s.box = 0; s.done = false; if (s.fin) s.fin = 0; if (!retry) { const n = fsStep(s.fs, t, 1); if (n) s.fs = n; }   // 当晚重考又错不重复记遗忘
     s.tries = retry ? (s.tries || 0) + 1 : 1; s.triesD = t; s.due = s.tries >= 2 ? addD(t, 1) : t; }   // 当晚再考一次，第二次还没想起来就明天
   s.u = now(); DB.words[k] = s; save();
 }
+/* 必须拼的词拼错了、孩子说是手滑：不再直接记对，改成「看清了，等会儿再拼一次」。box 和 FSRS 都不动（不比「拼错了」重），
+   当晚隔 3 张再考（triesD = due = 今天走重考队列），重考必须拼（needSpell 认 slipD），拼对才推进 */
+function slipWord(w, fk){
+  const k = wordKey(w), t = today(), s = DB.words[k]; if (!s) return;
+  s.hist = (s.hist || []).concat([Object.assign({d:t, ok:false, slip:1}, fk || {})]).slice(-20);
+  if (s.triesD !== t) s.tries = 0;   // 手滑不算一次没想起来
+  s.slipD = s.triesD = s.due = t; s.done = false;
+  s.u = now(); save();
+}
+// 家长看：这两周先说「想出来了」几次，后来真要拼时（当场打了字或之后的必拼轮）拼对几次。手滑算拼错
+// 每次拼写只配一次表态：中间隔着另一次「想出来了」的，只算离这次拼写最近的那一次，免得几轮自评都数到同一次拼写上
+function wordPjStat(from, to){
+  let n = 0, n0 = 0, k = 0, m = 0;
+  for (const s of Object.values(DB.words)) { const H = s.hist || [];
+    H.forEach((h, i) => { if (h.d < from || h.d > to) return; if (h.pj === 0) { n0++; return; } if (h.pj !== 1) return; n++;
+      let c = h.ty ? h : null; if (!c) for (const x of H.slice(i + 1)) { if (x.ty || x.slip) { c = x; break; } if (x.pj === 1) break; }
+      if (c) { k++; if (c.ok) m++; } }); }
+  return {n, n0, k, m};
+}
+/* 第 9 章第 7 条：新做法兜底。孩子界面看不到这里。
+   FEAT_SINCE 是各条新做法的上线日期（代码常量，不放 settings：settings 按字段整体 LWW，两台设备各写一个 key 会丢一边）。
+   featRetreat(k) 纯计算、不落库：某个新做法近 7 天（不含今天，当晚不会中途换题面）客观作答 ≥12 次、跨 ≥3 晚、正确率 <60%，
+   就退回旧做法 7 天，然后再试；再试的头 3 晚不触发。客观对错只取拼写结果、背诵检验分、AI 判题，不取孩子自评（听讲解「一样 / 不一样」是自报，不参与退回） */
+const FEAT_SINCE = {recHide: '2026-10-16', tingQA: '2026-10-16', wordPj: '2026-10-16', wordForm: '2026-10-16', varForm: '2026-10-16', redoPk: '2026-10-16'};
+const FR = {n: 12, nights: 3, rate: 0.6, days: 7, off: 7, grace: 3};
+const featBase = k => k.startsWith('word:') ? 'wordForm' : k.startsWith('var:') ? 'varForm' : k;
+const FEAT_NAME = k => k === 'recHide' ? '背诵先背后看' : k === 'wordPj' ? '单词先表态' : k === 'word:cloze' ? '单词课文填空' : k === 'word:ear' ? '单词听音拼写' : k.startsWith('var:') ? '同类题和专项·' + (FORM_N[k.slice(4)] || k.slice(4)) : k;
+// 各新做法的客观作答记录 [{d, ok}]
+function featEvents(k){ return memo('fev|' + k, () => {
+  const E = [];
+  if (k === 'recHide') { for (const r of Object.values(DB.recite || {})) for (const h of (r.hist || [])) if (h.rv === 1 && h.score != null) E.push({d: h.d, ok: h.score >= 70}); }
+  else if (k === 'wordPj') { for (const s of Object.values(DB.words || {})) { const H = s.hist || [];   // 说「想出来了」之后真拼了的那一次（当场打字，或下一轮必拼），和家长页 wordPjStat 同一配对
+      H.forEach((h, i) => { if (h.pj !== 1) return; let c = h.ty ? h : null; if (!c) for (const x of H.slice(i + 1)) { if (x.ty || x.slip) { c = x; break; } if (x.pj === 1) break; }
+        if (c) E.push({d: h.d, ok: !!c.ok && !c.slip}); }); } }
+  else if (k.startsWith('word:')) { const f = k.slice(5); for (const s of Object.values(DB.words || {})) for (const h of (s.hist || [])) if (h.k === f && !h.known) E.push({d: h.d, ok: !!h.ok && !h.slip}); }
+  else if (k.startsWith('var:')) { const f = k.slice(4);
+    for (const it of (DB.items || [])) for (const h of (it.vh || [])) if (!h.mix && h.f === f) E.push({d: h.d, ok: !!h.ok});
+    for (const r of Object.values(DB.kps || {})) for (const h of (r.hist || [])) { if (!h.forms || (h.k !== 'drill' && h.k !== 'check')) continue;
+      if (h.k === 'check') { if (h.forms[0] === f) E.push({d: h.d, ok: !!h.ok}); continue; }
+      if (h.fok) h.forms.forEach((x, i) => { if (x === f) E.push({d: h.d, ok: !!h.fok[i]}); }); } }   // 老的专项记录没有逐题对错，不算
+  return E; }); }
+// 截至 t 这一天：退回中返回 {from, to}（to 是退回的最后一天），否则 null
+function featRetreatAt(k, t){
+  const since = FEAT_SINCE[featBase(k)]; if (!since || t <= since) return null;
+  const by = {}; let first = null;
+  for (const e of featEvents(k)) { if (e.d < since || e.d >= t) continue; const x = by[e.d] || (by[e.d] = [0, 0]); x[0]++; if (e.ok) x[1]++; if (!first || e.d < first) first = e.d; }
+  if (!first) return null;
+  let off = null, quiet = null;
+  for (let D = addD(first, 1); D <= t; D = addD(D, 1)) {
+    if (off && D <= off) continue; if (quiet && D <= quiet) continue;
+    let n = 0, ok = 0, nights = 0; for (let i = 1; i <= FR.days; i++) { const x = by[addD(D, -i)]; if (x) { n += x[0]; ok += x[1]; nights++; } }
+    if (n >= FR.n && nights >= FR.nights && ok / n < FR.rate) { off = addD(D, FR.off - 1); quiet = addD(off, FR.grace); }
+  }
+  return off && t <= off ? {from: addD(off, -(FR.off - 1)), to: off} : null;
+}
+const featRetreat = k => memo('fr|' + k + '|' + today(), () => featRetreatAt(k, today()));
+const FEAT_KEYS = () => ['recHide', 'wordPj', 'word:cloze', 'word:ear'].concat([...new Set(Object.values(FORMS).flat())].filter(f => f !== 'solve').map(f => 'var:' + f));
+// 单词用时：只记录，不改评分（6–8 周后看「想了很久才对」和「很快就对」下一次复习正确率差多少，再决定开不开「慢了记吃力」）
+// ms = 卡片出现到第一次作答（翻面 / 想不起来 / 早就会了），超过 120 秒记 null；切到后台作废这张不记；del = 拼写框里删字次数；spR = 卡片出现到第一次在拼写框打字的毫秒数（没打字为 null）
+function wTimeStart(w){ const L = state.learn, k = wordKey(w), t = today(); if (!L.wt || L.wt.w !== k || L.wt.d !== t) L.wt = {w: k, d: t, t0: Date.now(), del: 0, spR: null}; }
+function wTimeCommit(w){ const W = state.learn && state.learn.wt; if (W && W.w === wordKey(w) && W.ms === undefined && !W.bad) { const ms = Date.now() - W.t0; W.ms = ms > 120000 ? null : ms; } }
+function wTimeTake(w){ const L = state.learn, W = L && L.wt; if (!W || W.w !== wordKey(w)) return {}; L.wt = null; if (W.bad) return {};
+  if (W.ms === undefined) { const ms = Date.now() - W.t0; W.ms = ms > 120000 ? null : ms; }
+  return {ms: W.ms, del: W.del, spR: W.spR}; }
+document.addEventListener('input', e => { const el = e.target, W = state.learn && state.learn.wt; if (!el || el.id !== 'w-spell' || !W || W.bad) return;
+  if (W.spR == null) W.spR = Date.now() - W.t0; if (String(e.inputType || '').startsWith('delete')) W.del++; }, true);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && state.learn && state.learn.wt) state.learn.wt.bad = 1; });
+// 家长复盘「看详细记录」里的「练习难度」卡：每个新做法一行，先写次数再写比例和分母
+function practiceCard(mon, end){
+  const inW = d => d >= mon && d <= end, rows = [], t = today();
+  const note = k => { const b = FEAT_SINCE[featBase(k)], r = featRetreatAt(k, end < t ? end : t);
+    const x = (r ? `<span class="pill amber">已退回旧做法</span> 近 7 天做对不到六成，旧做法用到 ${mdShort(r.to)}，之后再试。` : '') + (b && dayDiff(b, end) < 14 ? '新功能头两周，先不下结论。' : '');
+    return x ? `<div class="small faint" style="margin-top:3px">${x}</div>` : ''; };
+  const line = (k, name, n, m, okW, unit, den) => rows.push(`<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="white-space:nowrap">${esc(name)}</b>：做了 ${n} ${unit}，${okW} ${m} ${unit}（${pct(m, n)}%，分母是本周${den} ${n} ${unit}）${note(k)}</div>`);
+  { const E = featEvents('recHide').filter(e => inW(e.d)); let pk = 0; for (const r of Object.values(DB.recite || {})) for (const h of (r.hist || [])) if (h.peek && inW(h.d)) pk++;
+    if (E.length || pk) rows.push(`<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="white-space:nowrap">背诵先背后看</b>：到期复习不看原文背了 ${E.length} 次${E.length ? `，70 分以上 ${E.filter(e => e.ok).length} 次（${pct(E.filter(e => e.ok).length, E.length)}%，分母是本周不看原文的复习 ${E.length} 次）` : ''}${pk ? `；先看了原文再背 ${pk} 次，只当练习` : ''}${note('recHide')}</div>`); }
+  { let n = 0, m = 0; for (const r of Object.values(DB.ting || {})) for (const h of (r.h || [])) if (inW(h.d)) { n++; if (h.ok) m++; }
+    if (n) rows.push(`<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="white-space:nowrap">听讲解先问后讲</b>：答了 ${n} 次，自己说「和想的一样」${m} 次（${pct(m, n)}%，分母是本周先问后讲的作答 ${n} 次）。这是孩子自报，不算客观对错，不参与自动退回。${note('tingQA')}</div>`); }
+  { const E = featEvents('wordPj').filter(e => inW(e.d)); if (E.length) line('wordPj', '单词先表态', E.length, E.filter(e => e.ok).length, '说「想出来了」之后拼对', '次', '说「想出来了」之后真拼了的'); }
+  for (const [k, nm] of [['word:cloze', '单词课文填空'], ['word:ear', '单词听音拼写']]) { const E = featEvents(k).filter(e => inW(e.d)); if (E.length) line(k, nm, E.length, E.filter(e => e.ok).length, '拼对', '次', nm.slice(2) + '的'); }
+  for (const k of FEAT_KEYS().filter(k => k.startsWith('var:'))) { const E = featEvents(k).filter(e => inW(e.d)); if (E.length) line(k, FEAT_NAME(k), E.length, E.filter(e => e.ok).length, 'AI 判对', '道', FORM_N[k.slice(4)] + '题'); }
+  { let n = 0, m = 0; for (const it of allItems()) { if (!(it.exp || it.key || (it.ext && it.answer))) continue; for (const h of (it.hist || [])) if (h.ok && inW(h.d)) { n++; if (h.pk) m++; } }
+    if (n) rows.push(`<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="white-space:nowrap">重做先看讲解</b>：带答案或讲解的重做点「做对了」${n} 次，其中点之前展开过讲解或答案 ${m} 次（${pct(m, n)}%，分母是本周带答案的重做做对 ${n} 次）。只记录，孩子那边没有变化。${note('redoPk')}</div>`); }
+  if (!rows.length) return '';
+  return `<div class="card practice"><h3>练习难度</h3><p class="small faint" style="margin:0 0 4px">这几样是这次新换的练法，对错按拼写、背诵检验和 AI 判题算，不看孩子自评。</p>${rows.join('')}<p class="small faint" style="margin:8px 0 0">一个孩子、几周的数据，只看趋势。</p></div>`;
+}
+// 「需要注意」里的退回提示（排在作息类之后）
+function featRetreatNote(){ const R = FEAT_KEYS().map(k => [k, featRetreat(k)]).filter(x => x[1]); if (!R.length) return null;
+  return [`${R.map(([k]) => FEAT_NAME(k)).join('、')}先退回旧做法`, `近 7 天这几样做对的不到六成，可能偏难了。已经自动换回原来的练法，到 ${mdShort(R.map(x => x[1].to).sort().pop())} 之后再试，不用管。`]; }
 const RST = [['','没背'],['learning','在背'],['can','会背了'],['dict','默写全对'],['upd','内容有更新'],['rv-ok','复习还会'],['rv-no','复习忘了'],['voice','语音检验'],['type','默写检验']];
 const rState = id => (DB.recite[id] || {}).st || '';
 const RBOX = [3, 7, 21];                   // 会背之后隔 3、7、21 天回来检查，第 3 次还会就算记牢
 // 检验分数 → FSRS 评分：98%+ 很轻松、90%+ 记得、70%+ 吃力、以下忘了
 const recRate = p => p >= 98 ? 4 : p >= 90 ? 3 : p >= 70 ? 2 : 1;
-const recHistRate = h => h.score != null ? recRate(h.score) : ({'rv-ok': 3, 'rv-no': 1, can: 3, dict: 4})[h.st] || 0;
+const recHistRate = h => h.peek ? 0 : h.score != null ? recRate(h.score) :({'rv-ok': 3, 'rv-no': 1, can: 3, dict: 4})[h.st] || 0;
 function setRecite(id, st, rating){ const r = DB.recite[id] || {hist:[]}, it = LIB.recite && LIB.recite.items.find(i => i.id === id), stale = !!it && (r.rev || 1) < recRev(it), t = today();
   const past = (r.hist || []).filter(h => h.d < t);
   r.st = st; r.hist = (r.hist||[]).concat([{d:t, st}]).slice(-20);
@@ -3618,6 +3877,7 @@ function reviewRecite(id, ok, rating){ const r = DB.recite[id]; if (!r) return; 
   if (n) { r.fs = n; r.due = n.due; r.box = rt >= 3 ? (r.box || 0) + 1 : rt === 1 ? Math.max(0, (r.box || 0) - 1) : (r.box || 0); r.solid = rt >= 2 && n.days >= FS_MASTER; }
   else if (rt >= 3) { r.box = (r.box || 0) + 1; r.due = r.box >= RBOX.length ? null : addD(t, RBOX[r.box]); if (r.box >= RBOX.length) r.solid = true; }
   else if (rt === 1) { r.box = Math.max(0, (r.box || 0) - 1); r.due = addD(t, 1); r.solid = false; }   // 忘了只退一格、明天再背；重学很快
+  else { r.due = addD(t, RBOX[0]); r.solid = false; }   // 吃力（70–89 分）：格子不动，按最短间隔再查
   r.u = now(); save(); }
 const reciteDue = () => (LIB.recite ? LIB.recite.items : []).filter(x => { const r = DB.recite[x.id]; return r && r.due && r.due <= today() && !recStale(x); });
 // 长篇分段背：全文超过 160 字才切，按字数均分成 2–5 段，段内不拆句。返回 [[起行, 止行), ...]，短篇返回 []
@@ -3634,6 +3894,24 @@ const recRev = x => (x && x.rev) || 1;
 const recStale = x => { const r = DB.recite[x.id]; return !!r && ['can','dict'].includes(r.st) && (r.rev || 1) < recRev(x); };
 const rStateX = x => recStale(x) ? 'upd' : rState(x.id);
 const segDone = (x, k) => { const r = DB.recite[x.id]; return !!(r && r.segs && r.segRev === recRev(x) && r.segs[k]); };
+/* 到期复习先背后看：今天到期的篇目先只给篇名 + 开头提示，背完再看原文。
+   复习前看了原文 / 听了朗读 / 挖空里点开了行（state.learn.peek[id] = 当天日期，不落库），这次检验只当练习：不进 FSRS，明天再复习 */
+const recDueNow = x => { const r = x && DB.recite[x.id]; return !!(r && r.due && r.due <= today() && !recStale(x)); };
+const recPeeked = id => ((state.learn || {}).peek || {})[id] === today() && !featRetreat('recHide');
+function recPeek(id){ const x = LIB.recite && LIB.recite.items.find(i => i.id === id); if (!x || !recDueNow(x) || featRetreat('recHide')) return;   /* 先背后看退回期间：看原文不算偷看 */ const L = state.learn || (state.learn = {}); (L.peek = L.peek || {})[id] = today(); }
+// 到期复习抽哪一段：先抽从没查过、或超过 2 个复习周期没查过的段（最久没查的先）；都查过就抽近 3 次检验漏字最多的段；没有数据按日期轮
+function recPickSeg(x){
+  const sg = recSegs(x); if (!sg.length) return -1;
+  const r = DB.recite[x.id] || {}, t = today(), H = (r.hist || []).filter(h => !h.peek && h.score != null);   // 只认带分数的检验；reviewRecite 写的 rv-* 没有 seg，算进来会把每段都刷成「刚查过」
+  const last = sg.map((_, k) => H.reduce((m, h) => (h.seg == null || h.seg === k) && (!m || h.d > m) ? h.d : m, null));   // 整篇检验算每段都查过
+  const cyc = r.fs && r.fs.lr && r.fs.due ? Math.max(1, dayDiff(r.fs.lr, r.fs.due)) : RBOX[Math.min(Math.max(r.box || 0, 0), RBOX.length - 1)];
+  let pick = -1;
+  sg.forEach((_, k) => { if (last[k] && dayDiff(last[k], t) <= 2 * cyc) return; if (pick < 0 || (last[pick] && (!last[k] || last[k] < last[pick]))) pick = k; });
+  if (pick >= 0) return pick;
+  const cnt = sg.map(() => 0); for (const h of H.filter(h => h.score != null).slice(-3)) for (const li of h.mi || []) { const k = sg.findIndex(([a, b]) => li >= a && li < b); if (k >= 0) cnt[k]++; }
+  const mx = Math.max(...cnt); if (mx > 0) return cnt.indexOf(mx);
+  return dayDiff('2026-01-01', t) % sg.length;
+}
 // 按日期估计课本进度：秋季 9/1 开学、春季按寒假结束第二天（无预设时 3/1），一学期 6 个单元约 3 周一个；只用来排序和标「最近要背」
 // 学期起点：秋季 9-1；春季是寒假结束第二天（深圳校历，2027-02-22），没填寒假就按 3-1。背单词 / 磨耳朵 / 听讲解三处共用
 function termStart(t){ const tk = termKey(t), y = +t.slice(0, 4), m = +t.slice(5, 7), hj = holList().find(p => p.name === '寒假' && p.to.startsWith(y + '-'));
@@ -4341,6 +4619,17 @@ const tingLog = () => DB.ting || (DB.ting = {});
 function tingMigrate(){ const o = lsGet('observer:tingLog'); if (!o) return; const L = tingLog(); for (const k in o) if (!L[k]) L[k] = Object.assign({u: now()}, o[k]);
   const T = lsGet('observer:tingTime') || {}; for (const d in T) if (!L['t:' + d]) L['t:' + d] = {s: T[d], u: now()};
   try { localStorage.removeItem('observer:tingLog'); localStorage.removeItem('observer:tingTime'); } catch(e) {} save(); }
+/* 先问后讲（第 9 章方案第 2 条）：听过 7 天以上的讲解复习段不整段重放，先放题头 → 问题 → 停下等「想好了」（最多 15 秒）→ 答案 → 「和你想的一样吗」。
+   index.enc.json 里每段可带 qo = {h 正文起点, q 问题起点, a 答案起点}：相对这一段 mp3 开头的字节偏移（gen_ting.py qa_offsets 用分片逐字节核对后写入，publish_ting.py 再校验一遍）。
+   裸 CBR 帧，秒数 = dur × 字节 / size；全程在当天那条 Blob 里 seek / 暂停，不换音频源。没有 qo（旧数据）、跟背段、偏移对不上 → 一律整段播放。
+   排期记在 DB.ting[id]：nx 下次到期日（没有就按 d+7）、iv 间隔天数（一样 → 14/28/56，不一样 → 回 7）、full=1 下次放完整版、h 最近 5 次短版作答 {d, ok, lat 想了几毫秒（只记录）, t}。
+   「一样 / 不一样」都只排间隔，不写 extests、不认定掌握。整条记录按 u 做 LWW 同步，h 不取并集，所以只留 5 条。 */
+const TING_QA_MAX = 8, TING_QA_WAIT = 15000;
+const tingQO = s => { const o = s && s.qo; return !!(o && s.kind !== 'recite' && s.size > 0 && s.dur > 0 && 0 < o.h && o.h < o.q && o.q < o.a && o.a < s.size); };
+const tingQT = s => { const k = s.dur / s.size; return {he: s.start + s.qo.h * k, qs: s.start + s.qo.q * k, as: s.start + s.qo.a * k}; };
+const tingDueOf = r => r.nx || addD(r.d, 7);
+const tingQASeen = id => !!(TING.qaSeen && TING.qaSeen[id] === today());
+const tingQADone = id => { const h = (tingLog()[id] || {}).h, x = h && h.length ? h[h.length - 1] : null; return x && x.d === today() ? (x.ok ? 'ok' : 'no') : ''; };
 const tingSubjToday = t => TING.pick && TING.pick.d === t ? TING.pick.s : tingExam(t) ? 'exam' : TING_ROTA[P(t).getDay()];
 // 一段讲解对应课本的一课（历史/地理/生物/道法）或一个考点（语文），和错题归的知识点是同一套 id：按知识点现状给权重
 const tingWeight = s => { if (!LIB.kp || !kpOk(s.subj, s.lesson)) return 0; const k = kpState(s.subj, s.lesson); return ({todo: 3, doing: 2, watch: 1, ok: 0, none: 0})[k.st] + k.errs.length; };
@@ -4348,7 +4637,8 @@ const tingWeight = s => { if (!LIB.kp || !kpOk(s.subj, s.lesson)) return 0; cons
 function tingPlan(t, subj){
   const idx = TING.idx; if (!idx) return [];
   const L = tingLog(), wk = tingWeek(t), tgt = tingMin() * 60, avail = idx.segs.filter(s => s.week <= wk);
-  const heard = s => L[s.id], old = s => heard(s) && dayDiff(L[s.id].d, t) >= 7, byOld = (a, b) => L[a.id].d < L[b.id].d ? -1 : 1;
+  const heard = s => L[s.id], old = s => heard(s) && tingDueOf(L[s.id]) <= t, byOld = (a, b) => L[a.id].d < L[b.id].d ? -1 : 1;   // 复习按 nx 到期（没有 nx 就是听过 7 天）
+  const byDue = (a, b) => { const x = tingDueOf(L[a.id]), y = tingDueOf(L[b.id]); return x < y ? -1 : x > y ? 1 : byOld(a, b); };
   let out = [], sum = 0;
   const take = s => { if (out.includes(s)) return; out.push(s); sum += s.dur; };
   const ex = tingExam(t);
@@ -4358,13 +4648,13 @@ function tingPlan(t, subj){
     for (const s of pool) { if (sum >= tgt) break; take(s); }
     return out;
   }
-  if (subj === 'review') { for (const s of avail.filter(heard).sort(byOld)) { if (sum >= tgt - 60) break; take(s); }
+  if (subj === 'review') { for (const s of avail.filter(heard).sort(byDue)) { if (sum >= tgt - 60) break; take(s); }
     const m = avail.find(s => s.subj === 'sx' && !heard(s)) || avail.filter(s => s.subj === 'sx' && old(s)).sort(byOld)[0]; if (m) take(m);   // 周日带一段数学概念问答
     for (const s of avail.filter(s => s.subj === 'yw' && !heard(s) && s.kind !== 'recite')) { if (sum >= tgt - 60) break; take(s); }   // 听过的还不多：补语文新段凑够时长
     if (out.length) return out; subj = 'yw'; }
   for (const s of avail.filter(s => s.subj === subj && !heard(s) && s.kind !== 'recite')) { if (sum >= tgt - 100) break; take(s); }
   if (subj === 'yw') { const rc = avail.find(s => s.kind === 'recite' && !heard(s)) || avail.filter(s => s.kind === 'recite' && old(s)).sort(byOld)[0]; if (rc) take(rc); }   // 语文日带一篇古诗文跟背
-  const rv = avail.filter(s => old(s) && s.subj === subj).sort(byOld)[0] || avail.filter(old).sort(byOld)[0];
+  const rv = avail.filter(s => old(s) && s.subj === subj).sort(byDue)[0] || avail.filter(old).sort(byDue)[0];
   if (rv) take(rv);
   if (!out.length) for (const s of avail.filter(s => s.subj === subj && heard(s)).sort(byOld)) { if (sum >= tgt) break; take(s); }   // 这科都听过了：从最早听的回放
   return out;
@@ -4372,9 +4662,11 @@ function tingPlan(t, subj){
 // 当天的计划算一次就定住（存本机），放完以后不会因为「听过了」又换成新的一组；换科目 / 改时长才重算
 function tingList(t){
   const subj = tingSubjToday(t), C = lsGet('observer:tingPlan'), byId = id => TING.idx.segs.find(s => s.id === id);
-  let L = C && C.d === t && C.s === subj && C.m === tingMin() ? C.ids.map(byId).filter(Boolean) : null, rv = C && C.rv || null;
-  if (!L || !L.length) { L = tingPlan(t, subj); const H = tingLog(); rv = L.filter(s => H[s.id] && H[s.id].d < t).map(s => s.id); if (L.length && t === today()) lsSet('observer:tingPlan', {d: t, s: subj, m: tingMin(), ids: L.map(s => s.id), rv}); }
-  const RV = new Set(rv || []); let p = 0; return L.map(s => { const o = Object.assign({}, s, {start: p, end: p + s.dur, rv: RV.has(s.id)}); p += s.dur; return o; });
+  let L = C && C.d === t && C.s === subj && C.m === tingMin() ? C.ids.map(byId).filter(Boolean) : null, rv = C && C.rv || null, qa = C && C.qa || null;
+  if (!L || !L.length) { L = tingPlan(t, subj); const H = tingLog(); rv = L.filter(s => H[s.id] && H[s.id].d < t).map(s => s.id);
+    qa = L.filter(s => rv.includes(s.id) && tingQO(s) && !H[s.id].full && tingDueOf(H[s.id]) <= t).slice(0, TING_QA_MAX).map(s => s.id);   // 到期的复习段走先问后讲（周日复习 / 考前一次最多 8 段）；没到期被周日 / 考前拉进来的整段放，不改排期；上次「不一样」的放完整版
+    if (L.length && t === today()) lsSet('observer:tingPlan', {d: t, s: subj, m: tingMin(), ids: L.map(s => s.id), rv, qa}); }
+  const RV = new Set(rv || []), QA = new Set(qa || []); let p = 0; return L.map(s => { const o = Object.assign({}, s, {start: p, end: p + s.dur, rv: RV.has(s.id)}); o.qa = QA.has(s.id) && tingQO(o); p += s.dur; return o; });
 }
 const tingDev = () => { let d = lsGet('observer:dev'); if (!d) { d = Math.random().toString(36).slice(2, 8); lsSet('observer:dev', d); } return d; };
 const tingSecOf = date => { const L = tingLog(), pre = 't:' + date; let sec = 0; for (const k in L) if (k === pre || k.startsWith(pre + ':')) sec += L[k].s || 0; return sec; };
@@ -4417,7 +4709,7 @@ async function tingDayBlob(list){ const bs = []; for (const s of list) bs.push(a
 function tingAudio(){
   if (TING.a) return TING.a;
   const a = TING.a = AM.hook(new Audio(), 'ting'); a.preload = 'auto';
-  a.addEventListener('ended', () => { if (a.src === EAR_SILENT || !TING.on) return; tingMark(); if (TING.cur) TING.ask = TING.cur.id; tingStop(true); });
+  a.addEventListener('ended', () => { if (a.src === EAR_SILENT || !TING.on) return; tingMark(); if (TING.cur && !tingQAOn()) TING.ask = TING.cur.id; tingStop(true); });
   a.addEventListener('timeupdate', tingTick);
   a.addEventListener('play', tingUI); a.addEventListener('pause', () => { tingFlush(); tingUI(); });   // 暂停 / 放完都会触发 pause；锁屏按钮改由 AM 统一注册
   return a;
@@ -4429,7 +4721,7 @@ async function tingStart(i){
   AM.claim('ting');   // 停掉磨耳朵 / 朗读 / 听说（以前只停磨耳朵）
   const a = tingAudio(), key = tingKey(list);
   if (!(TING.key === key && TING.url)) { a.src = EAR_SILENT; a.play().catch(amErr('ting')); }
-  TING.list = list; TING.on = true; TING.err = ''; TING.i = i || 0; TING.cur = list[TING.i]; TING.loading = true; tingUI();
+  TING.list = list; TING.on = true; TING.err = ''; TING.i = i || 0; TING.cur = list[TING.i]; tingQAEnter(); TING.loading = true; tingUI();
   try {
     if (TING.key !== key || !TING.url) {
       const b = await tingDayBlob(list); if (!TING.on) { TING.loading = false; tingUI(); return; }
@@ -4448,34 +4740,84 @@ function tingSeek(i){
   const n = TING.list.length; i = (i + n) % n;
   if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(i);
   AM.claim('ting');
-  TING.i = i; TING.cur = TING.list[i]; TING.on = true; TING.err = ''; TING.lt = null;
+  TING.i = i; TING.cur = TING.list[i]; tingQAEnter(); TING.on = true; TING.err = ''; TING.lt = null;
   TING.a.currentTime = TING.cur.start; TING.a.play().catch(amErr('ting')); tingMeta(); tingUI();
 }
 // ▶ 继续 / 锁屏播放共用：放完了从头放；音频没了就重新开始
-function tingResume(){ const a = TING.a; if (!a || !TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
+function tingResume(){ if (tingQAPP()) return; const a = TING.a; if (!a || !TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
   if (a.ended || (a.duration && a.currentTime >= a.duration - 0.3)) return tingSeek(0);
   AM.claim('ting');
   TING.on = true; TING.err = ''; TING.lt = null; a.play().catch(e => { if ((e && e.name === 'AbortError') || !TING.on || AM.cur !== 'ting') return; amErr('ting')(e); tingStart(TING.i); }); }
 function tingPause(){ TING.on = false; if (TING.a) TING.a.pause(); }
 function tingMeta(){ if (AM.cur !== 'ting') return; const t = TING.cur; if (t && 'mediaSession' in navigator && window.MediaMetadata) try { navigator.mediaSession.metadata = new MediaMetadata({title: t.title, artist: TING_SUBJ[t.subj] || '', album: '听讲解'}); } catch(e) {} amPos(); }
-function tingStop(done){ TING.on = false; if (TING.a) TING.a.pause(); tingFlush(); if (done) toast('今天的讲解放完了'); tingUI(); }
+function tingStop(done){ TING.on = false; clearTimeout(TING.qaT); if (TING.a) TING.a.pause(); tingFlush(); if (done) toast('今天的讲解放完了'); tingUI(); }
 // 一段听过 80% 才算听过（跳过的不算）；记最近一次日期和次数，7 天后进复习
 function tingMark(){ const t = TING.cur; if (!t || TING.marked[t.id] === today()) return; TING.marked[t.id] = today();
-  const L = tingLog(); L[t.id] = Object.assign({}, L[t.id] || {}, {d: today(), n: ((L[t.id] || {}).n || 0) + 1, u: now()}); save(); }
+  const L = tingLog(); L[t.id] = Object.assign({}, L[t.id] || {}, {d: today(), n: ((L[t.id] || {}).n || 0) + 1, u: now()});
+  if (L[t.id].full && !t.qa) { delete L[t.id].full; delete L[t.id].nx; }   // 「不一样」之后的完整版放过了：回到听过 7 天再复习
+  save(); }
 function tingTick(){
   const a = TING.a; if (!a || a.src === EAR_SILENT || !TING.list.length) return;
   const ct = a.currentTime;
   if (TING.lt != null && !a.paused) { const dt = ct - TING.lt; if (dt > 0 && dt < 3) TING.acc = (TING.acc || 0) + dt; }   // 秒数先攒在内存，暂停 / 放完 / 换段时 tingFlush 落盘
   TING.lt = ct;
+  if (tingQAOn() && !TING.loading) { tingQATick(a, ct); return; }   // 先问后讲：按作答记听过，不按 80% 进度，也不自动跳段
   let i = 0; TING.list.forEach((t, k) => { if (ct >= t.start - 0.05) i = k; });
   const t = TING.cur;
   if (t && ct >= t.start + 0.8 * (t.end - t.start) && ct < t.end + 0.5) tingMark();   // 跳到别段去的不算听过
-  if (i !== TING.i && !TING.loading) { if (t && i > TING.i && ct < t.end + 3) TING.ask = t.id; tingFlush(); TING.i = i; TING.cur = TING.list[i]; tingMeta(); tingUI(); }
+  if (i !== TING.i && !TING.loading) { if (t && i > TING.i && ct < t.end + 3 && !(t.qa && TING.qp !== 'full')) TING.ask = t.id; tingFlush(); TING.i = i; TING.cur = TING.list[i]; tingQAEnter(); tingMeta(); tingUI(); }
   const bar = document.getElementById('ting-bar');
   if (bar && t) bar.style.width = Math.min(100, Math.max(0, 100 * (ct - t.start) / Math.max(1, t.end - t.start))).toFixed(1) + '%';
 }
 // 攒的秒数写进 DB.ting['t:日期:设备']（每台设备一条，汇总相加；同一条只会被本机改，同步合并不会互相覆盖）
 function tingFlush(){ if (!(TING.acc > 0.5)) return; const L = tingLog(), k = 't:' + today() + ':' + tingDev(), r = L[k] || (L[k] = {s: 0}); r.s += TING.acc; r.u = now(); TING.acc = 0; save(); }
+/* 先问后讲的播放：TING.qp = head 题头 → q 问题（含 3 秒停顿）→ think 暂停等「想好了」→ ans 答案 → judge 暂停问「一样 / 不一样」
+   → done（一样，跳下一段）/ full2（不一样：回到这段开头放完整讲解，到问题处跳下一段）；full = 没回答 / 锁屏，退回整段播放（只记听过，不改排期）。
+   null = 不是先问后讲（新课、跟背、旧数据、今天已经答过）。15 秒后对已激活的 audio 调 play()，iPad 主屏幕 PWA 上要实机确认 */
+const tingQAOn = () => !!(TING.cur && TING.cur.qa && TING.qp && TING.qp !== 'full' && TING.qp !== 'done');
+function tingQAEnter(){ clearTimeout(TING.qaT); const t = TING.cur; TING.qp = t && t.qa && !tingQADone(t.id) && !tingQASeen(t.id) ? 'head' : null; TING.qlat = null; }
+function tingQAPlayAt(sec){ const a = TING.a; AM.claim('ting'); TING.on = true; TING.err = ''; TING.lt = null; try { a.currentTime = sec; } catch(e) {} a.play().catch(amErr('ting')); }
+function tingQATick(a, ct){
+  const t = TING.cur, T = tingQT(t), p = TING.qp;
+  if (p === 'head' && ct >= T.he - 0.05) { TING.qp = 'q'; if (ct < T.qs) try { a.currentTime = T.qs; } catch(e) {} }   // 题头放完直接跳到问题
+  else if (p === 'q' && ct >= T.as - 0.15) {
+    if (document.visibilityState === 'hidden') return tingQAFull();   // 锁屏 / 切走时没人点按钮：退回整段
+    a.pause(); try { a.currentTime = T.as; } catch(e) {} TING.qp = 'think'; TING.qt0 = Date.now(); clearTimeout(TING.qaT); TING.qaT = setTimeout(tingQAFull, TING_QA_WAIT); tingUI(); }
+  else if (p === 'ans' && ct >= t.end - 0.3) { a.pause(); TING.qp = 'judge'; clearTimeout(TING.qaT); TING.qaT = setTimeout(tingQASkip, TING_QA_WAIT); tingUI(); }   // 停在这段末尾，不放进下一段
+  else if (p === 'full2' && ct >= T.qs - 0.1) tingQANext();
+  const bar = document.getElementById('ting-bar');
+  if (bar) bar.style.width = Math.min(100, Math.max(0, 100 * (ct - t.start) / Math.max(1, t.end - t.start))).toFixed(1) + '%';
+}
+// 想好了：放答案
+function tingQAGo(){ const t = TING.cur; if (!t || !t.qa || TING.qp !== 'think' || !TING.a) return; clearTimeout(TING.qaT);
+  TING.qlat = TING.qt0 ? Date.now() - TING.qt0 : null; TING.qp = 'ans'; tingQAPlayAt(tingQT(t).as); tingUI(); }
+// 没回答（15 秒到 / 锁屏）：从正文开头整段放完，按老规则 80% 记听过、放完问「答上了吗」
+function tingQAFull(){ clearTimeout(TING.qaT); const t = TING.cur; if (!t || !t.qa || !TING.a) return; TING.qp = 'full';
+  if (TING.on) tingQAPlayAt(tingQT(t).he); tingUI(); }
+// 「和你想的一样吗」没人点：记听过，排期不动，接着放下一段；答案已经听完，今天文字照常给看，再点回这段也不重新问（TING.qaSeen 只在内存）
+function tingQASkip(){ clearTimeout(TING.qaT); if (TING.qp !== 'judge') return; TING.qp = 'done'; tingMark(); if (TING.cur) (TING.qaSeen || (TING.qaSeen = {}))[TING.cur.id] = today(); if (TING.on) tingQANext(); else tingUI(); }
+function tingQANext(){ if (TING.i + 1 >= TING.list.length) { tingStop(true); return; } tingSeek(TING.i + 1); }
+function tingQAJudge(ok){
+  const t = TING.cur; if (!t || !t.qa || TING.qp !== 'judge') return; clearTimeout(TING.qaT);
+  tingMark();
+  const L = tingLog(), r = L[t.id] = Object.assign({}, L[t.id] || {d: today(), n: 1}), tt = now();
+  r.h = (r.h || []).filter(x => x.t !== tt).concat([{d: today(), ok: !!ok, lat: TING.qlat == null ? null : Math.round(TING.qlat), t: tt}]).slice(-5);
+  if (ok) { r.iv = Math.min(56, (r.iv || 7) * 2); r.nx = addD(today(), r.iv); delete r.full; }
+  else { r.iv = 7; r.nx = addD(today(), 2); r.full = 1; }   // 2 天后再出这段，放完整版；自报的「不一样」只排间隔，不写 extests、不改掌握判定
+  r.u = now(); save();
+  if (ok) { TING.qp = 'done'; tingQANext(); }
+  else { TING.qp = 'full2'; tingQAPlayAt(t.start); toast('2 天后再听这段'); }
+  tingUI(); }
+// ▶ / 锁屏播放在问答停顿里：等想的时候 = 想好了；等判断的时候 = 不回答，接着下一段
+function tingQAPP(){ if (!(TING.cur && TING.cur.qa)) return false; if (TING.qp === 'think') { tingQAGo(); return true; } if (TING.qp === 'judge') { TING.on = true; tingQASkip(); return true; } return false; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && TING.qp === 'think' && TING.on) tingQAFull(); });
+function tingQAHTML(){
+  const t = TING.cur, p = TING.qp; if (!t || !t.qa) return '';
+  if (p === 'head' || p === 'q') return `<p class="small muted" style="margin:8px 0 0">复习这段：先听问题，自己想好再听答案</p>`;
+  if (p === 'think') return `<div style="margin-top:10px"><p class="small" style="margin:0 0 8px">${esc(t.q)}</p><button class="btn primary fillbtn" style="margin-bottom:0" data-act="tingqgo">想好了</button></div>`;
+  if (p === 'judge') return `<div class="row" style="gap:8px;margin-top:10px"><span class="small muted" style="flex:1;min-width:0">和你想的一样吗</span><button class="btn sm" data-act="tingqj" data-v="1">一样</button><button class="btn sm ghost" data-act="tingqj" data-v="0">不一样</button></div>`;
+  if (p === 'full2') return `<p class="small muted" style="margin:8px 0 0">完整讲一遍。2 天后再听这段</p>`;
+  return ''; }
 function tingUI(){ if (document.getElementById('tingbox')) render(); }
 // 一段放完按「答上了 / 没答上」：按考前自测同一套记录写进 DB.extests（kind 'ting'，不算一次自测），没答上的课目立刻成「弄懂知识点」里的待攻克
 function tingAnswer(id, ok){
@@ -4494,8 +4836,9 @@ function tingNowHTML(){
   const t = TING.cur; if (!t) return '';
   const on = tingPlaying();
   const ended = !!(TING.a && !TING.on && (TING.a.ended || (TING.a.duration && TING.a.currentTime >= TING.a.duration - 0.3)));
-  return `<div class="ear-np" style="margin-top:12px"><div class="t"><span class="small faint">${ended ? '放完了 · ▶ 从头再放' : `${TING_KIND[t.kind] || TING_SUBJ[t.subj] || ''} · 第 ${TING.i + 1}/${TING.list.length} 段`}</span><b>${esc(t.title)}</b><div class="ear-bar"><i id="ting-bar"></i></div></div>
-    <button class="btn ghost tbtn" data-act="tingnext" data-v="-1" aria-label="上一段">${SVG_PREV}</button><button class="btn primary tbtn big" data-act="tingpp" aria-label="${on ? '暂停' : '继续'}">${TING.loading ? '<span class="small">…</span>' : on ? SVG_PAUSE : SVG_PLAY}</button><button class="btn ghost tbtn" data-act="tingnext" data-v="1" aria-label="下一段">${SVG_NEXT}</button></div>` + (TING.ask ? tingAskHTML(TING.ask) : '');
+  const bw = TING.a && TING.a.src !== EAR_SILENT ? Math.min(100, Math.max(0, 100 * (TING.a.currentTime - t.start) / Math.max(1, t.end - t.start))) : 0;   // 暂停着重绘（想好了 / 一样吗）不会再有 timeupdate：按当前位置先画上
+  return `<div class="ear-np" style="margin-top:12px"><div class="t"><span class="small faint">${ended ? '放完了 · ▶ 从头再放' : `${TING_KIND[t.kind] || TING_SUBJ[t.subj] || ''} · 第 ${TING.i + 1}/${TING.list.length} 段`}</span><b>${esc(t.title)}</b><div class="ear-bar"><i id="ting-bar"${bw > 0 ? ` style="width:${bw.toFixed(1)}%"` : ''}></i></div></div>
+    <button class="btn ghost tbtn" data-act="tingnext" data-v="-1" aria-label="上一段">${SVG_PREV}</button><button class="btn primary tbtn big" data-act="tingpp" aria-label="${on ? '暂停' : '继续'}">${TING.loading ? '<span class="small">…</span>' : on ? SVG_PAUSE : SVG_PLAY}</button><button class="btn ghost tbtn" data-act="tingnext" data-v="1" aria-label="下一段">${SVG_NEXT}</button></div>` + tingQAHTML() + (TING.ask ? tingAskHTML(TING.ask) : '');
 }
 const tingMins = list => Math.max(1, Math.round(list.reduce((a, s) => a + s.dur, 0) / 60));
 // 科目一排横滑，就在播放卡上：点哪科立刻换成哪科；正在放的话直接接着放新的一组。今天轮到的科目带「今天」
@@ -4527,14 +4870,15 @@ function vTing(){
   let h = `<div class="row">${fromToday ? '<button class="btn sm ghost" data-act="tab" data-v="today">‹ 今天</button>' : backBtn('home')}<h2 style="margin:0">听讲解</h2></div>` + tingPlayerHTML(true);
   if (TING.st !== 'ok') return h;
   const t = today(), list = tingList(t), L = tingLog(), wk = tingWeek(t), subj = tingSubjToday(t);
-  if (list.length) h += `<div style="margin-top:12px">` + list.map((s, i) => `<button class="ear-row ${TING.cur && TING.cur.id === s.id ? 'on' : ''}" data-act="tingpick" data-v="${i}"><span class="k">${TING_KIND[s.kind] || (s.rv ? '复习' : TING_SUBJ[s.subj])}</span><span style="flex:1;min-width:0">${esc(s.title)}${tingAnswered(s.id) === 'ok' ? ' <span class="small" style="color:var(--good,#2f7a66)">✓</span>' : tingAnswered(s.id) === 'no' ? ' <span class="small" style="color:var(--bad,#b5402a)">没答上</span>' : ''}</span><span class="small faint">${Math.round(s.dur / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div>`;
+  if (list.length) h += `<div style="margin-top:12px">` + list.map((s, i) => `<button class="ear-row ${TING.cur && TING.cur.id === s.id ? 'on' : ''}" data-act="tingpick" data-v="${i}"><span class="k">${TING_KIND[s.kind] || (s.rv ? '复习' : TING_SUBJ[s.subj])}</span><span style="flex:1;min-width:0">${esc(s.title)}${(tingAnswered(s.id) || tingQADone(s.id)) === 'ok' ? ' <span class="small" style="color:var(--good,#2f7a66)">✓</span>' : tingAnswered(s.id) === 'no' ? ' <span class="small" style="color:var(--bad,#b5402a)">没答上</span>' : tingQADone(s.id) === 'no' ? ' <span class="small faint">2 天后再听</span>' : ''}</span><span class="small faint">${Math.round(s.dur / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div>`;
   // 设置和进度收在一行小字里，不占主视线
   const cnt = s => { const A = TING.idx.segs.filter(x => x.subj === s && x.week <= wk); return A.length ? `${A.filter(x => L[x.id]).length}/${A.length}` : ''; };
   h += `<details data-keep="tingS" ${(state.keep || {}).tingS ? 'open' : ''} style="margin-top:10px"><summary class="small muted">设置 · 第 ${wk} 周 · 已听 ${['yw','ls','dl','sw','df','sx'].filter(cnt).map(k => TING_SUBJ[k] + ' ' + cnt(k)).join('，')}</summary>
     <div class="row" style="gap:6px;margin-top:8px"><span class="small muted">每天约</span>${[5,8,12].map(m => `<button class="chip ${m === tingMin() ? 'on' : ''}" data-act="tingmin" data-v="${m}">${m} 分钟</button>`).join('')}</div></details></div>`;
   const s = TING.cur || list[0];
-  if (s) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${TING.cur ? '正在放' : '第一段'} · ${TING_KIND[s.kind] || TING_SUBJ[s.subj]}</div><h3 style="margin:0 0 10px">${esc(s.title)}</h3>${s.paras.map(p => `<p>${esc(p)}</p>`).join('')}${s.kind === 'recite' ? '' : `<p><b>问题：</b>${esc(s.q)}</p>`}${s.kind === 'recite' ? '' : `<details data-keep="tingA" ${(state.keep || {}).tingA ? 'open' : ''}><summary class="small">看答案</summary><p style="margin-top:8px">${esc(s.a)}</p></details>`}${tingAskHTML(s.id, s.kind === 'recite' ? '背下来了吗' : '这题答上了吗')}</div>`;
-  h += `<p class="small faint" style="margin:0 4px 16px">按学校进度只放教到的内容。周一、四语文，周二历史，周三地理，周五生物，周六道法，周日复习加一段数学；语文日最后带一篇古诗文跟背。每段放完按「答上了 / 没答上」，没答上的课直接进「弄懂知识点」；期中、期末前 14 天改成错得多的课先放。锁屏也能放。</p>`;
+  const qaFull = s && s.qa && TING.cur === s && TING.qp === 'full', qaHide = s && s.qa && !tingQADone(s.id) && !tingQASeen(s.id) && !qaFull;   // 先问后讲的段：答完之前不摆出讲解原文和答案
+  if (s) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${TING.cur ? '正在放' : '第一段'} · ${TING_KIND[s.kind] || TING_SUBJ[s.subj]}</div><h3 style="margin:0 0 10px">${esc(s.title)}</h3>${qaHide ? `<p class="small muted">${TING.cur === s && TING.qp === 'judge' ? '选完「一样 / 不一样」再看文字。' : '复习这段先听问题、自己想，听完答案再看文字。'}</p>` : s.paras.map(p => `<p>${esc(p)}</p>`).join('')}${s.kind === 'recite' ? '' : `<p><b>问题：</b>${esc(s.q)}</p>`}${s.kind === 'recite' || qaHide ? '' : `<details data-keep="tingA" ${(state.keep || {}).tingA ? 'open' : ''}><summary class="small">看答案</summary><p style="margin-top:8px">${esc(s.a)}</p></details>`}${s.qa && !qaFull ? '' : tingAskHTML(s.id, s.kind === 'recite' ? '背下来了吗' : '这题答上了吗')}</div>`;
+  h += `<p class="small faint" style="margin:0 4px 16px">按学校进度只放教到的内容。周一、四语文，周二历史，周三地理，周五生物，周六道法，周日复习加一段数学；语文日最后带一篇古诗文跟背。听过的复习段先放问题，想好了再听答案。每段放完按「答上了 / 没答上」，没答上的课直接进「弄懂知识点」；期中、期末前 14 天改成错得多的课先放。锁屏也能放。</p>`;
   return h;
 }
 
@@ -4730,9 +5074,14 @@ const KP_DRILL = {
 const kpDrillHow = (sid, t) => ((KP_DRILL[sid] || (taxOf(sid) ? KP_DRILL.sx : KP_DRILL.mem))[t]) || KP_DRILL.sx.concept;
 async function kpDrillGen(X, n){
   const {k, errTxt} = kpCtx(X), sb = subjById(X.sid), op = kpOp(X); X.busy = true; X.qs = []; X.qi = 0; X.err = ''; render();
-  try { const L = parseJSONList(await kpAsk([{role: 'system', content: `你是初中${sb.name}老师，给七年级学生出「${k.name}」的专项练习 ${n} 道。${n > 1 ? '由易到难，' : '难度中等，'}${kpDrillHow(X.sid, X.type)}。专门冲着这个卡点：${X.stuck || '这个知识点最常见的错'}。不能用下面这些他做错的原题。每道 3 分钟内能做完。只输出 JSON 数组：[{"q":"题目"}]\n他做错的题（不要用）：\n${errTxt}`}, {role: 'user', content: '出题'}], {temperature: 0.7}));
-    if (state.kpx !== X || X.op !== op) return; const old = k.its.map(i => i.stem || '').filter(Boolean);
-    X.qs = (L || []).map(x => ({q: String(x.q || '').slice(0, 400), ans: '', res: null, tries: 0, sol: ''})).filter(x => x.q && !old.some(o => kpSimilar(o, x.q))).slice(0, n);   // 和原题几乎一样的不要（防止讲解把原题答案讲出来）
+  const fr = kpFormReq(X, k, n); if (fr) X.formOn = true; else delete X.formOn;   // 换问法开关关着时 fr 为空，题目和以前一样
+  try { let L, Q = [], tries = 0; const old = k.its.map(i => i.stem || '').filter(Boolean);
+    do { L = (fr ? parseJSONListLoose : parseJSONList)(await kpAsk([{role: 'system', content: `你是初中${sb.name}老师，给七年级学生出「${k.name}」的专项练习 ${n} 道。${n > 1 ? '由易到难，' : '难度中等，'}${kpDrillHow(X.sid, X.type)}。专门冲着这个卡点：${X.stuck || '这个知识点最常见的错'}。不能用下面这些他做错的原题。每道 ${fr ? '3 到 5' : '3'} 分钟内能做完。${fr || '只输出 JSON 数组：[{"q":"题目"}]'}\n他做错的题（不要用）：\n${errTxt}`}, {role: 'user', content: '出题'}], {temperature: 0.7}));
+      if (state.kpx !== X || X.op !== op) return;
+      if (fr) (L || []).forEach(x => { x.f = n <= 1 ? X.cf : FORMS[X.sid].includes(x.f) ? x.f : X.sid === 'sx' ? 'solve' : 'unk'; });   // 英语没有「正常求解」，没标或不认识的记 unk
+      Q = (L || []).map(x => Object.assign({q: String(x.q || '').slice(0, fr ? 900 : 400), ans: '', res: null, tries: 0, sol: ''}, fr ? {f: x.f} : {})).filter(x => x.q && !old.some(o => kpSimilar(o, x.q))).slice(0, n);   // 和原题几乎一样的不要（防止讲解把原题答案讲出来）
+    } while (fr && n > 1 && ++tries < 2 && !X.limit && Q.length >= n && !kpFormsOk(Q, n, X.sid));   // 过滤后的这组问法不够 2 种或找错改错超过 1 道：重出一次（到了当晚时长就不重出），还不行就照用
+    X.qs = Q;
     if (!X.qs.length) X.err = '题没出来，再试一次'; }
   catch(e) { if (state.kpx !== X || X.op !== op) return; X.err = '出题失败：' + e.message; }
   X.busy = false; render();
@@ -4779,8 +5128,9 @@ function kpParentCard(){
 }
 function kpFinish(X){
   const ok = X.qs.filter(q => q.res && q.res.ok && !q.saw).length;
-  if (X.step === 'check') { const pass = ok >= 1; kpLog(X, {k: 'check', ok: pass}, pass ? {mast: today(), mastAt: now(), chk: null} : {chk: null}); X.result = pass ? 'mast' : 'again'; }
-  else { const pass = ok >= kpNeed(X.qs.length); kpLog(X, {k: 'drill', n: X.qs.length, ok, type: X.type, stuck: X.stuck}, pass ? {chk: addD(today(), 7)} : {}); X.result = pass ? 'pass' : 'more'; }
+  const fm = X.formOn ? {forms: X.qs.map(q => q.f || 'solve'), fok: X.qs.map(q => q.res && q.res.ok && !q.saw ? 1 : 0)} : {};   // 换问法开着才记每道的问法和对错（fok 给兜底统计按问法算正确率）
+  if (X.step === 'check') { const pass = ok >= 1; kpLog(X, Object.assign({k: 'check', ok: pass}, fm), pass ? {mast: today(), mastAt: now(), chk: null} : {chk: null}); X.result = pass ? 'mast' : 'again'; }
+  else { const pass = ok >= kpNeed(X.qs.length); kpLog(X, Object.assign({k: 'drill', n: X.qs.length, ok, type: X.type, stuck: X.stuck}, fm), pass ? {chk: addD(today(), 7)} : {}); X.result = pass ? 'pass' : 'more'; }
   X.step = 'done'; render();
 }
 function kpTime(X, end){ if (!X || !X.t0) return; const m = (Date.now() - X.t0) / 60000;
@@ -4813,8 +5163,8 @@ function vKpx(){
     const Q = X.qs[X.qi];
     if (!Q) { h += X.busy ? '<p class="muted">AI 正在出题…</p>' : ''; foot = X.busy ? '' : `<button class="btn primary" data-act="kpregen">再出一次</button>`; }
     else {
-      h += `<p class="small faint" style="margin:0 0 6px">第 ${X.qi + 1}/${X.qs.length} 道${X.sid !== 'sx' ? '' : X.type === 'read' ? ' · 先写出题目里的关键条件，再写答案' : X.type === 'calc' ? ' · 一步一步写' : ''}</p><div class="card" style="font-size:18px;line-height:1.7;white-space:pre-wrap">${esc(Q.q)}</div>`;
-      if (!(Q.res && Q.res.ok)) h += `<textarea id="kpx-in" data-in="kpx" class="wiz-in" style="min-height:90px" placeholder="${X.sid === 'sx' && X.type === 'read' ? '关键条件：……\n答案：……' : X.sid === 'sx' ? '写答案和关键步骤' : '写答案'}">${esc(Q.ans)}</textarea>${pencilTip()}`;
+      h += `<p class="small faint" style="margin:0 0 6px">第 ${X.qi + 1}/${X.qs.length} 道${Q.f && Q.f !== 'solve' && FORM_N[Q.f] ? ` · 这次：${FORM_N[Q.f]}。${FORM_TIP[Q.f] || ''}` : X.sid !== 'sx' ? '' : X.type === 'read' ? ' · 先写出题目里的关键条件，再写答案' : X.type === 'calc' ? ' · 一步一步写' : ''}</p><div class="card" style="font-size:18px;line-height:1.7;white-space:pre-wrap">${esc(Q.q)}</div>`;
+      if (!(Q.res && Q.res.ok)) h += `<textarea id="kpx-in" data-in="kpx" class="wiz-in" style="min-height:90px" placeholder="${Q.f === 'finderr' ? '第几步错了，改成什么，答案是……' : X.sid === 'sx' && X.type === 'read' ? '关键条件：……\n答案：……' : X.sid === 'sx' ? '写答案和关键步骤' : '写答案'}">${esc(Q.ans)}</textarea>${pencilTip()}`;
       if (X.busy) h += '<p class="muted">AI 正在看…</p>';
       if (Q.res) h += `<div class="signal ${Q.res.ok ? 'good' : ''}" style="margin-top:10px"><span class="k">${Q.res.ok ? '对了' : '还不对'}</span>${esc(Q.res.hint)}</div>`;
       if (Q.res && !Q.res.ok && Q.tries >= 2) h += Q.sol ? `<div class="card" style="margin-top:10px;white-space:pre-wrap;line-height:1.7"><div class="small faint">这道题的讲解（看过讲解的题不算做对）</div>${esc(Q.sol)}</div>` : `<div class="small muted" style="margin-top:10px">${Q.solBusy ? 'AI 正在写这道题的讲解…' : ''}</div>${Q.solBusy ? '' : '<button class="btn" style="margin-top:6px" data-act="kpsol">看这道题的讲解</button>'}`;
@@ -5005,23 +5355,38 @@ function vWords(){
   return h;
 }
 function vWordCard(){
-  const L = state.learn, q0 = wordQueue(), isRetry = w => { const s = wState(w); return s && s.triesD === today() && s.due === today() && !s.done; };
-  const q = wordsDoneToday() >= wordsTonight() ? q0.filter(isRetry) : q0;
-  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">背单词</h2><span class="spacer"></span><span class="small faint">今晚还剩 ${Math.min(q.length, Math.max(0, wordsTonight() - wordsDoneToday()))}</span><button class="btn sm ghost" data-act="lv" data-v="words">单词表 / 打印</button></div>` + `<details style="margin-top:6px"><summary class="small faint">怎么背</summary><p class="small faint" style="margin:6px 0 0">看中文想英文，想完再翻面听发音。每天新学 ${newPerDay()} 个（按最近的正确率自动调：记得牢就多学，记不住就少学），记住的隔 1、3、7、21 天再考，第 4 次还记得就算掌握。</p></details>`;
-  if (!q.length) return h + `<div class="card empty" style="margin-top:12px">今天的单词背完了。明天再来，隔天复习才记得牢。<div style="margin-top:12px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button></div></div>`;
-  const w = q[0], s = wState(w), flip = L.flip, mustSpell = !!s && (s.box || 0) >= 2 && !w.u, spellOk = (L.typed || '').trim().toLowerCase() === w.w.toLowerCase();
+  const L = state.learn, q = wordCardQueue();
+  let h = `<div class="row">${backBtn('home')}<h2 style="margin:0">背单词</h2><span class="spacer"></span><span class="small faint">今晚还剩 ${Math.min(q.length, Math.max(0, wordsTonight() - wordsDoneToday()))}</span><button class="btn sm ghost" data-act="lv" data-v="words">单词表 / 打印</button></div>` + `<details style="margin-top:6px"><summary class="small faint">怎么背</summary><p class="small faint" style="margin:6px 0 0">看中文想英文，想完再翻面听发音。每天新学 ${newPerDay()} 个（按最近的正确率自动调：记得牢就多学，记不住就少学），${featRetreat('wordPj') ? '先在心里想，再点「翻面看答案」对答案。' : '先在心里想，再点「想出来了」或「想不起来」翻面对答案。'}记住的按每次记得的程度排下次复习，越熟隔得越久，隔到两个月就算掌握；没想起来、拼错的当晚隔几张再考。${((c, e) => c && e ? '' : `复习时题面会换：${!c && !e ? '有时是课文里的原句填空，有时只念发音让你拼' : !c ? '有时是课文里的原句填空' : '有时只念发音让你拼'}，最后都要能看中文拼出来。${!c && !e ? '填空和听写' : !c ? '填空' : '听写'}要先拼出来，再点「对答案」。`)(featRetreat('word:cloze'), featRetreat('word:ear'))}</p></details>`;
+  const wk = L.flip && L.wk ? uniqWords().find(x => wordKey(x) === L.wk) : null;   // 翻面时已经记过的这张（先表态那一下就记了），队列已经变了，按 key 找回来
+  if (!q.length && !wk) return h + `<div class="card empty" style="margin-top:12px">今天的单词背完了。明天再来，隔天复习才记得牢。<div style="margin-top:12px"><button class="btn primary" data-act="tab" data-v="today">回到今天 ›</button></div></div>`;
+  const w = wk || q[0], s = wState(w), flip = L.flip, wf = wk ? (L.wf && L.wf.w === wordKey(w) ? L.wf : {f: 'cn'}) : wCardForm(w, s), fm = wf.f;
+  const cz = fm === 'cloze' ? clozeSent(wf.cs) : null, fmL = fm === 'cloze' && cz ? 'cloze' : fm === 'ear' ? 'ear' : 'cn';
+  if (fm === 'cloze' && !cz && wf === L.wf) { L.wf.f = 'cn'; delete L.wf.cs; }   // 句子找不到了（磨耳朵课文换过）：这张按看中文记
+  if (!flip && !wk) wTimeStart(w);
+  const mustSpell = !wk && (needSpell(w, s) || fmL !== 'cn'), spellOk = (L.typed || '').trim().toLowerCase() === w.w.toLowerCase();
+  const nSeen = s ? (s.hist || []).length - (wk ? 1 : 0) : 0, lastE = wk && s ? (s.hist || [])[s.hist.length - 1] : null;
   h += `<div class="card" style="margin-top:12px;text-align:center;padding:28px 16px">
-    <div class="small faint">${s ? '复习 · 第 ' + ((s.hist||[]).length + 1) + ' 次' : '新词'}${w.unit ? ' · ' + esc(w.unit) : ''}</div>
-    <div style="font-size:26px;font-weight:700;margin:14px 0 4px">${(() => { const m = shortCn(w.cn).match(/^((?:[a-z]+\.\s*)+)?(.*)$/); return (m[1] ? `<span style="font-size:15px;font-weight:500;color:var(--ink3);margin-right:6px">${esc(m[1].trim())}</span>` : '') + esc(m[2]); })()}</div>
-    ${!flip ? `<input type="text" id="w-spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${mustSpell ? '这一轮要拼出来' : '拼一下（可选）'}" value="${esc(L.typed||'')}" style="max-width:260px;margin:12px auto 0;display:block;text-align:center;font-family:Georgia,serif;font-size:20px">${pencilTip('center')}` : ''}
+    <div class="small faint">${nSeen > 0 ? '复习 · 第 ' + (nSeen + 1) + ' 次' : '新词'}${w.unit ? ' · ' + esc(w.unit) : ''}${fmL === 'cloze' ? ' · 课文填空' : fmL === 'ear' ? ' · 听音拼写' : ''}</div>
+    ${fmL === 'ear' && !flip ? `<div class="wform-ear" style="margin:14px 0 4px"><button class="btn" style="min-height:52px;padding:9px 22px;font-size:17px" data-act="wsay">${SPK} 再听一遍</button></div>`
+      : fmL === 'cloze' ? `<div class="wform-cloze" style="font-size:19px;line-height:1.6;margin:14px 0 4px;font-family:Georgia,serif;text-align:center">${(() => { const re = wRe(w), m = cz.s.match(re); if (!m) return esc(cz.s); const at = m.index + m[1].length, got = m[2];
+          const mid = flip ? `<b style="border-bottom:2px solid var(--line)">${esc(got)}</b>` : got.split(/\s+/).map(x => `<b>${esc(x[0])}</b><span style="letter-spacing:2px">${'_'.repeat(Math.max(1, x.length - 1))}</span>`).join(' ');
+          return esc(cz.s.slice(0, at)) + mid + esc(cz.s.slice(at + got.length)); })()}</div><div class="small muted">${esc(shortCn(w.cn))}</div>`
+      : `<div style="font-size:26px;font-weight:700;margin:14px 0 4px">${(() => { const m = shortCn(w.cn).match(/^((?:[a-z]+\.\s*)+)?(.*)$/); return (m[1] ? `<span style="font-size:15px;font-weight:500;color:var(--ink3);margin-right:6px">${esc(m[1].trim())}</span>` : '') + esc(m[2]); })()}</div>`}
+    ${!flip ? `<input type="text" id="w-spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${fmL === 'cloze' ? '填出空白处的词' : fmL === 'ear' ? '拼出听到的词' : mustSpell ? '这一轮要拼出来' : '拼一下（可选）'}" value="${esc(L.typed||'')}" style="max-width:260px;margin:12px auto 0;display:block;text-align:center;font-family:Georgia,serif;font-size:20px">${pencilTip('center')}` : ''}
     ${flip ? `<div style="font-size:34px;font-weight:700;margin:22px 0 4px;font-family:Georgia,serif">${esc(w.w)}</div><div class="muted">${esc(w.p || '')}</div>
       ${L.typed ? (L.typed.trim().toLowerCase() === w.w.toLowerCase() ? '<div class="pill good" style="display:inline-block;margin-top:8px">拼对了</div>' : `<div class="small" style="margin-top:8px;color:var(--amber)">你拼的是：${esc(L.typed)}</div>`) : ''}
       ${w.cn && w.cn !== shortCn(w.cn) ? `<div class="small faint" style="margin-top:6px">${esc(w.cn)}</div>` : ''}${w.book === termBook(today()) ? `<div class="small" style="margin-top:4px;color:var(--accent)">课本 ${esc(w.unit)}${w.u ? ' · 只要求认识，不用会拼' : ''}</div>` : ''}
-      <button class="btn sm" style="margin-top:10px" data-act="say" data-v="${esc(w.w)}">${SPK} 再听一遍</button>` : `<p class="small faint" style="margin-top:22px">${mustSpell ? '记住两轮了，这次要把它拼出来' : '先在心里想（或写在纸上）英文怎么说'}</p>`}</div>`;
-  h += flip && mustSpell ? (spellOk ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">拼对了 ✓ 下一个</button></div>`
-      : `<div class="row"><button class="btn" style="flex:2;min-height:52px" data-act="wmark" data-v="0">拼错了，过两天再考</button><button class="btn ghost" style="flex:1;min-height:52px" data-act="wmark" data-v="1">只是手滑</button></div>`)
-    : flip ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">想对了</button><button class="btn" style="flex:1;min-height:52px" data-act="wmark" data-v="0">没想起来</button></div>`
-            : `<div class="row"><button class="btn primary" style="flex:2;min-height:52px" data-act="wflip">翻面看答案</button>${!s ? '<button class="btn" style="flex:1;min-height:52px" data-act="wknown">早就会了</button>' : ''}</div>`;
+      ${lastE && lastE.pj === 1 && !lastE.ok ? '<div class="small muted wsmnote" style="margin-top:6px">下一次这个词要拼出来</div>' : ''}
+      <button class="btn sm" style="margin-top:10px" data-act="say" data-v="${esc(w.w)}">${SPK} 再听一遍</button>` : `<p class="small faint" style="margin-top:22px">${fmL === 'cloze' ? '按句子意思，拼出空白处的词' : fmL === 'ear' ? '听发音拼出来，没听清就再听一遍' : mustSpell ? ((s.box || 0) >= 2 ? '记住两轮了，这次要把它拼出来' : '这一轮要把它拼出来') : '先在心里想（或写在纸上）英文怎么说'}</p>`}</div>`;
+  // 不要求拼的卡先表态：「想出来了」「想不起来」再翻面。想不起来 / 打了字的当场就记好，翻面后只剩「下一个」
+  h += flip && wk ? `<div class="row"><button class="btn primary" style="flex:1;min-height:52px" data-act="wnext">下一个</button></div>`
+    : flip && mustSpell ? (spellOk ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">拼对了 ✓ 下一个</button></div>`
+      : `<div class="row"><button class="btn" style="flex:1;min-height:52px;white-space:nowrap;padding:9px 10px" data-act="wmark" data-v="0">拼错了，隔几张再考</button>${s && s.slipD === today() ? '' : '<button class="btn" style="flex:1;min-height:52px;white-space:nowrap;padding:9px 10px" data-act="wslip">看清了，等会儿再拼一次</button>'}</div>`)
+    : flip ? `<div class="row"><button class="btn good" style="flex:1;min-height:52px" data-act="wmark" data-v="1">对了</button><button class="btn" style="flex:1;min-height:52px" data-act="wmark" data-v="0">其实不对</button></div>`
+    : mustSpell && fmL !== 'cn' ? `<div class="row"><button class="btn primary" style="flex:1;min-height:52px" data-act="wflip">对答案 →</button><button class="btn" style="flex:1;min-height:52px" data-act="wnone">想不起来 →</button></div>`
+    : mustSpell ? `<div class="row"><button class="btn primary" style="flex:2;min-height:52px" data-act="wflip">翻面看答案</button></div>`
+            : featRetreat('wordPj') ? `<div class="row"><button class="btn primary" style="flex:2;min-height:52px" data-act="wflip">翻面看答案</button></div>${!s ? '<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost sm" data-act="wknown">早就会了</button></div>' : ''}`   // 先表态退回期间：和以前一样一个键翻面
+            : `<div class="row"><button class="btn primary" style="flex:1;min-height:52px" data-act="wflip" data-pj="1">想出来了 →</button><button class="btn" style="flex:1;min-height:52px" data-act="wflip" data-pj="0">想不起来 →</button></div>${!s ? '<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost sm" data-act="wknown">早就会了</button></div>' : ''}`;
   return h;
 }
 function vRecite(){
@@ -5089,7 +5454,9 @@ async function recStart(){
   sr.start(); R.phase = 'rec'; R.how = 'browser'; render();
 }
 async function recStop(){
-  const R = state.rcheck; if (!REC) return; REC.on = false; R.phase = 'busy'; render();
+  const R = state.rcheck; if (!REC) return; REC.on = false; R.phase = 'busy';
+  R.sec = REC.t0 ? Math.round((Date.now() - REC.t0) / 1000) : null;   // 背诵用时：只记录，不参与评分
+  render();
   try {
     if (REC.sr) { REC.sr.stop(); await new Promise(r => setTimeout(r, 800)); }
     else { clearTimeout(REC.cut); await new Promise(res => { REC.done = res; if (REC.mr && REC.mr.state === 'recording') REC.mr.stop(); else res(); }); REC.stream.getTracks().forEach(t => t.stop());
@@ -5111,10 +5478,15 @@ async function finishCheck(){
   const strict = R.mode === 'type', res = alignText(si == null ? x.text : x.text.slice(sg[si][0], sg[si][1]), R.said || '', strict);
   R.res = res; R.phase = 'result';
   const pctv = Math.round(res.score * 100), r = DB.recite[x.id] || {hist: []}, cur = r.st || '', eff = rStateX(x);
-  r.hist = (r.hist || []).concat([Object.assign({d: today(), st: strict ? 'type' : 'voice', score: pctv}, si == null ? {} : {seg: si})]).slice(-20); r.u = now(); DB.recite[x.id] = r;
-  const dueNow = eff !== 'upd' && r.due && r.due <= today();   // 复习可以只抽一段背
-  if (dueNow) reviewRecite(x.id, pctv >= 70, recRate(pctv));   // 70–90 分记「吃力」，间隔排短一些
-  if (si != null) {
+  const dueNow = eff !== 'upd' && r.due && r.due <= today(), peek = !!dueNow && recPeeked(x.id);   // 复习可以只抽一段背
+  const off = si == null ? 0 : sg[si][0], mi = [...new Set([...res.miss].map(k => +k.split(':')[0] + off))].sort((a, b) => a - b).slice(0, 20);   // 漏字落在全文第几行
+  r.hist = (r.hist || []).concat([Object.assign({d: today(), st: peek ? 'peek' : strict ? 'type' : 'voice', score: pctv}, si == null ? {} : {seg: si},
+    peek ? {peek: 1, m: strict ? 'type' : 'voice'} : dueNow && !featRetreat('recHide') ? {rv: 1} : {}, mi.length ? {mi} : {}, R.mode === 'voice' && R.sec != null ? {sec: R.sec} : {})]).slice(-20); r.u = now(); DB.recite[x.id] = r;
+  R.peek = peek;
+  if (peek) r.due = addD(today(), 1);   // 看了原文再背只当练习：不进 FSRS，明天不看再背一次
+  else if (dueNow) reviewRecite(x.id, pctv >= 70, recRate(pctv));   // 70–90 分记「吃力」，间隔排短一些
+  if (peek) save();   // 看了原文再背：不升「会背了 / 默写全对」，也不记分段过关（否则回放时这天会被当成一次真复习）
+  else if (si != null) {
     const ok = strict ? pctv >= 98 : pctv >= 90; R.segOk = ok;
     if (ok) { if (r.segRev !== recRev(x)) { r.segs = {}; r.segRev = recRev(x); } r.segs[si] = strict || r.segs[si] === 'dict' ? 'dict' : 'can'; }
     const all = sg.every((_, k) => segDone(x, k)), allDict = all && sg.every((_, k) => r.segs[k] === 'dict');
@@ -5134,7 +5506,8 @@ function vReciteCheck(){
   if (R.phase === 'result') {
     const p = Math.round(R.res.score * 100), good = R.mode === 'type' ? p >= 98 : p >= 90;
     h += `<div style="text-align:center;margin:10px 0 14px"><div style="font-family:var(--mono);font-size:44px;font-weight:700;color:${good ? 'var(--good)' : 'var(--amber)'}">${p}%</div>
-      <div class="muted">${!good ? `背出了 ${R.res.got}/${R.res.total} 个字，标出来的是漏了或错了的` : si != null ? (R.allDone ? `这一段过了！${sg.length} 段全部背下来，整篇记为「${R.mode === 'type' ? '默写全对' : '会背了'}」` : `这一段过了（已过 ${sg.filter((_, k) => segDone(x, k)).length}/${sg.length} 段）`) : (R.mode === 'type' ? '默写全对，记为「默写全对」' : '背下来了，记为「会背了」')}</div></div>
+      <div class="muted">${!good ? `背出了 ${R.res.got}/${R.res.total} 个字，标出来的是漏了或错了的` : R.peek ? '这遍背对了' : si != null ? (R.allDone ? `这一段过了！${sg.length} 段全部背下来，整篇记为「${R.mode === 'type' ? '默写全对' : '会背了'}」` : `这一段过了（已过 ${sg.filter((_, k) => segDone(x, k)).length}/${sg.length} 段）`) : (R.mode === 'type' ? '默写全对，记为「默写全对」' : '背下来了，记为「会背了」')}</div></div>
+      ${R.peek ? '<p class="small muted rcpeek" style="text-align:center;margin:0 0 10px">看了原文，这次只当练习。明天不看再背一次就算数。</p>' : ''}
       <div class="card" style="font-family:var(--serif);font-size:18px;line-height:2;text-align:center">${markedLines(lines, R.res.miss)}</div>
       ${R.said ? `<details><summary class="small faint">识别到的内容</summary><p class="small muted">${esc(R.said)}</p></details>` : ''}${R.err ? `<div class="signal">${esc(R.err)}</div>` : ''}`;
     const nx = si == null || !good ? -1 : sg.findIndex((_, k) => k !== si && !segDone(x, k));
@@ -5165,10 +5538,30 @@ function blankLine(line, lvl){
 function vPoem(){
   const L = state.learn, x = (LIB.recite ? LIB.recite.items : []).find(i => i.id === L.poem);
   if (!x) { L.view = 'recite'; return vRecite(); }
-  const st = rStateX(x), mode = L.pmode || 'full', sg = recSegs(x), segAt = Object.fromEntries(sg.map(([a], k) => [a, k]));
+  const st = rStateX(x), sg = recSegs(x), segAt = Object.fromEntries(sg.map(([a], k) => [a, k]));
+  const dueNow = !!x.text && x.mode !== 'title' && recDueNow(x), peeked = dueNow && recPeeked(x.id), rvSeg = recPickSeg(x), rvOff = featRetreat('recHide');
+  const mode = L.pmode === 'hide' && (!dueNow || rvOff) ? 'full' : L.pmode || 'full';   // 先背后看退回期间：和以前一样直接看原文   // 不到期了（背完了）就自动显示原文
   const lvl = L.lvl || 1;
-  let h = `<div class="poemv"><div class="row" style="order:-2">${backBtn('recite', '篇目')}<span class="spacer"></span>${x.text ? `<div class="seg sm"><button data-act="pmode" data-v="full" class="${mode==='full'?'on':''}">原文</button><button data-act="pmode" data-v="blank" class="${mode==='blank'?'on':''}">挖空练习</button></div>` : ''}</div>`;
+  let h = `<div class="poemv"><div class="row" style="order:-2">${backBtn('recite', '篇目')}<span class="spacer"></span>${x.text ? `<div class="seg sm">${dueNow && !rvOff ? `<button data-act="pmode" data-v="hide" class="${mode==='hide'?'on':''}">先背</button>` : ''}<button data-act="pmode" data-v="full" class="${mode==='full'?'on':''}">原文</button><button data-act="pmode" data-v="blank" class="${mode==='blank'?'on':''}">挖空练习</button></div>` : ''}</div>`;
   if (x.text && mode === 'blank') h += `<div class="row" style="order:-2;margin-top:8px;justify-content:flex-end"><span class="small faint">难度</span><div class="seg sm">` + [[1,'提示多'],[2,'提示少'],[3,'全默']].map(([k,n]) => `<button data-act="plvl" data-v="${k}" class="${lvl===k?'on':''}">${n}</button>`).join('') + `</div></div>`;
+  if (mode === 'hide') {   // 到期复习第一屏：篇名 + 今天背哪段 + 开头提示 + 按钮；原文和朗读放下面
+    const rr0 = DB.recite[x.id] || {}, lines = rvSeg >= 0 ? x.text.slice(sg[rvSeg][0], sg[rvSeg][1]) : x.text, cue = rvSeg >= 0 ? lines[0].replace(/[，。；：？！、“”]/g, '').slice(0, 4) : '';
+    const sc = (rr0.hist || []).filter(e => e.score != null), low2 = sc.length >= 2 && sc.slice(-2).every(e => e.score < 70);
+    const MI = MIC.replace('<svg','<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-3px"'), sv = rvSeg >= 0 ? ` data-s="${rvSeg}"` : '';
+    h += `<div class="card rvhide" style="margin-top:12px;text-align:center"><h2 style="margin:6px 0 2px">${esc(x.title)}</h2><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>
+      <div class="small muted" style="margin-top:14px">今天该复习这篇了，不看原文背一遍</div>
+      <div class="rvwhat" style="font-size:20px;font-weight:700;margin:6px 0 2px">${rvSeg >= 0 ? `今天背第 ${rvSeg + 1} 段` : '从题目开始背'}</div>
+      ${cue ? `<div class="muted rvcue">开头是「${esc(cue)}」</div>` : ''}
+      ${peeked ? '<p class="small rvpeek" style="margin:10px 0 0"><b>看了原文，明天不看再背一次就算数。</b>今晚背一遍当练习。</p>' : ''}
+      <div class="row" style="justify-content:center;margin-top:14px;gap:8px"><button class="btn primary" data-act="rcheck" data-v="voice"${sv}>${MI} ${rvSeg >= 0 ? '背这段' : '背给我听'}</button><button class="btn" data-act="rcheck" data-v="type"${sv}>${rvSeg >= 0 ? '默写' : '打字默写'}</button></div>
+      ${low2 ? '<p class="small muted" style="margin:10px 0 0">最近两次都没到 70%，可以先用挖空练一遍。</p>' : ''}
+      <p class="small faint" style="margin:10px 0 0">90% 以上算还记得，隔更久再查。背完会显示原文，漏的字标出来。</p></div>
+      <div class="card"><div class="small faint">先看原文或听朗读再背，这次只算练习，明天再背一次。</div><div class="row ptools" style="justify-content:center;margin-top:8px;gap:8px"><button class="btn sm ghost" data-act="pmode" data-v="full">看原文</button><button class="btn sm ghost" data-act="sayzh">${SPK} 听朗读</button></div></div>`;
+    h += `<div class="small muted" style="margin:0 4px 10px">现在：<b>${(RST.find(r => r[0] === st) || ['', '没背'])[1]}</b>${rr0.due ? ' · 今天复习' : ''}</div>`;
+    const hist0 = rr0.hist || [];
+    if (hist0.length) h += `<p class="small faint" style="margin:10px 4px 0">记录：${hist0.slice(-5).map(e => mdShort(e.d) + ' ' + (e.score != null ? (e.peek ? '看后背 ' : e.st === 'type' ? '默写 ' : '背诵 ') + e.score + '%' : (RST.find(r=>r[0]===e.st)||['',''])[1])).join(' → ')}</p>`;
+    return h + `</div>`;
+  }
   h += `<div class="card" style="margin-top:12px;text-align:center"><h2 style="margin:6px 0 2px">${esc(x.title)}</h2><div class="small muted">${esc([x.dynasty, x.author].filter(Boolean).join(' · '))}</div>
     ${x.mode === 'excerpt' ? '<div class="pill amber" style="display:inline-block;margin-top:8px">默写常考重点句 · 全文看课本</div>' : ''}${x.checked === false ? '<div class="small faint" style="margin-top:6px">这篇还没逐字校对，背之前对照课本看一眼</div>' : ''}`;
   const prose = ['文言文', '现代文'].includes(x.kind) || /[。！？].{14,}/.test((x.text || [])[0] || '');   // 文章按段落左对齐，诗词逐行居中
@@ -5181,11 +5574,10 @@ function vPoem(){
   const segMid = sg.length && sg.some((_, k) => segDone(x, k)) && !sg.every((_, k) => segDone(x, k));   // 背到一半：下一段就在最上面
   if (sg.length && x.text) h += `</div><div class="card" style="${segMid ? 'order:-1;margin-top:12px' : ''}"><div class="row"><h3 style="margin:0">分段背</h3><span class="spacer"></span><span class="small muted">过了 ${sg.filter((_, k) => segDone(x, k)).length}/${sg.length} 段</span></div><p class="small muted" style="margin:4px 0 8px">一段一段背，每段背对九成就打勾，${sg.length} 段都过了整篇记「会背了」。</p>` +
     sg.map(([a], k) => `<div class="row segrow" style="padding:6px 0;border-top:1px solid var(--line)"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">第 ${k + 1} 段 <span class="small faint">「${esc(x.text[a].replace(/[，。；：？！、“”]/g, '').slice(0, 4))}…」</span></span>${segDone(x, k) ? '<span class="pill good">✓</span>' : ''}<button class="btn sm" data-act="rcheck" data-v="voice" data-s="${k}">背这段</button><button class="btn sm ghost" data-act="rcheck" data-v="type" data-s="${k}">默写</button></div>`).join('');
-  const rvSeg = sg.length ? (dayDiff('2026-01-01', today()) % sg.length) : -1;
-  if (st !== 'upd' && rr.due && rr.due <= today()) h += `</div><div class="card" style="background:var(--accent-bg);border-color:transparent"><h3>今天该复习这篇了</h3><p class="small muted" style="margin:0 0 8px">${rvSeg >= 0 ? `长篇不用整篇背，抽一段就行：<b>第 ${rvSeg + 1} 段</b>。` : ''}不看原文背一遍：90% 以上算还记得，隔更久再查；低于 70% 就改回「在背」。</p>${rvSeg >= 0 ? `<button class="btn sm primary" data-act="rcheck" data-v="voice" data-s="${rvSeg}">背第 ${rvSeg + 1} 段</button>` : ''}`;
+  if (st !== 'upd' && rr.due && rr.due <= today()) h += `</div><div class="card rvdue" style="background:var(--accent-bg);border-color:transparent;order:-1;margin-top:12px"><h3>今天该复习这篇了</h3>${peeked ? '<p class="small rvpeek" style="margin:0 0 6px"><b>看了原文，明天不看再背一次就算数。</b>今晚背一遍当练习。</p>' : ''}<p class="small muted" style="margin:0 0 8px">${rvSeg >= 0 ? `长篇不用整篇背，抽一段就行：<b>第 ${rvSeg + 1} 段</b>。` : ''}不看原文背一遍：90% 以上算还记得，隔更久再查；低于 70% 就改回「在背」。</p>${rvSeg >= 0 ? `<button class="btn sm primary" data-act="rcheck" data-v="voice" data-s="${rvSeg}">背第 ${rvSeg + 1} 段</button>` : x.text ? `<button class="btn sm primary" data-act="rcheck" data-v="voice">从题目开始背</button>` : ''}`;
   h += `</div>` + (st === 'upd' ? '' : `<div class="small muted" style="margin:0 4px 10px">现在：<b>${(RST.find(r => r[0] === st) || ['', '没背'])[1]}</b>${rr.solid ? ' <span class="pill good">已经记牢</span>' : rr.due ? ' · 下次复习 ' + mdShort(rr.due) : ''}</div>`) + `<div>`;
   const hist = (DB.recite[x.id] || {}).hist || [];
-  if (hist.length) h += `<p class="small faint" style="margin:10px 0 0">记录：${hist.slice(-5).map(e => mdShort(e.d) + ' ' + (e.score != null ? (e.st === 'type' ? '默写 ' : '背诵 ') + e.score + '%' : (RST.find(r=>r[0]===e.st)||['',''])[1])).join(' → ')}</p>`;
+  if (hist.length) h += `<p class="small faint" style="margin:10px 0 0">记录：${hist.slice(-5).map(e => mdShort(e.d) + ' ' + (e.score != null ? (e.peek ? '看后背 ' : e.st === 'type' ? '默写 ' : '背诵 ') + e.score + '%' : (RST.find(r=>r[0]===e.st)||['',''])[1])).join(' → ')}</p>`;
   return h + `</div></div>`;
 }
 function vBooks(){
@@ -5335,6 +5727,7 @@ function attentionItems(){
       if (t === h.to) { const L = holLeftList(h); if (L.length) A.unshift(['明天开学', L.map(o => `${holTaskName(o.t)}还差 ${o.left} 份`).join('；') + '。']); } } }
   { const h = holList().find(x => x.tasks.length && t > x.to && dayDiff(x.to, t) <= 7 && holLeftList(x).length);
     if (h) A[dayDiff(h.to, t) <= 3 ? 'unshift' : 'push']([`${h.name}作业没做完就开学了`, holLeftList(h).map(o => `${holTaskName(o.t)}剩 ${o.left} 份`).join('；') + (h.after === 'drop' ? '（他说不用交了）' : '') + '。下个假期录清单时，可以让他头几天多做一点，别都压到最后。']); }
+  { const fr = featRetreatNote(); if (fr) A.push(fr); }   // 新做法自动退回（第 9 章第 7 条）：家长不用动手，放最后，只占剩下的空位
   return A.slice(0, 3);
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
@@ -5423,6 +5816,11 @@ async function aiSelfTest(){
     const t = await aiChat([{role: 'user', content: [{type: 'image_url', image_url: {url: cv.toDataURL('image/jpeg', 0.9)}}, {type: 'text', text: '图里写的算式是什么？只输出 JSON：{"text":"算式"}'}]}], {temperature: 0});
     const j = parseJSONObj(t); if (!j) throw new Error('返回的不是 JSON：' + t.slice(0, 40)); if (!/37/.test(j.text) || !/85/.test(j.text)) throw new Error('没认对：' + j.text); return '认出：' + j.text; });
   await step('出同类题', async () => { const t = await aiChat([{role: 'system', content: '你是初中数学老师。出一道和下面同类的题，只输出题目，不要答案。'}, {role: 'user', content: '原题：解方程 2(x-1)=3x+4'}], {temperature: 0.7}); if (!t.trim()) throw new Error('返回是空的'); return t.trim().slice(0, 40); });
+  // 换问法上线前的两步：① 出的找错步题要标出错在哪一步（且那一步在题里）；② 一份全对的解答拿去判，必须判为没有错步
+  await step('出找错步题（标出错在哪一步）', async () => { const r = parseFinderr(await aiChat([{role: 'system', content: varFormSys('数学', 'finderr')}, {role: 'user', content: '原题：解方程 2(x-1)=3x+4\n知识点：去括号\n错因：运算执行 · 去括号漏乘'}], {temperature: 0.7}));
+    if (!r) throw new Error('没标出错在哪一步（或标的那一步题里没有），换问法先别打开'); return `错在第 ${r.bad} 步：` + r.q.replace(/\s+/g, ' ').slice(0, 40); });
+  await step('全对的解答不判错（找错步）', async () => { const v = await finderrVerify('解方程 2(x-1)=3x+4。\n第1步：去括号，得 2x-2=3x+4\n第2步：移项，得 2x-3x=4+2\n第3步：合并同类项，得 -x=6\n第4步：系数化为 1，得 x=-6\n这段解答错在第几步？');
+    if (v.err) throw new Error(`把一份全对的解答判成了有错（第 ${v.step} 步），换问法先别打开`); return '判为每一步都对'; });
   rows.push({name: '语音识别（背诵检验）', st: asrPaused() ? 'bad' : 'skip', msg: asrPaused() ? '刚才余额不足，10 分钟内先用设备自带识别' : '按分钟收费，这里不自动测；背一遍古诗就知道'}); render();
 }
 function aiTestHTML(){
@@ -5444,6 +5842,8 @@ function aiCard(){
   if (aiReady() && !state.aiEdit) return `<div class="card"><h3>AI 学习教练 <span class="pill good">已开启</span></h3>
     <p class="small muted" style="margin:0 0 8px">${(AI.model || 'glm-4.6v-flash') === 'glm-4.6v-flash' ? 'GLM-4.6V-Flash（免费）' : esc(AI.model)}${asrPaused() ? ' · 语音识别余额不足，暂时用设备自带识别' : ''}</p>${gradeStat() ? `<p class="small muted" style="margin:0 0 8px">${gradeStat()}</p>` : ''}
     <label class="f">孩子每晚最多用 AI 老师多久</label><div class="seg">` + [...new Set([10, 20, 30, 45, tutorLimit()])].sort((x, y) => x - y).map(n => `<button data-act="tumin" data-v="${n}" class="${tutorLimit() === n ? 'on' : ''}">${n} 分</button>`).join('') + `</div>
+    <label class="f">同类题、专项换问法（数学加「找错步」，英语在翻译、改错、造句、填空之间轮换）</label><div class="seg"><button data-act="varform" data-v="0" class="${varFormOn() ? '' : 'on'}">关</button><button data-act="varform" data-v="1" class="${varFormOn() ? 'on' : ''}">开</button></div>
+    <p class="small faint" style="margin:6px 0 0">默认关。打开前先点「检查 AI 功能」，「出找错步题」「全对的解答不判错」两项都要 ✅，再抽看 10 到 20 道题没问题再开。最后一关和考前自测不换问法；生物、地理、历史、道法、语文不轮换。</p>
     <div class="row" style="margin-top:10px;gap:14px"><a href="#" class="small" style="color:var(--accent)" data-act="aitest">检查 AI 功能</a><a href="#" class="small faint" data-act="aiedit">换密钥或模型</a></div>${aiTestHTML()}${memCard()}</div>`;
   return `<div class="card"><h3>AI 学习教练 · 语音识别 ${aiReady() ? '<span class="pill good">已开启</span>' : '<span class="pill">未开启</span>'}</h3>
     <p class="small muted" style="margin:0 0 8px">用智谱大模型：背诵检验时把录音转成文字，以及之后的 AI 辅导。密钥只存在这台设备上，不进备份文件。发给模型的只有学习内容，不含名字、学校、排名和你的情绪记录。</p>
@@ -5618,7 +6018,8 @@ const ACT = {
     const w = DB.weeks[state.week] = DB.weeks[state.week] || {}; w.adjust = m ? m[0] : t.slice(0, 60); w.u = now(); (w.fu = w.fu || {}).adjust = w.u; save(); toast('已写进「下周只调一件事」'); render(); },
   pet: el => { const pe = JSON.parse(JSON.stringify(DB.settings.pe || {})); pe.tests = pe.tests || {}; pe.tests[el.dataset.y] = pe.tests[el.dataset.y] === el.dataset.v ? '' : el.dataset.v; setSetting('pe', pe); save(); render(); },
   explain: el => { const dd = dayObj(today()) || {}; setDayField(today(), 'explain', (dd.explain || 0) + 1); save(); toast(el.dataset.v === '1' ? '好。只听不判，就是在帮他' : '让他换个说法再讲一遍'); render(); },
-  golearn: el => { stopAllEn(); const from = state.tab; state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.from = from; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.learn.task = !!el.dataset.s; state.sp = null; state.ls = null; state.rt = null; /* task：从今天页一三五加练进来，考试模式下也走练习页 */ } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
+  golearn: el => { stopAllEn(); const from = state.tab; state.tab = 'learn'; state.learn = state.learn || {view:'home'}; state.learn.from = from; state.learn.view = el.dataset.v; state.learn.flip = false; if (el.dataset.v === 'recite' && !featRetreat('recHide')) { const ds = reciteDue().filter(x => x.text); if (ds.length === 1) Object.assign(state.learn, {view: 'poem', poem: ds[0].id, pmode: 'hide', reveal: {}}); }   // 只有 1 篇到期：直接打开它的先背页
+    if (el.dataset.v === 'speak') { state.learn.sp = el.dataset.s || null; state.learn.task = !!el.dataset.s; state.sp = null; state.ls = null; state.rt = null; /* task：从今天页一三五加练进来，考试模式下也走练习页 */ } try { sessionStorage.setItem('obs-tab','learn'); } catch(e) {} render(); window.scrollTo(0,0); },
   toggleq: el => { const it = DB.items.find(x => x.id === el.dataset.v); if (!it) return; it.q = !queued(it); it.u = now(); save(); render(); },
   pv: el => { state.pv = el.dataset.v; state.examEdit = null; render(); window.scrollTo(0,0); },
   lv: el => { state.learn.view = el.dataset.v; state.learn.flip = false; state.learn.task = false; if (el.dataset.v === 'speak' || el.dataset.v === 'home') { stopAllEn(); state.learn.sp = null; state.sp = null; } if (el.dataset.v === 'speak' && el.dataset.s) state.learn.sp = el.dataset.s; render(); window.scrollTo(0,0); },
@@ -5632,7 +6033,9 @@ const ACT = {
   earmin: el => { lsSet('observer:earMin', +el.dataset.v); if (EAR.on) { EAR.until = Date.now() + (+el.dataset.v) * 60000; earGuard(); } render(); },
   tingplay: () => tingStart(0),
   tingpick: el => tingSeek(+el.dataset.v),
-  tingpp: () => { const a = TING.a; if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
+  tingqgo: () => tingQAGo(),
+  tingqj: el => tingQAJudge(el.dataset.v === '1'),
+  tingpp: () => { if (tingQAPP()) return; const a = TING.a; if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
     if (a.ended || (a.duration && a.currentTime >= a.duration - 0.3)) return tingSeek(0);   // 放完了：从头再放（tingSeek 里会 claim）
     if (tingPlaying()) return tingPause();
     tingResume(); },
@@ -5643,22 +6046,37 @@ const ACT = {
   wbook: el => { state.learn.book = el.dataset.v; state.learn.unit = null; render(); },
   wunit: el => { state.learn.unit = el.dataset.v || null; render(); },
   say: el => speak(el.dataset.v, 'en-US'),
-  wflip: () => { const sp = $('#w-spell'); state.learn.typed = sp ? sp.value : ''; const q0 = wordQueue()[0], s0 = q0 && wState(q0); if (s0 && (s0.box || 0) >= 2 && !q0.u && !state.learn.typed.trim()) { toast('这个词已经记住两轮了，这一轮要拼出来'); if (sp) sp.focus(); return; } state.learn.flip = true; render(); const q = wordQueue(); if (q[0]) speak(q[0].w, 'en-US'); },
-  wmark: el => { const q = wordQueue(); if (q[0]) { const sp = $('#w-spell'), ty = ((sp ? sp.value : '') || state.learn.typed || '').trim().toLowerCase(); markWord(q[0], el.dataset.v === '1', !!ty && ty === q[0].w.toLowerCase()); } state.learn.flip = false; state.learn.typed = ''; render(); },
-  wknown: () => { const q = wordQueue(); const w = q[0]; if (!w) return; const sp = $('#w-spell'), ty = (sp ? sp.value : '').trim().toLowerCase(); if (ty !== w.w.toLowerCase()) { toast(ty ? '拼得不对，先当新词背' : '先在上面拼一下，拼对了才算早就会了'); if (sp) sp.focus(); return; } const t = today(); DB.words[wordKey(w)] = {box: WBOX.length, done: true, due: null, first: t, hist: [{d: t, ok: true, known: true}], u: now()}; save(); state.learn.typed = ''; render(); },
+  wflip: el => { const L = state.learn, sp = $('#w-spell'); L.typed = sp ? sp.value : ''; const q0 = curWord(), s0 = q0 && wState(q0), fq = !!q0 && !!wfK(q0).k && wfK(q0).k !== 'cn', ms = !!q0 && (needSpell(q0, s0) || fq);
+    if (fq && !L.typed.trim()) { toast('先拼出来；想不起来就点「想不起来」'); if (sp) sp.focus(); return; }
+    if (fq && L.wf.f === 'ear' && wHomo(q0, L.typed)) { toast('这个读音还有另一个写法'); if (sp) sp.focus(); return; }   // 同音词不判错，换个写法再拼
+    if (ms && !L.typed.trim()) { toast(s0.sm && (s0.box || 0) < 2 ? '上次说想出来了没对上，这一轮要拼出来' : s0.slipD === today() && (s0.box || 0) < 2 ? '刚才看清了，这次拼出来' : '这个词已经记住两轮了，这一轮要拼出来'); if (sp) sp.focus(); return; }
+    L.wk = null; L.pj = null; const pj = el && el.dataset ? el.dataset.pj : null; if (q0) wTimeCommit(q0);
+    if (q0 && !ms && (pj === '0' || pj === '1')) { const ty = L.typed.trim().toLowerCase(), ok = !!ty && ty === q0.w.toLowerCase();
+      if (pj === '0' || ty) { markWord(q0, ok, Object.assign({pj: +pj, sp: ok, ty: !!ty}, wfK(q0), wTimeTake(q0))); L.wk = wordKey(q0); } else L.pj = 1; }   // 想不起来 / 打了字：当场记；想出来了没打字：翻面后自己判
+    L.flip = true; render(); if (q0) speak(q0.w, 'en-US'); },
+  wmark: el => { const L = state.learn, q = [curWord()]; if (q[0]) { const sp = $('#w-spell'), ty = ((sp ? sp.value : '') || L.typed || '').trim().toLowerCase(), fk = wfK(q[0]), ms = needSpell(q[0], wState(q[0])) || (!!fk.k && fk.k !== 'cn'); markWord(q[0], el.dataset.v === '1', Object.assign({sp: !!ty && ty === q[0].w.toLowerCase()}, ms ? {ty: 1} : {}, !ms && L.pj === 1 ? {pj: 1} : {}, fk, wTimeTake(q[0]))); if (!ms && L.pj === 1 && el.dataset.v !== '1') toast('下一次这个词要拼出来'); } L.flip = false; L.typed = ''; L.pj = null; L.wk = null; L.wf = null; render(); },
+  wnext: () => { const L = state.learn; L.flip = false; L.typed = ''; L.pj = null; L.wk = null; L.wf = null; render(); },
+  wslip: () => { const L = state.learn, q = [curWord()]; if (q[0]) slipWord(q[0], Object.assign({}, wfK(q[0]), wTimeTake(q[0]))); L.flip = false; L.typed = ''; L.pj = null; L.wk = null; L.wf = null; render(); },
+  // 换问法的卡（填空 / 听写）想不起来：当场记没想起来，翻面只剩「下一个」
+  wnone: () => { const L = state.learn, w = curWord(); if (!w) return; const sp = $('#w-spell'); L.typed = sp ? sp.value : ''; L.pj = null;
+    wTimeCommit(w); markWord(w, false, Object.assign({ty: 1}, wfK(w), wTimeTake(w))); L.wk = wordKey(w);   // 必拼轮想不起来算拼错（ty），家长页「后来拼对」的统计才不漏这次
+    L.flip = true; render(); speak(w.w, 'en-US'); },
+  wsay: () => { const L = state.learn, w = L.wf && uniqWords().find(x => wordKey(x) === L.wf.w); if (!w) return; const sp = $('#w-spell'); if (sp) L.typed = sp.value; wSay(w); },
+  wknown: () => { const w = curWord(); if (!w) return; const sp = $('#w-spell'), ty = (sp ? sp.value : '').trim().toLowerCase(); if (ty !== w.w.toLowerCase()) { toast(ty ? '拼得不对，先当新词背' : '先在上面拼一下，拼对了才算早就会了'); if (sp) sp.focus(); return; } const t = today(); DB.words[wordKey(w)] = {box: WBOX.length, done: true, due: null, first: t, hist: [Object.assign({d: t, ok: true, known: true}, wTimeTake(w))], u: now()}; save(); state.learn.typed = ''; render(); },
   wprint: el => printWords(el.dataset.v),
   wcsv: () => { const L = state.learn, q = v => /[",\n]/.test(v||'') ? '"' + String(v).replace(/"/g,'""') + '"' : (v||'');
     download('单词-' + today() + '.csv', '\ufeff' + ['英文,音标,词性,中文,单元,状态'].concat(wordsOf(L.book, L.unit).map(w => { const s = wState(w); return [w.w, w.p, w.pos, w.cn, w.unit, s ? s.done ? '掌握' : '在背' : '未学'].map(q).join(','); })).join('\r\n'), 'text/csv'); },
   rterm: el => { state.learn.term = el.dataset.v; state.learn.allTerms = false; render(); },
   rterms: () => { state.learn.allTerms = true; render(); },
   rdexp: el => { (state.rd = state.rd || {})['exp' + el.dataset.v] = true; render(); },
-  rpoem: el => { state.learn.poem = el.dataset.v; state.learn.view = 'poem'; state.learn.pmode = 'full'; state.learn.reveal = {}; render(); window.scrollTo(0,0); },
-  pmode: el => { state.learn.pmode = el.dataset.v; state.learn.reveal = {}; render(); },
+  rpoem: el => { const rx = LIB.recite && LIB.recite.items.find(i => i.id === el.dataset.v); state.learn.poem = el.dataset.v; state.learn.view = 'poem'; state.learn.pmode = rx && rx.text && recDueNow(rx) && !featRetreat('recHide') ? 'hide' : 'full'; state.learn.reveal = {}; render(); window.scrollTo(0,0); },
+  pmode: el => { const L = state.learn, v = el.dataset.v; if (v === 'blank' && L.pmode === 'hide') L.lvl = 3;   // 到期复习从先背页切挖空：默认全默，不算偷看
+    if (v === 'full' || (v === 'blank' && (L.lvl || 1) < 3)) recPeek(L.poem); L.pmode = v; L.reveal = {}; render(); },
   rrev: el => { reviewRecite(state.learn.poem, el.dataset.v === '1'); toast(el.dataset.v === '1' ? '记得真牢，隔几天再来' : '改成「在背」，再多读几遍'); render(); },
-  plvl: el => { state.learn.lvl = +el.dataset.v; state.learn.reveal = {}; render(); },
-  preveal: el => { state.learn.reveal[el.dataset.v] = true; render(); },
+  plvl: el => { if (+el.dataset.v < 3) recPeek(state.learn.poem); state.learn.lvl = +el.dataset.v; state.learn.reveal = {}; render(); },
+  preveal: el => { recPeek(state.learn.poem); state.learn.reveal[el.dataset.v] = true; render(); },
   rset: el => { setRecite(state.learn.poem, el.dataset.v); toast('记下了'); render(); },
-  sayzh: () => { const x = LIB.recite.items.find(i => i.id === state.learn.poem); if (!x || !x.text) return;
+  sayzh: () => { const x = LIB.recite.items.find(i => i.id === state.learn.poem); if (!x || !x.text) return; if (recDueNow(x) && !recPeeked(x.id)) { recPeek(x.id); render(); }   // 复习前听朗读只算练习
     if (x.audio) { try { speechSynthesis.cancel(); } catch(e) {} const a = amEl('__poemAudio', 'poem'); if (!a.paused && a.dataset.id === x.id) { a.pause(); return; } AM.claim('poem'); a.src = 'audio/' + x.id + '.mp3'; a.dataset.id = x.id; a.play().catch(e => { if ((e && e.name === 'AbortError') || AM.cur !== 'poem' || a.dataset.id !== x.id) return; speak(x.title + '。' + x.text.join(''), 'zh-CN'); }); }   // 被别人抢占 / 换了一首不算失败，别用系统朗读顶回去
     else speak(x.title + '。' + x.text.join(''), 'zh-CN'); },
   rprint: el => printRecite(el.dataset.v),
@@ -5739,8 +6157,8 @@ const ACT = {
   varclose: () => { state.variant = null; render(); },
   vardone: el => { const V = state.variant, id = V.iid, ok = el.dataset.ok === '1'; state.variant = null;
     if (V.from === 'grade') { if (ok && state.grade) (state.grade.vdone = state.grade.vdone || {})[id] = true; render(); return; }
-    if (V.final) { if (ok) redoItem(id, true, true); else finalMiss(id); } else if (ok) redoItem(id, true, true); else render(); },
-  varself: () => { const id = state.variant.iid; state.variant = null; finalMiss(id, true); },
+    if (V.final) { if (ok) redoItem(id, true, true, V.pk ? {pk: 1} : undefined); else finalMiss(id, false, V.pk); } else if (ok) redoItem(id, true, true); else render(); },
+  varself: () => { const V = state.variant, id = V.iid; state.variant = null; finalMiss(id, true, V.pk); },
   memclear: el => { if (!confirm('清空这科的 AI 学习档案？')) return; DB.aiMem[el.dataset.v] = {text: '', n: 0, u: now()}; save(); render(); },
   spopen: el => { stopAllEn(); state.learn.sp = el.dataset.v; state.learn.task = false; state.sp = null; render(); window.scrollTo(0,0); },
   lsplay: () => { const S = state.ls; S.phase = 'play'; S.n2 = false; render(); playTwice('audio/en/' + S.id + '.mp3', () => { if (state.ls === S && S.phase === 'play' && state.tab === 'learn') { S.phase = 'q'; S.i = 0; lsAsk(); } }, () => { if (state.ls === S && S.phase === 'play') { S.phase = 'intro'; if (state.tab === 'learn') setTimeout(render, 0); } }); },
@@ -5808,6 +6226,7 @@ const ACT = {
   praiseseen: el => { try { const old = (localStorage.getItem('observer:praiseSeen') || '').split('|').slice(-6); localStorage.setItem('observer:praiseSeen', old.concat([el.dataset.v]).join('|')); } catch(e) {} render(); },
   praiseundo: () => { setDayField(today(), 'praise', ''); save(); render(); },
   badgeon: () => { if (!window.Notification) return toast(standalone() ? '这台设备的系统版本不支持（需要 iPadOS 16.4 以上）' : '先把 app 添加到主屏幕，再从主屏幕图标打开，然后点这里'); Notification.requestPermission().then(p => { toast(p === 'granted' ? '好了，主屏幕图标会显示数字' : '没有授权，可以在 iPad 设置里打开通知'); updateBadge(); render(); }); },
+  varform: el => { setSetting('varForm', el.dataset.v === '1'); save(); render(); },
   aitest: () => { if (state.aiTest && state.aiTest.some(r => r.st === '…')) return; if (!DB.settings.aiTested) { setSetting('aiTested', true); save(); } aiSelfTest(); },
   hintoff: el => { const o = Object.assign({}, DB.settings.hintOff || {}); o[el.dataset.v] = true; setSetting('hintOff', o); save(); render(); },
   rgphoto: el => { state.pview = null; recogPhoto(el.dataset.v); },
@@ -5889,7 +6308,7 @@ const ACT = {
   parev: el => { state.errView = el.dataset.v; setTab('errors'); },   // 家长页进错题本（孩子的重做页不再放家长入口）
   redo: el => { const k = el.dataset.v, t0 = Date.now(); if (ACT._lastRedo && ACT._lastRedo.k === k && t0 - ACT._lastRedo.t < 800) return; if (ACT._lastRedo && t0 - ACT._lastRedo.t < 400) return; ACT._lastRedo = {k, t: t0};
     if (el.dataset.ok !== '1') { const it = allItems().find(x => x.id === k); if (it && hintOffer(it)) { state.hint = {id: k, phase: 'ask'}; render(); return; } }   // 先问要不要提示
-    redoItem(k, el.dataset.ok === '1'); },
+    redoItem(k, el.dataset.ok === '1', undefined, redoPkTake(k)); },
   hintgo: () => { hintGo(); },
   pensnd: el => { setSetting('penSound', el.dataset.v === '1'); save(); render(); if (DB.settings.penSound) penSound(); },
   copytxt: el => { const ta = $('#copy-' + el.dataset.v); if (!ta) return; const txt = ta.value;
@@ -5909,7 +6328,7 @@ const ACT = {
     r.sums = (r.sums || []).concat([{d: today(), ch: ch.slice(0, 30), text: text.slice(0, 300)}]).slice(-60); saveRead(r); delete D['text' + i]; delete D['ch' + i];
     toast(aiReady() ? '记下了 ✓ AI 看一眼就回你' : '记下了 ✓'); render(); readFb(r.id, r.sums.length - 1); },
   newseen: el => { try { localStorage.setItem('observer:new-' + el.dataset.v, WHATS_NEW.v); } catch(e) {} render(); },
-  hintno: () => { const H = state.hint; state.hint = null; if (H && H.phase === 'ask' && !H.fromQp) redoItem(H.id, false); else render(); },   // 不要提示 = 记下还是不会；看过提示后关掉 = 留着再做
+  hintno: () => { const H = state.hint; state.hint = null; if (H && H.phase === 'ask' && !H.fromQp) redoItem(H.id, false, undefined, redoPkTake(H.id)); else render(); },   // 不要提示 = 记下还是不会；看过提示后关掉 = 留着再做
   hintclose: () => { state.hint = null; render(); },
   skipitem: el => { if (!confirm('找不到原题，就把这道移出重做队列？')) return; const it = DB.items.find(x => x.id === el.dataset.v); it.done = true; it.skipped = true; it.u = now(); save(); render(); },
   alldue: (el, e) => { e.preventDefault(); state.showAllDue = true; render(); },
@@ -5997,6 +6416,7 @@ const WIZ_NAV = {wiznext:'fwd', wizpicked:'fwd', wizsame:'fwd', wizrest:'fwd', w
 document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.stopPropagation(); if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault();
     const inWiz = state.wiz && el.closest('#wiz'), act = el.dataset.act, before = inWiz ? [state.wiz.i, state.wiz.step].join() : null;
     f(el, e);
+    try { wAuto(); } catch(err) {}   // 换到听写卡就念一遍（要在点击里）
     if (!inWiz && !state.wiz && el.tagName === 'BUTTON' && act !== 'tab' && !el.closest('#tabs')) { const sel = `#main [data-act="${act}"]` + (el.dataset.v != null ? `[data-v="${el.dataset.v}"]` : '') + (el.dataset.t ? `[data-t="${el.dataset.t}"]` : '');
       const nx = $(sel); if (nx && nx.tagName === 'BUTTON' && nx.closest('.card, .tools, .steps, .seg, .chiprow')) { nx.classList.add('tapped'); nx.addEventListener('animationend', () => nx.classList.remove('tapped'), {once:true}); } return; }
     if (!inWiz || !state.wiz) return;
@@ -6038,7 +6458,8 @@ function onDataIn(e){
   save();
 }
 document.addEventListener('input', onDataIn);
-document.addEventListener('toggle', e => { const d = e.target; if (!d || !d.dataset) return; if (d.dataset.rdopen != null) (state.rd = state.rd || {})['open' + d.dataset.rdopen] = d.open; if (d.dataset.keep) (state.keep = state.keep || {})[d.dataset.keep] = d.open; }, true);   // 名著「说一说」折叠区重绘后保持展开
+const redoPkTake = id => { const P = state.redoPk || {}, v = P[id] === today(); delete P[id]; return v ? {pk: 1} : undefined; };
+document.addEventListener('toggle', e => { const d = e.target; if (!d || !d.dataset) return; if (d.dataset.pk && d.open) (state.redoPk = state.redoPk || {})[d.dataset.pk] = today(); if (d.dataset.rdopen != null) (state.rd = state.rd || {})['open' + d.dataset.rdopen] = d.open; if (d.dataset.keep) (state.keep = state.keep || {})[d.dataset.keep] = d.open; }, true);   // 名著「说一说」折叠区重绘后保持展开
 document.addEventListener('compositionend', onDataIn);   // iPad 拼音选字确认后，Safari 有时不再发 input
 
 document.addEventListener('change', e => {
