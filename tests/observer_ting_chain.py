@@ -31,7 +31,7 @@ try:
     with sync_playwright() as p:
         b = p.chromium.launch(args=['--autoplay-policy=no-user-gesture-required'])
         ctx = b.new_context(viewport={'width': 390, 'height': 844}, timezone_id='Asia/Shanghai')
-        ctx.clock.install(time='2026-10-14T20:00:00+08:00')   # 周三 = 地理日
+        ctx.clock.install(time='2026-11-12T20:00:00+08:00')   # 周三 = 地理日
         ctx.route('https://api.github.com/**', gh)
         pg = ctx.new_page()
         errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -42,7 +42,7 @@ try:
                 pg.wait_for_timeout(ms)
             return False
         pg.goto(f'http://localhost:{PORT}/observer/index.html'); pg.wait_for_timeout(1500)
-        T = ev("today()"); ok('0 固定时钟', T == '2026-10-14', T)
+        T = ev("today()"); ok('0 固定时钟 周四', T == '2026-11-12', T)
         ev("SYNC = {repo:'me/observer-data', token:'x', pass:'testpw'}; TING.st = 'none'; TING.idx = null; loadTing(true); 0")
         ok('0b 解密到本地生成的 index', wait("TING.st === 'ok'"), ev("TING.st"))
 
@@ -101,6 +101,14 @@ try:
         pg.wait_for_timeout(300); pg.screenshot(path='/tmp/claude-1001/-home-coder/95350df7-a535-48ad-ba03-a1d8b3eabd75/scratchpad/ting_all.png', full_page=True)
         ok('10b 390 宽无横向滚动', ev("document.documentElement.scrollWidth") <= 391)
         ok('11 无页面报错', not errs, '; '.join(errs))
+        # ===== 英语 =====
+        ev("DB.ting = {}; localStorage.removeItem('observer:tingPlan'); TING.played = null; tingStop(); TING.cur = null; TING.list = []; TING.pick = null; render(); 0")
+        ok('12 周四轮到英语', ev("tingSubjToday(today())") == 'yy', ev("tingSubjToday(today())"))
+        ok('12b 英语芯片在', pg.locator('[data-act=tingsubj][data-v=yy]').count() == 1)
+        pg.click('[data-act=tingplay]')
+        ok('12c 英语放起来', wait("TING.a && !TING.a.paused && TING.a.currentTime > 0.2 && TING.cur.subj === 'yy'", 100), ev("TING.err"))
+        ok('12d 英语段数', ev("TING.idx.segs.filter(s => s.subj === 'yy').length") == 38)
+        ok('13 无页面报错', not errs, '; '.join(errs))
 
 except Exception:
     traceback.print_exc()
