@@ -88,7 +88,7 @@ try:
         ok('3 周日复习：qa ≤ 8 段', 0 < S['qa'] <= 8 and S['rc'] == 0, json.dumps(S))
         ev("DB.settings.examDates[termKey('2026-10-20') + '-mid'] = '2026-10-29'; lsSet('observer:tingMin', 20); 0")
         S = ev("(() => { const L = tingList('2026-10-20'); return {exam: tingSubjToday('2026-10-20'), n: L.length, qa: L.filter(s => s.qa).length}; })()")
-        ok('3b 考前：qa 封顶 8 段，其余整段', S['exam'] == 'exam' and S['qa'] == 8 and S['n'] > 8, json.dumps(S))
+        ok('3b 考前：qa 封顶 8 段（一组约 8 分钟，放完由 tingChain 接下一组）', S['exam'] == 'exam' and 0 < S['qa'] <= 8 and S['qa'] <= S['n'], json.dumps(S))
         ev("DB.settings.examDates = {}; lsSet('observer:tingMin', 5); 0")
 
         # ===== 4. 播放：复习日（手动选「复习」）全是 qa 段 =====
