@@ -75,6 +75,32 @@ try:
         ev("TING.idx.segs.forEach(s => tingPlayed(today()).add(s.id)); TING.a.currentTime = TING.a.duration - 1; 0")
         ok('6 全部放过才停', wait("!TING.on", 60))
         ok('7 无页面报错', not errs, '; '.join(errs))
+        # ===== 自选科目一直放这科；随机；按课点播 =====
+        ev("DB.ting = {}; localStorage.removeItem('observer:tingPlan'); TING.played = null; tingStop(); TING.cur = null; TING.list = []; TING.pick = null; render(); 0")
+        pg.click('[data-act=tingsubj][data-v=ls]'); pg.wait_for_timeout(300)
+        ok('8 点历史', ev("tingSubjToday(today())") == 'ls')
+        pg.click('[data-act=tingplay]'); wait("TING.a && !TING.a.paused && TING.a.currentTime > 0.2", 75)
+        subs = []
+        for _ in range(4):
+            ev("TING.a.currentTime = TING.a.duration - 1; 0"); wait("TING.a.currentTime < TING.a.duration - 2 && !TING.a.paused", 100)
+            subs.append(ev("tingSubjToday(today())"))
+        nls = ev("TING.idx.segs.filter(s => s.subj === 'ls' && s.week <= tingWeek(today())).length"); npl = ev("[...tingPlayed(today())].filter(id => id.startsWith('ls')).length")
+        ok('8b 选了历史就一直放历史（直到历史都放过）', all(x == 'ls' for x in subs) or npl >= nls, json.dumps([subs, npl, nls]))
+        pg.click('[data-act=tingsubj][data-v=rand]')
+        ok('9 随机：开始放', wait("TING.a && !TING.a.paused && TING.a.currentTime > 0.2 && tingSubjToday(today()) === 'rand'", 100), ev("TING.err"))
+        r1 = ev("TING.list.map(s => s.id)")
+        ev("TING.a.currentTime = TING.a.duration - 1; 0"); wait("TING.list[0].id !== '" + r1[0] + "' && !TING.a.paused", 100)
+        r2 = ev("TING.list.map(s => s.id)")
+        ok('9b 随机接下一组仍随机、不重复', ev("tingSubjToday(today())") == 'rand' and not set(r1) & set(r2) and r2, json.dumps([r1, r2]))
+        ok('9c 随机里不止一科', len(set(x.split('-')[0] for x in r1 + r2)) >= 2, json.dumps(r1 + r2))
+        pg.click('[data-act=tingsubj][data-v=sw]'); pg.wait_for_timeout(500)
+        pg.locator('summary:has-text("全部")').click(); pg.wait_for_timeout(200)
+        pick = ev("TING.idx.segs.filter(s => s.subj === 'sw' && s.week <= tingWeek(today()))[2].id")
+        pg.click(f'[data-act=tingone][data-v="{pick}"]')
+        ok('10 点某一课从这课开始放', wait("TING.cur && TING.cur.id === '" + pick + "' && !TING.a.paused", 100), ev("TING.cur && TING.cur.id"))
+        pg.wait_for_timeout(300); pg.screenshot(path='/tmp/claude-1001/-home-coder/95350df7-a535-48ad-ba03-a1d8b3eabd75/scratchpad/ting_all.png', full_page=True)
+        ok('10b 390 宽无横向滚动', ev("document.documentElement.scrollWidth") <= 391)
+        ok('11 无页面报错', not errs, '; '.join(errs))
 
 except Exception:
     traceback.print_exc()

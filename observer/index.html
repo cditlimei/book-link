@@ -859,7 +859,7 @@ body.ekrun #tabs{display:none}body.ekrun{padding-bottom:calc(env(safe-area-inset
 <script>
 'use strict';
 /* 出错记录：iPad 上的报错我们看不到——最近 20 条只存本机，家长在设置里复制发来。只记位置和报错类型，不记题目/名字等内容 */
-const APP_V = 'v81';
+const APP_V = 'v82';
 const ERRLOG_K = 'observer:errlog';
 function logErr(msg, src, line, col, stack){
   try {
@@ -4597,7 +4597,7 @@ function vEar(){
    播放中不换音频源，锁屏也能接着放。科目按星期轮换，进度按学校教学周门控不超前；听过的段 7 天后回放一次当复习。
    听过记录只在本机（同磨耳朵），没网时放已下载的段。 */
 const TING = {idx:null, st:'none', a:null, list:[], i:0, on:false, cur:null, url:null, key:null, err:'', lt:null, dl:{}, loading:false, pick:null, marked:{}};
-const TING_SUBJ = {yw:'语文', ls:'历史', dl:'地理', sw:'生物', df:'道法', sx:'数学', review:'复习', exam:'考前复习'};
+const TING_SUBJ = {rand:'随机', yw:'语文', ls:'历史', dl:'地理', sw:'生物', df:'道法', sx:'数学', review:'复习', exam:'考前复习'};
 const TING_KIND = {recite: '跟背'};
 const SVG_PREV = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M6 5h2.4v14H6zM20 5v14L9.5 12z"/></svg>';
 const SVG_NEXT = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M15.6 5H18v14h-2.4zM4 5v14l10.5-7z"/></svg>';
@@ -4648,6 +4648,11 @@ function tingPlan(t, subj){
     for (const s of pool) { if (sum >= tgt) break; take(s); }
     return out;
   }
+  if (subj === 'rand') {   // 随机：已经教到的各科讲解打乱了放（听过的也放，吃饭时反复听帮着记），今天放过的不重复
+    const seen = tingPlayed(t), pool = avail.filter(s => !seen.has(s.id));
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    for (const s of pool) { if (sum >= tgt - 60) break; take(s); }
+    return out; }
   if (subj === 'review') { for (const s of avail.filter(heard).sort(byDue)) { if (sum >= tgt - 60) break; take(s); }
     const m = avail.find(s => s.subj === 'sx' && !heard(s)) || avail.filter(s => s.subj === 'sx' && old(s)).sort(byOld)[0]; if (m) take(m);   // 周日带一段数学概念问答
     for (const s of avail.filter(s => s.subj === 'yw' && !heard(s) && s.kind !== 'recite')) { if (sum >= tgt - 60) break; take(s); }   // 听过的还不多：补语文新段凑够时长
@@ -4680,7 +4685,10 @@ function tingPlayed(t){ if (!TING.played || TING.played.d !== t) TING.played = {
 function tingNextBatch(t, extra){
   const seen = new Set(tingPlayed(t)); for (const s of extra || []) seen.add(s.id);
   const cur = tingSubjToday(t), k = TING_CHAIN.indexOf(cur), order = [cur].concat(TING_CHAIN.slice(k + 1), TING_CHAIN.slice(0, k + 1), ['review']).filter((x, i, a) => a.indexOf(x) === i);
-  for (const subj of order) { const L = tingPlan(t, subj).filter(s => !seen.has(s.id)); if (L.length) return {subj, list: L}; }
+  if (cur === 'rand') { const L = tingPlan(t, 'rand').filter(s => !seen.has(s.id)); return L.length ? {subj: 'rand', list: L} : null; }
+  for (const subj of order) { let L = tingPlan(t, subj).filter(s => !seen.has(s.id));
+    if (!L.length && subj === cur && TING_CHAIN.includes(subj)) L = tingRest(t, subj, seen);
+    if (L.length) return {subj, list: L}; }
   return null;
 }
 function tingChain(){
@@ -4689,6 +4697,19 @@ function tingChain(){
   if (!nx) { tingStop(false); toast('能听的讲解都放完了，明天有新的'); return; }
   TING.pick = {d: t, s: nx.subj}; tingSetList(t, nx.subj, nx.list); TING.cur = null; TING.ask = TING.ask || null;
   toast('接着放：' + TING_SUBJ[nx.subj]); tingStart(0);
+}
+// 这一科今天还没放过的（听过的也算），按课本顺序取约一组
+function tingRest(t, subj, seen, from){
+  const wk = tingWeek(t); let A = TING.idx.segs.filter(s => s.subj === subj && s.week <= wk);
+  if (from) { const k = A.findIndex(s => s.id === from); if (k > 0) A = A.slice(k).concat(A.slice(0, k)); }
+  const out = []; let sum = 0; for (const s of A) { if (seen.has(s.id) && s.id !== from) continue; if (sum >= tingMin() * 60 - 100) break; out.push(s); sum += s.dur; }
+  return out;
+}
+// 点某一段（某一课 / 某个考点）：从这段开始放，后面接这一科的下一课
+function tingPlayOne(id){
+  const s = TING.idx.segs.find(x => x.id === id); if (!s) return;
+  const t = today(), L = tingRest(t, s.subj, tingPlayed(t), id);
+  if (TING.on) tingStop(); TING.pick = {d: t, s: s.subj}; tingSetList(t, s.subj, L); TING.cur = null; TING.ask = null; tingStart(0);
 }
 // 放的时候把下一组先下好，接上时不用等
 function tingPrefetchNext(){ const nx = tingNextBatch(today(), TING.list); if (nx) (async () => { for (const s of nx.list) { try { await tingSegBlob(s); } catch(e) { return; } } })(); }
@@ -4869,7 +4890,7 @@ const tingMins = list => Math.max(1, Math.round(list.reduce((a, s) => a + s.dur,
 function tingChipsHTML(){
   setTimeout(() => { const r = document.querySelector('.chiprow'), on = r && r.querySelector('.chip.on'); if (r && on && (on.offsetLeft + on.offsetWidth > r.scrollLeft + r.clientWidth || on.offsetLeft < r.scrollLeft)) r.scrollLeft = Math.max(0, on.offsetLeft - 12); }, 0);
   const t = today(), cur = tingSubjToday(t), ex = tingExam(t), rota = ex ? 'exam' : TING_ROTA[P(t).getDay()];
-  const keys = (ex ? ['exam'] : []).concat(['yw','ls','dl','sw','df','sx','review']);
+  const keys = (ex ? ['exam'] : []).concat(['rand','yw','ls','dl','sw','df','sx','review']);
   return `<div class="chiprow">${keys.map(k => `<button class="chip ${k === cur ? 'on' : ''}" data-act="tingsubj" data-v="${k}">${TING_SUBJ[k]}${k === rota ? '<span class="chip-sub">今天</span>' : ''}</button>`).join('')}</div>`;
 }
 // 播放卡：今天页和学习页用同一个。full = 学习页，下面接列表、设置和文字
@@ -4895,10 +4916,13 @@ function vTing(){
   if (TING.st !== 'ok') return h;
   const t = today(), list = tingList(t), L = tingLog(), wk = tingWeek(t), subj = tingSubjToday(t);
   if (list.length) h += `<div style="margin-top:12px">` + list.map((s, i) => `<button class="ear-row ${TING.cur && TING.cur.id === s.id ? 'on' : ''}" data-act="tingpick" data-v="${i}"><span class="k">${TING_KIND[s.kind] || (s.rv ? '复习' : TING_SUBJ[s.subj])}</span><span style="flex:1;min-width:0">${esc(s.title)}${(tingAnswered(s.id) || tingQADone(s.id)) === 'ok' ? ' <span class="small" style="color:var(--good,#2f7a66)">✓</span>' : tingAnswered(s.id) === 'no' ? ' <span class="small" style="color:var(--bad,#b5402a)">没答上</span>' : tingQADone(s.id) === 'no' ? ' <span class="small faint">2 天后再听</span>' : ''}</span><span class="small faint">${Math.round(s.dur / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div>`;
+  // 这一科全部讲解：想听哪一课点哪一课
+  if (TING_CHAIN.includes(subj)) { const A = TING.idx.segs.filter(x => x.subj === subj && x.week <= wk);
+    if (A.length) h += `<details data-keep="tingAll" ${(state.keep || {}).tingAll ? 'open' : ''} style="margin-top:10px"><summary class="small">${TING_SUBJ[subj]}全部 ${A.length} 段 · 点哪段从哪段放</summary><div style="margin-top:6px">` + A.map(x => `<button class="ear-row ${TING.cur && TING.cur.id === x.id ? 'on' : ''}" data-act="tingone" data-v="${x.id}"><span class="k">${TING_KIND[x.kind] || (L[x.id] ? '听过' : '没听')}</span><span style="flex:1;min-width:0">${esc(x.title)}</span><span class="small faint">${Math.round(x.dur / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div></details>`; }
   // 设置和进度收在一行小字里，不占主视线
   const cnt = s => { const A = TING.idx.segs.filter(x => x.subj === s && x.week <= wk); return A.length ? `${A.filter(x => L[x.id]).length}/${A.length}` : ''; };
   h += `<details data-keep="tingS" ${(state.keep || {}).tingS ? 'open' : ''} style="margin-top:10px"><summary class="small muted">设置 · 第 ${wk} 周 · 已听 ${['yw','ls','dl','sw','df','sx'].filter(cnt).map(k => TING_SUBJ[k] + ' ' + cnt(k)).join('，')}</summary>
-    <p class="small muted" style="margin:8px 0 0">不限时长：这组放完自动接下一组（先这科没听过的，再轮到别的科），想停就按暂停。</p></details></div>`;
+    <p class="small muted" style="margin:8px 0 0">不限时长：这组放完自动接下一组。自己点了哪科就一直放哪科，这科都放过了再轮到别的科；点「随机」就各科打乱了放。想停就按暂停。</p></details></div>`;
   const s = TING.cur || list[0];
   const qaFull = s && s.qa && TING.cur === s && TING.qp === 'full', qaHide = s && s.qa && !tingQADone(s.id) && !tingQASeen(s.id) && !qaFull;   // 先问后讲的段：答完之前不摆出讲解原文和答案
   if (s) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${TING.cur ? '正在放' : '第一段'} · ${TING_KIND[s.kind] || TING_SUBJ[s.subj]}</div><h3 style="margin:0 0 10px">${esc(s.title)}</h3>${qaHide ? `<p class="small muted">${TING.cur === s && TING.qp === 'judge' ? '选完「一样 / 不一样」再看文字。' : '复习这段先听问题、自己想，听完答案再看文字。'}</p>` : s.paras.map(p => `<p>${esc(p)}</p>`).join('')}${s.kind === 'recite' ? '' : `<p><b>问题：</b>${esc(s.q)}</p>`}${s.kind === 'recite' || qaHide ? '' : `<details data-keep="tingA" ${(state.keep || {}).tingA ? 'open' : ''}><summary class="small">看答案</summary><p style="margin-top:8px">${esc(s.a)}</p></details>`}${s.qa && !qaFull ? '' : tingAskHTML(s.id, s.kind === 'recite' ? '背下来了吗' : '这题答上了吗')}</div>`;
@@ -5755,9 +5779,9 @@ function attentionItems(){
   return A.slice(0, 3);
 }
 /* 「这次更新了什么」：每台设备看一次；刚开始用（记录不到 3 天）的直接跳过 */
-const WHATS_NEW = {v: '2026-11-07',
-  kid: ['听讲解<b>不限时间</b>了：一组放完会自动接着放下一组（先这一科没听过的，再轮到别的科），吃饭、路上想听多久听多久，不想听了按暂停。'],
-  parent: ['听讲解去掉「每天约 5/8/12 分钟」：每组约 8 分钟，放完自动接下一组（本科新段 → 其他科 → 到期复习），当天放过的不重复，全部放过才停；放当前组时预先下载下一组。']};
+const WHATS_NEW = {v: '2026-11-07b',
+  kid: ['听讲解<b>不限时间</b>了：一组放完会自动接着放下一组（先这一科没听过的，再轮到别的科），吃饭、路上想听多久听多久，不想听了按暂停。可以自己点科目一直听这一科，或者在这科「全部」里点想听的那一课；点「随机」就各科打乱了放。'],
+  parent: ['听讲解去掉「每天约 5/8/12 分钟」：每组约 8 分钟，放完自动接下一组（本科新段 → 其他科 → 到期复习），当天放过的不重复，全部放过才停；放当前组时预先下载下一组。手选科目会一直放该科（新段 → 该科听过的），学习页可按课点播；新增「随机」各科打乱。']};
 function whatsNew(who){
   let seen = ''; try { seen = localStorage.getItem('observer:new-' + who) || ''; } catch(e) { return ''; }
   if (seen >= WHATS_NEW.v) return '';
@@ -6057,6 +6081,7 @@ const ACT = {
   earmin: el => { lsSet('observer:earMin', +el.dataset.v); if (EAR.on) { EAR.until = Date.now() + (+el.dataset.v) * 60000; earGuard(); } render(); },
   tingplay: () => tingStart(0),
   tingpick: el => tingSeek(+el.dataset.v),
+  tingone: el => tingPlayOne(el.dataset.v),
   tingqgo: () => tingQAGo(),
   tingqj: el => tingQAJudge(el.dataset.v === '1'),
   tingpp: () => { if (tingQAPP()) return; const a = TING.a; if (!TING.url || TING.key !== tingKey(tingList(today()))) return tingStart(TING.cur ? TING.i : 0);
