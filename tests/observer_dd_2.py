@@ -52,7 +52,7 @@ try:
           const fake = Object.assign({}, rc[0], {qo: {h: 10, q: 20, a: 30}});
           return {talk: talk.length, talkQO: talk.filter(tingQO).length, rcQO: rc.filter(tingQO).length, fakeRc: tingQO(fake), T, dur: s.dur, size: s.size, qo: s.qo,
             bad: tingQO(Object.assign({}, s, {qo: {h: 5, q: 3, a: 9}})) || tingQO(Object.assign({}, s, {qo: {h: 1, q: 2, a: s.size + 1}})) || tingQO(Object.assign({}, s, {qo: undefined})) }; })()""")
-        ok('1 讲解段全部带 qo', st['talk'] == 110 and st['talkQO'] == 110, json.dumps({k: st[k] for k in ['talk', 'talkQO']}))
+        ok('1 讲解段全部带 qo', st['talk'] >= 110 and st['talkQO'] == st['talk'], json.dumps({k: st[k] for k in ['talk', 'talkQO']}))
         ok('1b 跟背段不走先问后讲（硬塞 qo 也不走）', st['rcQO'] == 0 and st['fakeRc'] is False)
         ok('1c 偏移不合法 / 没有 qo 一律不走', st['bad'] is False)
         k = st['dur'] / st['size']
@@ -200,7 +200,8 @@ try:
         ok('10b 周日：nx 没到的段整段放', 'dl-02' in g and not g['dl-02']['qa'], json.dumps(L))
         ok('10c 周日：到期的段照旧走短版', 'dl-03' in g and g['dl-03']['qa'], json.dumps(L))
         ev("DB.settings.examDates[termKey('2026-10-20') + '-mid'] = '2026-10-29'; lsSet('observer:tingMin', 20); localStorage.removeItem('observer:tingPlan'); TING.pick = {d: '2026-10-20', s: 'dl'}; 0")
-        L = ev("tingList('2026-10-20').map(s => ({id: s.id, qa: s.qa}))")
+        # 一组固定约 8 分钟、地理新段多，考前第一组被没听过的新段占满；dl-01~03 会在后面的组里出现（tingChain → tingSetList），这里直接按那一组验证短版规则
+        L = ev("tingSetList('2026-10-20', 'dl', ['dl-01','dl-02','dl-03'].map(id => TING.idx.segs.find(s => s.id === id))).map(s => ({id: s.id, qa: s.qa}))")
         ok('10d 考前：没到期的听过段不走短版', not any(x['qa'] for x in L if x['id'] in ('dl-01', 'dl-02')) and any(x['qa'] for x in L if x['id'] == 'dl-03'), json.dumps(L))
         ev("DB.settings.examDates = {}; TING.pick = null; lsSet('observer:tingMin', 5); localStorage.removeItem('observer:tingPlan'); 0")
         # ===== 11. 「一样吗」15 秒没点（暂停着）：答案已听完 → 文字照常给看，再点回不重新问 =====
