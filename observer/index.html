@@ -3845,6 +3845,8 @@ function practiceCard(mon, end){
     if (E.length || pk) rows.push(`<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="white-space:nowrap">背诵先背后看</b>：到期复习不看原文背了 ${E.length} 次${E.length ? `，70 分以上 ${E.filter(e => e.ok).length} 次（${pct(E.filter(e => e.ok).length, E.length)}%，分母是本周不看原文的复习 ${E.length} 次）` : ''}${pk ? `；先看了原文再背 ${pk} 次，只当练习` : ''}${note('recHide')}</div>`); }
   { let n = 0, m = 0; for (const r of Object.values(DB.ting || {})) for (const h of (r.h || [])) if (inW(h.d)) { n++; if (h.ok) m++; }
     if (n) rows.push(`<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="white-space:nowrap">听讲解先问后讲</b>：答了 ${n} 次，自己说「和想的一样」${m} 次（${pct(m, n)}%，分母是本周先问后讲的作答 ${n} 次）。这是孩子自报，不算客观对错，不参与自动退回。${note('tingQA')}</div>`); }
+  { const o = ear2Week(mon, end);   // 磨耳朵新版：答题 / 跟读 / 单词是「放过去」的次数；答上没答上只记他自己点了的
+    if (o.q || o.sh || o.w) rows.push(`<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="white-space:nowrap">磨耳朵答题跟读</b>：${o.days.size} 天放过，听了 ${o.q} 道题、跟读 ${o.sh} 句、单词 ${o.w} 个。${o.ok + o.no ? `他自己点了 ${o.ok + o.no} 次，「答上了」${o.ok} 次（${pct(o.ok, o.ok + o.no)}%，分母是他点过的 ${o.ok + o.no} 次）。` : '答题后没点过「答上了 / 没答上」。'}</div>`); }
   { const E = featEvents('wordPj').filter(e => inW(e.d)); if (E.length) line('wordPj', '单词先表态', E.length, E.filter(e => e.ok).length, '说「想出来了」之后拼对', '次', '说「想出来了」之后真拼了的'); }
   for (const [k, nm] of [['word:cloze', '单词课文填空'], ['word:ear', '单词听音拼写']]) { const E = featEvents(k).filter(e => inW(e.d)); if (E.length) line(k, nm, E.length, E.filter(e => e.ok).length, '拼对', '次', nm.slice(2) + '的'); }
   for (const k of FEAT_KEYS().filter(k => k.startsWith('var:'))) { const E = featEvents(k).filter(e => inW(e.d)); if (E.length) line(k, FEAT_NAME(k), E.length, E.filter(e => e.ok).length, 'AI 判对', '道', FORM_N[k.slice(4)] + '题'); }
@@ -4445,10 +4447,71 @@ const earUnitAuto = () => earRota(today());
 const earUnit = () => { const o = lsGet('observer:earUnit'); return o && o.a === (enUnit(today()) || 1) ? o.u : earUnitAuto(); };   // 手选的单元一直有效，直到课程学到下一单元
 const earMin = () => lsGet('observer:earMin') || 15;
 const earTrack = id => EAR.idx ? EAR.idx.tracks.find(t => t.id === id) : null;
-const earDay = u => EAR.idx ? (EAR.idx.days || []).find(d => d.unit === (u || earUnit())) : null;
+const earDay = u => { u = u || earUnit(); return ear2Day(u) || (EAR.idx ? (EAR.idx.days || []).find(d => d.unit === u) : null); };
+/* ---- 新版（她 2026-11-17 通过）：每篇课文四步——① 盲听 ② 听后答题（问题后停 5 秒让他说，再放答案）③ 逐句跟读（每句后留空白）④ 单词（英文→跟读→中文→课文原句）。
+   索引 v3 在 days（旧版整条，旧 app 继续用）之外多了 texts（每篇课文一条）和 words（每单元一条），每条带 items 时间轴（gen_ear2.py 生成）。
+   某单元有 texts 就走新版：本单元两篇课文 + 单词，三条音频按字节拼成一条 Blob 播放（裸 CBR MP3，同听讲解），播放中不换音频源，锁屏不断。
+   单词那条只放挑中的 10 个（背单词里到期没拿下的优先，其次在背的、没背过的按天轮换），其余在 earTick 里跳过；放完一轮就停，不再循环到定时。
+   语速 慢/标准/快 用 playbackRate，不另合成音频。答题、跟读、单词的次数记在 DB.ting['e:日期:设备']（随同步走，家长复盘「练习难度」里看） ---- */
+const EAR_KIND2 = {listen: '盲听', qa: '答题', shadow: '跟读', words4: '单词', word: '单词'};
+Object.assign(EAR_KIND, EAR_KIND2);
+const EAR_RATES = [['慢速', 0.85], ['标准', 1], ['快速', 1.15]];
+const earRate = () => { const r = lsGet('observer:earRate'); return r > 0 ? r : 1; };
+const EAR_WN = 10;
+EAR.d2 = {};
+function ear2Day(u){
+  const X = EAR.idx; if (!X || !X.texts) return null;
+  if (EAR.d2.x !== X) EAR.d2 = {x: X};
+  if (u in EAR.d2) return EAR.d2[u];
+  const T = Object.entries(X.texts).filter(([, t]) => t.unit === u).sort(([a], [b]) => (a.endsWith('-r') ? 0 : 1) - (b.endsWith('-r') ? 0 : 1));
+  const W = Object.entries(X.words || {}).filter(([, t]) => t.unit === u);
+  if (!T.length || T.some(([, t]) => !t.ver)) return EAR.d2[u] = null;
+  const parts = T.map(([id, t]) => Object.assign({id, type: 'text'}, t)).concat(W.filter(([, t]) => t.ver).map(([id, t]) => Object.assign({id, type: 'words'}, t)));
+  let off = 0; for (const p of parts) { p.off = off; off += p.dur; }
+  return EAR.d2[u] = {id: 'v2-u' + u, ver: parts.map(p => p.ver).join('.'), unit: u, v2: true, parts, dur: off, size: parts.reduce((s, p) => s + (p.size || 0), 0)};
+}
+// 今天放哪 10 个词：同一天同一单元固定（换设备、重开都一样），不受中途背单词影响
+function ear2Pick(u, W){
+  const t = today(), o = lsGet('observer:earPick');
+  if (o && o.d === t && o.u === u) { const S = new Set(o.w); const r = W.filter(i => S.has(i.w)); if (r.length) return r; }
+  const rank = i => { const s = LIB.words ? wState({w: i.w}) : null; return !s ? 2 : s.done ? 3 : s.due <= t ? 0 : 1; };
+  const k0 = Math.max(0, dayDiff('2026-09-01', t)) * 7, n = W.length;
+  const top = new Set(W.map((i, j) => ({i, r: rank(i), o: (j - k0 % n + n) % n})).sort((a, b) => a.r - b.r || a.o - b.o).slice(0, EAR_WN).map(x => x.i));
+  const r = W.filter(i => top.has(i)); lsSet('observer:earPick', {d: t, u, w: r.map(i => i.w)}); return r;
+}
+// 播放列表（不改全局状态：计数表挂在返回值 .cnt 上，开始播放时才取用）
+function ear2Playlist(d){
+  const L = [], C = [];
+  for (const p of d.parts) {
+    const at = s => p.off + s;
+    if (p.type === 'text') {
+      const st = n => (p.items.find(i => i.k === 'step' && i.n === n) || {}).s;
+      const s1 = st(1) || 0, s2 = st(2), s3 = st(3);
+      const base = {pid: p.id, title: p.title, unit: p.unit, page: p.page, items: p.items, sents: p.sents, qs: p.qs, off: p.off};
+      L.push(Object.assign({id: p.id + ':1', kind: 'listen', start: at(s1), end: at(s2)}, base));
+      L.push(Object.assign({id: p.id + ':2', kind: 'qa', start: at(s2), end: at(s3)}, base));
+      L.push(Object.assign({id: p.id + ':3', kind: 'shadow', start: at(s3), end: at(p.dur)}, base));
+      for (const i of p.items) if (i.k === 'a' || i.k === 'shadow') C.push({k: i.k === 'a' ? 'q' : 'sh', t: at(i.e)});
+    } else {
+      const W = p.items.filter(i => i.k === 'word'), pick = ear2Pick(p.unit, W), s4 = p.items.find(i => i.k === 'step');
+      if (!pick.length) continue;
+      L.push({id: p.id + ':4', pid: p.id, kind: 'words4', title: `今天的 ${pick.length} 个单词`, unit: p.unit, start: at(s4 ? s4.s : 0), end: at(W[0].s), off: p.off});
+      for (const i of pick) { L.push({id: p.id + ':' + i.w, pid: p.id, kind: 'word', title: i.w, unit: p.unit, start: at(i.s), end: at(i.e), word: i, off: p.off}); C.push({k: 'w', t: at(i.e) - 0.3}); }
+    }
+  }
+  C.sort((a, b) => a.t - b.t); L.cnt = C; return L;
+}
+// 次数：放过去才算（拖动 / 跳段跳过的不算，见 earTick 里 3 秒判断）
+function ear2Count(k){ const L = tingLog(), key = 'e:' + today() + ':' + tingDev(), r = L[key] || (L[key] = {q: 0, ok: 0, no: 0, sh: 0, w: 0});
+  r[k] = (r[k] || 0) + 1; r.u = now(); if (!EAR.svT) EAR.svT = setTimeout(() => { EAR.svT = 0; save(); }, 15000); }
+const ear2Week = (from, to) => { const L = tingLog(), o = {q: 0, ok: 0, no: 0, sh: 0, w: 0, days: new Set()}; for (const k in L) if (k.startsWith('e:')) { const d = k.slice(2, 12); if (d < from || d > to) continue; o.days.add(d); for (const x of ['q', 'ok', 'no', 'sh', 'w']) o[x] += L[k][x] || 0; } return o; };
+const ear2Min = d => { const L = ear2Playlist(d); return Math.max(1, Math.round(L.reduce((s, t) => s + t.end - t.start, 0) / 60 / earRate())); };
+// 当前放到哪一小条（问题 / 跟读句 / 单词），给页面显示
+function ear2Item(){ const t = EAR.cur, a = EAR.a; if (!t || !t.items || !a) return null; const x = a.currentTime - t.off; let it = null; for (const i of t.items) { if (i.k === 'step') continue; if (x >= i.s - 0.05) it = i; else break; } return it; }
 // 今天要放的各段：本单元课文 → 阅读 → 单词 → 上一单元课文复习（音频是预先拼好的一整条，这里是每段的起点）
 function earPlaylist(u){
   const d = earDay(u); if (!d) return [];
+  if (d.v2) return ear2Playlist(d);
   return d.segs.map((s, i) => Object.assign({}, earTrack(s.id), {start: s.start, end: i + 1 < d.segs.length ? d.segs[i + 1].start : d.dur}));
 }
 const earToday = () => Math.round(((lsGet('observer:earLog') || {})[today()] || 0) / 60);
@@ -4466,6 +4529,7 @@ async function loadEar(force){
 }
 async function earKey(env){ const k = env.salt + '|' + env.iter; return EAR.keys[k] || (EAR.keys[k] = deriveKey(SYNC.pass, b64d(env.salt), env.iter)); }
 function earBlob(d){
+  if (d.v2) return Promise.all(d.parts.map(earBlob)).then(B => new Blob(B, {type: 'audio/mpeg'}));   // 新版三条按字节拼成一条
   const ck = 'ear:' + d.id + ':' + d.ver;
   if (EAR.dl[ck]) return EAR.dl[ck];
   return EAR.dl[ck] = (async () => {
@@ -4479,11 +4543,12 @@ function earBlob(d){
     H[d.id] = d.ver; lsSet('observer:earHave', H);
     return blob; })().finally(() => { setTimeout(() => { delete EAR.dl[ck]; }, 0); });
 }
-const earHave = d => !!d && (lsGet('observer:earHave') || {})[d.id] === d.ver;
+const earHave = d => !!d && (d.v2 ? d.parts.every(earHave) : (lsGet('observer:earHave') || {})[d.id] === d.ver);
 function earAudio(){
   if (EAR.a) return EAR.a;
   const a = EAR.a = AM.hook(new Audio(), 'ear'); a.preload = 'auto';
   a.addEventListener('ended', () => { if (a.src === EAR_SILENT || !EAR.on) return;   // 现在正式源开了 loop，正常不会走到这里，留作兜底
+    if (EAR.day && EAR.day.v2) return earStop(true);   // 新版放完一轮就停
     if (Date.now() >= EAR.until) return earStop(true);
     a.currentTime = 0; a.play().catch(amErr('ear')); });   // 一轮放完、时间还没到：从头再来一遍
   a.addEventListener('timeupdate', earTick);
@@ -4495,16 +4560,16 @@ async function earStart(i){
   const d = earDay(); if (!d) return;
   AM.claim('ear');   // 停掉听讲解 / 朗读 / 听说（以前只停听讲解）
   const a = earAudio(); if (!(EAR.day === d && EAR.url)) { a.loop = false; a.src = EAR_SILENT; a.play().catch(amErr('ear')); }
-  EAR.list = earPlaylist(); EAR.until = Date.now() + earMin() * 60000; EAR.on = true; EAR.err = '';
+  EAR.list = earPlaylist(); EAR.cnt = EAR.list.cnt || []; EAR.until = Date.now() + (d.v2 ? 6 * 3600000 : earMin() * 60000); EAR.on = true; EAR.err = '';
   EAR.i = i || 0; EAR.cur = EAR.list[EAR.i]; EAR.loading = true; earUI();
   try {
     if (EAR.day !== d || !EAR.url) {
       const b = await earBlob(d); if (!EAR.on) { EAR.loading = false; earUI(); return; }
       const old = EAR.url; EAR.url = URL.createObjectURL(b); EAR.day = d; a.src = EAR.url; if (old) URL.revokeObjectURL(old);
     }
-    a.loop = true;   // 一轮放完由浏览器自己从头接着放，不再靠 ended 里重新 play()（锁屏时可能被拒，错误还被吞掉）；到点停在 earTick / earGuard
+    a.loop = !d.v2; earRateApply(a);   // 旧版：一轮放完由浏览器自己从头接着放，不再靠 ended 里重新 play()（锁屏时可能被拒，错误还被吞掉）；到点停在 earTick / earGuard
     if (a.readyState < 1) { await amReady(a); if (!EAR.on) { EAR.loading = false; earUI(); return; } }
-    try { a.currentTime = EAR.cur.start; } catch(e) {}   // 先跳到这一段再出声，免得开头先从 0 秒响一下
+    try { a.currentTime = EAR.cur.start; } catch(e) {} ear2Ci(EAR.cur.start);   // 先跳到这一段再出声，免得开头先从 0 秒响一下
     await a.play(); if (Math.abs(a.currentTime - EAR.cur.start) > 2) a.currentTime = EAR.cur.start;
     EAR.lt = null; earMeta(); earGuard();
   } catch(e) { if (!EAR.on || AM.cur !== 'ear' || (e && e.name === 'AbortError')) { EAR.loading = false; earUI(); return; }   // 被暂停 / 别的音源抢占，不算没放出来
@@ -4518,7 +4583,7 @@ function earSeek(i){
   AM.claim('ear');
   if (Date.now() >= EAR.until) EAR.until = Date.now() + earMin() * 60000;
   EAR.i = i; EAR.cur = EAR.list[i]; EAR.on = true; EAR.err = ''; EAR.lt = null;
-  EAR.a.currentTime = EAR.cur.start; EAR.a.play().catch(amErr('ear')); earMeta(); earUI(); earGuard();
+  EAR.a.currentTime = EAR.cur.start; ear2Ci(EAR.cur.start); earRateApply(EAR.a); EAR.a.play().catch(amErr('ear')); earMeta(); earUI(); earGuard();
 }
 // ▶ 继续 / 锁屏播放共用：到点后再放重新计时；音频没了就重新开始
 function earResume(){ const a = EAR.a; if (!a || !EAR.url || EAR.day !== earDay() || !EAR.list.length || !EAR.cur) return earStart(EAR.cur ? EAR.i : 0);   // 换过单元 list 被清空：重建，不然到点检测全失效会一直循环
@@ -4531,11 +4596,26 @@ function earGuard(){ clearTimeout(EAR.gT); if (!EAR.on || !EAR.list.length) retu
   const mx = Math.max(60, ...EAR.list.map(t => t.end - t.start)) * 1000 + 5000;
   EAR.gT = setTimeout(() => { if (!EAR.on) return; if (Date.now() >= EAR.until + mx) { EAR.lt = null; earStop(true); } else earGuard(); }, Math.max(1000, EAR.until + mx - Date.now())); }
 function earMeta(){ if (AM.cur !== 'ear') return; const t = EAR.cur; if (t && 'mediaSession' in navigator && window.MediaMetadata) try { navigator.mediaSession.metadata = new MediaMetadata({title: t.title, artist: `Unit ${t.unit} · ${EAR_KIND[t.kind] || ''}`, album: '早上磨耳朵'}); } catch(e) {} amPos(); }
-function earStop(done){ EAR.on = false; if (EAR.a) EAR.a.pause(); if (done) toast(`磨耳朵 ${earMin()} 分钟放完了`); earUI(); }
+function earStop(done){ EAR.on = false; if (EAR.a) EAR.a.pause(); if (EAR.svT) { clearTimeout(EAR.svT); EAR.svT = 0; save(); }
+  if (done) { const v2 = EAR.day && EAR.day.v2; if (v2) { EAR.i = 0; EAR.cur = null; EAR.list = []; }   // 清空列表：之后暂停引起的 timeupdate 不会把当前段又设回最后一个词，再点播放从头开始
+    toast(v2 ? '今天这一轮放完了' : `磨耳朵 ${earMin()} 分钟放完了`); } earUI(); }
+function earRateApply(a){ const r = EAR.day && EAR.day.v2 ? earRate() : 1; try { a.defaultPlaybackRate = r; a.playbackRate = r; a.preservesPitch = true; } catch(e) {} }
+// 计数指针：跳到 t 之后，t 之前的条目不再计
+function ear2Ci(t){ const C = EAR.cnt || []; let k = 0; while (k < C.length && C[k].t <= t + 0.05) k++; EAR.ci = k; }
 function earTick(){
   const a = EAR.a; if (!a || a.src === EAR_SILENT || !EAR.list.length) return;
   const ct = a.currentTime;
   if (EAR.lt != null && !a.paused) { const dt = ct - EAR.lt; if (dt > 0 && dt < 3) { const L = lsGet('observer:earLog') || {}, k = today(); L[k] = (L[k] || 0) + dt; earTick.n = (earTick.n || 0) + 1; if (earTick.n % 20 === 0) { for (const x of Object.keys(L)) if (x < addD(k, -60)) delete L[x]; } lsSet('observer:earLog', L); } }
+  if (EAR.day && EAR.day.v2 && !EAR.loading) {
+    const C = EAR.cnt || [];
+    while ((EAR.ci || 0) < C.length && ct >= C[EAR.ci || 0].t) { const c = C[EAR.ci || 0]; if (EAR.lt != null && ct - c.t < 3 && !a.paused) ear2Count(c.k); EAR.ci = (EAR.ci || 0) + 1; }
+    const cur = EAR.list[EAR.i], nx = EAR.list[EAR.i + 1];
+    if (cur && ct >= cur.end - 0.03 && EAR.on) {
+      if (!nx) { EAR.lt = null; return earStop(true); }
+      if (nx.start > cur.end + 0.3) { EAR.lt = null; a.currentTime = nx.start; EAR.i++; EAR.cur = nx; earMeta(); earUI(); return; }   // 单词只放挑中的：跳过中间没挑的
+    }
+    const it = ear2Item(); if (it !== EAR.it) { EAR.it = it; earUI(); }
+  }
   const wrapped = EAR.lt != null && ct + 1 < EAR.lt;   // loop 从尾回到头（跳段 / 锁屏拖动都会先把 lt 清空，不会误判）
   EAR.lt = ct;
   if (wrapped && EAR.on && !EAR.loading && Date.now() >= EAR.until) { EAR.lt = null; EAR.i = 0; EAR.cur = EAR.list[0]; return earStop(true); }   // 停在第 0 段，锁屏再按播放时标题和进度对得上   // 定时到了、一轮刚放完：不再从头放
@@ -4557,6 +4637,26 @@ function earNowHTML(){
     <button class="btn sm ghost" data-act="earnext" data-v="-1" aria-label="上一段">⏮</button><button class="btn sm primary" data-act="earpp" aria-label="${earPlaying() ? '暂停' : '继续'}">${EAR.loading ? '…' : earPlaying() ? '⏸' : '▶'}</button><button class="btn sm ghost" data-act="earnext" data-v="1" aria-label="下一段">⏭</button></div>`;
 }
 // 今天页：早上 5–10 点（或正在放）出现在最上面
+// 新版正在放的内容：盲听时不给原文（想看可以展开）；答题显示问题，放到答案才给答案和中文；跟读显示这一句和中文；单词显示词、中文和例句
+function ear2TextHTML(t){
+  const it = EAR.cur === t ? ear2Item() : null, head = `<div class="small faint" style="margin-bottom:8px">${EAR.cur ? '正在放' : '第一段'} · Unit ${t.unit} · ${EAR_KIND[t.kind]}${t.page ? ` · 课本第 ${t.page} 页` : ''}</div>`;
+  const full = () => `<details><summary class="small">看全文和中文</summary>${t.sents.map(([e, c], i) => i === 0 ? `<h3 style="margin:8px 0">${esc(e.replace(/\.$/, ''))}</h3>` : `<p style="margin:6px 0">${esc(e)}<br><span class="small muted">${esc(c)}</span></p>`).join('')}</details>`;
+  if (t.kind === 'listen') return `<div class="card ear-txt">${head}<h3 style="margin:0 0 6px">${esc(t.title)}</h3><p class="muted">先别看，只用耳朵听。听完要回答 3 个问题。</p>${full()}</div>`;
+  if (t.kind === 'qa') {
+    const j = it && (it.k === 'q' || it.k === 'a') ? it.j : 0, q = t.qs[j], showA = !!(it && it.k === 'a'), key = t.pid + ':' + j + ':' + today();
+    const done = (EAR.qa || {})[key];
+    return `<div class="card ear-txt">${head}<div class="small muted">第 ${j + 1} 题，共 ${t.qs.length} 题</div><h3 style="margin:6px 0">${esc(q[0])}</h3>`
+      + (showA ? `<p style="margin:6px 0"><b>${esc(q[1])}</b><br><span class="small muted">${esc(q[2])}</span></p>` : `<p class="muted" style="margin:6px 0">说出你的答案…</p>`)
+      + (showA ? (done ? `<p class="small faint" style="margin:6px 0 0">记下了：${done === 'ok' ? '答上了' : '没答上'}</p>` : `<div class="row" style="gap:8px;margin-top:6px"><button class="chip" data-act="earqa" data-v="${key}|ok">答上了</button><button class="chip" data-act="earqa" data-v="${key}|no">没答上</button><span class="small faint">点不点都行</span></div>`) : '') + `</div>`;
+  }
+  if (t.kind === 'shadow') {
+    const i = it && it.k === 'shadow' ? it.i : 0, sn = t.sents[i] || ['', ''];
+    return `<div class="card ear-txt">${head}<div class="small muted">听一句，跟着大声说一句</div><h3 style="margin:8px 0;line-height:1.5">${esc(it && it.k === 'shadow' ? it.x : sn[0])}</h3><p class="small muted" style="margin:0 0 8px">${esc(sn[1])}</p>${full()}</div>`;
+  }
+  const w = t.kind === 'word' ? t.word : null;
+  if (!w) return `<div class="card ear-txt">${head}<p class="muted">先听英文，跟着说一遍，再听中文意思和例句。</p></div>`;
+  return `<div class="card ear-txt">${head}<h3 style="margin:0 0 4px">${esc(w.w)}</h3><p style="margin:0 0 8px">${esc(w.cn)}</p>${w.ex ? `<p style="margin:0">${esc(w.ex)}</p><p class="small faint" style="margin:4px 0 0">${w.own ? '自编例句' : '课文原句'}</p>` : ''}</div>`;
+}
 function earCard(){
   loadEar();
   const hr = new Date().getHours();
@@ -4566,7 +4666,7 @@ function earCard(){
   let h = `<div class="card" id="earbox"><div class="row"><h3 style="margin:0">早上磨耳朵</h3><span class="spacer"></span><span class="small muted">Unit ${u}${n ? ` · 今天听了 ${n} 分钟` : ''}</span></div>`;
   if (EAR.st !== 'ok') return h + `<p class="small muted" style="margin:6px 0 0">${EAR.st === 'err' ? '课文音频没加载到，联网后再打开。' : '加载中…'}</p></div>`;
   if (EAR.cur) h += earNowHTML();
-  else h += `<p class="small muted" style="margin:6px 0 10px">洗漱、吃早饭时放着，不用盯着看。本单元课文和单词，再复习上一单元，约 ${earMin()} 分钟。</p><button class="btn primary fillbtn" style="margin-bottom:0" data-act="earplay">▶ 开始放</button>`;
+  else h += `<p class="small muted" style="margin:6px 0 10px">${(earDay() || {}).v2 ? `洗漱、吃早饭时放着，不用盯着看：两篇课文先盲听、再答题、再跟读，最后 ${EAR_WN} 个单词，约 ${ear2Min(earDay())} 分钟。答题、跟读都说出声。` : `洗漱、吃早饭时放着，不用盯着看。本单元课文和单词，再复习上一单元，约 ${earMin()} 分钟。`}</p><button class="btn primary fillbtn" style="margin-bottom:0" data-act="earplay">▶ 开始放</button>`;
   if (EAR.err) h += `<p class="small" style="color:var(--bad,#b5402a);margin:6px 0 0">${esc(EAR.err)}</p>`;
   return h + `<div style="text-align:right;margin-top:6px"><a href="#" class="small" data-act="golearn" data-v="ear">看原文 / 换单元</a></div></div>`;
 }
@@ -4579,14 +4679,17 @@ function vEar(){
   const u = earUnit(), auto = earUnitAuto(), list = earPlaylist(), n = earToday();
   h += `<div class="card" id="earbox"><div class="small muted">${esc(EAR.idx.book || '')} · 按开学日期估计学到 Unit ${enUnit(today()) || 1} · 今天轮到 Unit ${auto}（隔天放当前单元，另一天轮前面学过的）${n ? ` · 今天听了 ${n} 分钟` : ''}</div>`;
   h += `<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">${[1,2,3,4,5,6,7,8].map(k => `<button class="chip ${k === u ? 'on' : ''}" data-act="earunit" data-v="${k}">Unit ${k}</button>`).join('')}</div>`;
-  const d = earDay(); h += `<div class="small faint" style="margin-top:8px">这一轮 ${Math.round(d.dur / 60)} 分钟${earHave(d) ? ' · 已下载，没网也能放' : ' · 第一次放要联网下载（约 ' + Math.max(1, Math.round((d.size || 0) / 1048576)) + ' MB）'}</div>`;
-  h += `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">放多久</span>${[10,15,20,30].map(m => `<button class="chip ${m === earMin() ? 'on' : ''}" data-act="earmin" data-v="${m}">${m} 分钟</button>`).join('')}</div>`;
-  h += EAR.cur ? earNowHTML() : `<button class="btn primary fillbtn" style="margin:12px 0 0" data-act="earplay">▶ 开始放（Unit ${u}${u > 1 ? ` + 复习 Unit ${u - 1}` : ''}）</button>`;
+  const d = earDay(); h += `<div class="small faint" style="margin-top:8px">这一轮 ${d.v2 ? ear2Min(d) : Math.round(d.dur / 60)} 分钟${earHave(d) ? ' · 已下载，没网也能放' : ' · 第一次放要联网下载（约 ' + Math.max(1, Math.round((d.size || 0) / 1048576)) + ' MB）'}</div>`;
+  if (d.v2) h += `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">语速</span>${EAR_RATES.map(([n, r]) => `<button class="chip ${r === earRate() ? 'on' : ''}" data-act="earrate" data-v="${r}">${n}</button>`).join('')}</div>`;
+  else h += `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">放多久</span>${[10,15,20,30].map(m => `<button class="chip ${m === earMin() ? 'on' : ''}" data-act="earmin" data-v="${m}">${m} 分钟</button>`).join('')}</div>`;
+  h += EAR.cur ? earNowHTML() : `<button class="btn primary fillbtn" style="margin:12px 0 0" data-act="earplay">${SVG_PLAY} 开始放（Unit ${u}${d.v2 ? '：两篇课文 + 单词' : u > 1 ? ` + 复习 Unit ${u - 1}` : ''}）</button>`;
+  if (d.v2) h += `<p class="small muted" style="margin:8px 0 0">每篇课文分三步：先盲听，再答 3 个问题（问完停 5 秒，你说出答案），再一句一句跟读；最后是今天的 ${EAR_WN} 个单词。答题和跟读都要说出声，放完一轮自动停。</p>`;
   if (EAR.err) h += `<p class="small" style="color:var(--bad,#b5402a);margin:6px 0 0">${esc(EAR.err)}</p>`;
-  h += `<div style="margin-top:12px">` + list.map((t, i) => `<button class="ear-row ${EAR.cur && EAR.cur.id === t.id ? 'on' : ''}" data-act="earpick" data-v="${i}"><span class="k">${t.unit === u ? EAR_KIND[t.kind] : '复习'}</span><span style="flex:1;min-width:0">${esc(t.title)}</span><span class="small faint">${Math.round((t.end - t.start) / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div></div>`;
+  h += `<div style="margin-top:12px">` + list.map((t, i) => `<button class="ear-row ${EAR.cur && EAR.cur.id === t.id ? 'on' : ''}" data-act="earpick" data-v="${i}"><span class="k">${t.unit === u ? EAR_KIND[t.kind] : '复习'}</span><span style="flex:1;min-width:0">${esc(t.kind === 'word' ? t.title + '  ' + t.word.cn : t.title)}</span><span class="small faint">${Math.round((t.end - t.start) / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div></div>`;
   const t = EAR.cur || list[0];
-  if (t) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${EAR.cur ? '正在放' : '第一段'} · Unit ${t.unit} · ${EAR_KIND[t.kind]}${t.page ? ` · 课本第 ${t.page} 页` : ''}</div>${t.paras.map((p, i) => i === 0 && t.kind !== 'words' ? `<h3 style="margin:0 0 10px">${esc(p.replace(/\.$/, ''))}</h3>` : `<p>${esc(p)}</p>`).join('')}</div>`;
-  h += `<p class="small faint" style="margin:0 4px 16px">课文按课本原文朗读（美音，略慢于正常语速），不是课本配套录音。网页不能到点自己出声，早上点一下「开始放」；放的时候锁屏一般也会接着放；个别 iPad 从主屏幕图标打开、锁屏就停的，先别锁屏，告诉家长。</p>`;
+  if (t && d.v2) h += ear2TextHTML(t);
+  else if (t) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${EAR.cur ? '正在放' : '第一段'} · Unit ${t.unit} · ${EAR_KIND[t.kind]}${t.page ? ` · 课本第 ${t.page} 页` : ''}</div>${t.paras.map((p, i) => i === 0 && t.kind !== 'words' ? `<h3 style="margin:0 0 10px">${esc(p.replace(/\.$/, ''))}</h3>` : `<p>${esc(p)}</p>`).join('')}</div>`;
+  h += `<p class="small faint" style="margin:0 4px 16px">课文按课本原文朗读（美音${d.v2 ? '' : '，略慢于正常语速'}），不是课本配套录音。网页不能到点自己出声，早上点一下「开始放」；放的时候锁屏一般也会接着放；个别 iPad 从主屏幕图标打开、锁屏就停的，先别锁屏，告诉家长。</p>`;
   return h;
 }
 
@@ -6082,6 +6185,8 @@ const ACT = {
     earResume(); },   // 继续：先 claim 停掉听讲解等，再接着放
   earnext: el => earSeek(EAR.i + (+el.dataset.v)),
   earunit: el => { lsSet('observer:earUnit', {u: +el.dataset.v, a: enUnit(today()) || 1}); if (EAR.on) earStop(); AM.release('ear'); EAR.cur = null; EAR.list = []; render(); const d = earDay(); if (d) earBlob(d).then(() => earUI()).catch(() => {}); },
+  earrate: el => { lsSet('observer:earRate', +el.dataset.v); if (EAR.a) earRateApply(EAR.a); render(); },
+  earqa: el => { const [key, r] = el.dataset.v.split('|'); EAR.qa = EAR.qa || {}; if (EAR.qa[key]) return; EAR.qa[key] = r; ear2Count(r); render(); },
   earmin: el => { lsSet('observer:earMin', +el.dataset.v); if (EAR.on) { EAR.until = Date.now() + (+el.dataset.v) * 60000; earGuard(); } render(); },
   tingplay: () => tingStart(0),
   tingpick: el => tingSeek(+el.dataset.v),
