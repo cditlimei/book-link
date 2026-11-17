@@ -44,7 +44,7 @@ try:
             pg.wait_for_timeout(200)
         ok('0 索引加载（v3）', ev("EAR.st === 'ok' && EAR.idx.v === 3"), ev("EAR.st"))
         ok('1 Unit 1 走新版：课文 r、c、单词三条', ev("(earDay(1)||{}).v2 && earDay(1).parts.map(p=>p.id).join()") == '7a-u1-r,7a-u1-c,7a-u1-w', ev("earDay(1) && earDay(1).parts && earDay(1).parts.map(p=>p.id).join()"))
-        ok('1b 没有新版的单元回落旧版整条', ev("(() => { const d = earDay(2); return !!(d && !d.v2 && d.segs); })()"))
+        ok('1b 没有新版的单元回落旧版整条', ev("(() => { const X = EAR.idx, T = X.texts; X.texts = Object.fromEntries(Object.entries(T).filter(([k]) => !k.startsWith('7a-u2-'))); EAR.d2 = {}; const d = earDay(2), r = !!(d && !d.v2 && d.segs); X.texts = T; EAR.d2 = {}; return r; })()"))
         # 选词：到期没拿下的优先、已掌握的排后
         ev("""DB.words = {'trust': {due: today(), done: false, u: 1}, 'courage': {due: today(), done: false, u: 1}, 'guitar': {due: '2026-12-30', done: true, u: 1}};
               localStorage.removeItem('observer:earPick'); 0""")
