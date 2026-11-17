@@ -4631,10 +4631,10 @@ function earTick(){
 function earUI(){ if (document.getElementById('earbox')) render(); }
 const earPlaying = () => !!(EAR.a && EAR.on && (!EAR.a.paused || EAR.loading));
 function earNowHTML(){
-  const t = EAR.cur, left = Math.max(0, Math.ceil((EAR.until - Date.now()) / 60000));
+  const t = EAR.cur, v2 = EAR.day && EAR.day.v2, left = v2 ? Math.max(1, Math.ceil(EAR.list.slice(EAR.i).reduce((s, x) => s + x.end - x.start, 0) / 60 / earRate())) : Math.max(0, Math.ceil((EAR.until - Date.now()) / 60000));
   if (!t) return '';
   return `<div class="ear-np"><div class="t"><span class="small faint">Unit ${t.unit} · ${EAR_KIND[t.kind] || ''}${EAR.on ? ` · ${left ? `还剩约 ${left} 分钟` : '放完这段就停'}` : ''}</span><b>${esc(t.title)}</b><div class="ear-bar"><i id="ear-bar"></i></div></div>
-    <button class="btn sm ghost" data-act="earnext" data-v="-1" aria-label="上一段">⏮</button><button class="btn sm primary" data-act="earpp" aria-label="${earPlaying() ? '暂停' : '继续'}">${EAR.loading ? '…' : earPlaying() ? '⏸' : '▶'}</button><button class="btn sm ghost" data-act="earnext" data-v="1" aria-label="下一段">⏭</button></div>`;
+    <button class="btn sm ghost" data-act="earnext" data-v="-1" aria-label="上一段">${SVG_PREV}</button><button class="btn sm primary" data-act="earpp" aria-label="${earPlaying() ? '暂停' : '继续'}">${EAR.loading ? '…' : earPlaying() ? SVG_PAUSE : SVG_PLAY}</button><button class="btn sm ghost" data-act="earnext" data-v="1" aria-label="下一段">${SVG_NEXT}</button></div>`;
 }
 // 今天页：早上 5–10 点（或正在放）出现在最上面
 // 新版正在放的内容：盲听时不给原文（想看可以展开）；答题显示问题，放到答案才给答案和中文；跟读显示这一句和中文；单词显示词、中文和例句
@@ -4683,11 +4683,12 @@ function vEar(){
   if (d.v2) h += `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">语速</span>${EAR_RATES.map(([n, r]) => `<button class="chip ${r === earRate() ? 'on' : ''}" data-act="earrate" data-v="${r}">${n}</button>`).join('')}</div>`;
   else h += `<div class="row" style="gap:6px;margin-top:8px"><span class="small muted">放多久</span>${[10,15,20,30].map(m => `<button class="chip ${m === earMin() ? 'on' : ''}" data-act="earmin" data-v="${m}">${m} 分钟</button>`).join('')}</div>`;
   h += EAR.cur ? earNowHTML() : `<button class="btn primary fillbtn" style="margin:12px 0 0" data-act="earplay">${SVG_PLAY} 开始放（Unit ${u}${d.v2 ? '：两篇课文 + 单词' : u > 1 ? ` + 复习 Unit ${u - 1}` : ''}）</button>`;
-  if (d.v2) h += `<p class="small muted" style="margin:8px 0 0">每篇课文分三步：先盲听，再答 3 个问题（问完停 5 秒，你说出答案），再一句一句跟读；最后是今天的 ${EAR_WN} 个单词。答题和跟读都要说出声，放完一轮自动停。</p>`;
+  if (d.v2 && EAR.cur) h += ear2TextHTML(EAR.cur).replace('class="card ear-txt"', 'class="ear-txt" style="margin-top:12px"');   // 正在放的内容紧跟播放器，不用往下翻
+  else if (d.v2) h += `<p class="small muted" style="margin:8px 0 0">每篇课文分三步：先盲听，再答 3 个问题（问完停 5 秒，你说出答案），再一句一句跟读；最后是今天的 ${EAR_WN} 个单词。答题和跟读都要说出声，放完一轮自动停。</p>`;
   if (EAR.err) h += `<p class="small" style="color:var(--bad,#b5402a);margin:6px 0 0">${esc(EAR.err)}</p>`;
   h += `<div style="margin-top:12px">` + list.map((t, i) => `<button class="ear-row ${EAR.cur && EAR.cur.id === t.id ? 'on' : ''}" data-act="earpick" data-v="${i}"><span class="k">${t.unit === u ? EAR_KIND[t.kind] : '复习'}</span><span style="flex:1;min-width:0">${esc(t.kind === 'word' ? t.title + '  ' + t.word.cn : t.title)}</span><span class="small faint">${Math.round((t.end - t.start) / 60 * 2) / 2 || 0.5} 分</span></button>`).join('') + `</div></div>`;
   const t = EAR.cur || list[0];
-  if (t && d.v2) h += ear2TextHTML(t);
+  if (t && d.v2) { if (!EAR.cur) h += ear2TextHTML(t); }
   else if (t) h += `<div class="card ear-txt"><div class="small faint" style="margin-bottom:8px">${EAR.cur ? '正在放' : '第一段'} · Unit ${t.unit} · ${EAR_KIND[t.kind]}${t.page ? ` · 课本第 ${t.page} 页` : ''}</div>${t.paras.map((p, i) => i === 0 && t.kind !== 'words' ? `<h3 style="margin:0 0 10px">${esc(p.replace(/\.$/, ''))}</h3>` : `<p>${esc(p)}</p>`).join('')}</div>`;
   h += `<p class="small faint" style="margin:0 4px 16px">课文按课本原文朗读（美音${d.v2 ? '' : '，略慢于正常语速'}），不是课本配套录音。网页不能到点自己出声，早上点一下「开始放」；放的时候锁屏一般也会接着放；个别 iPad 从主屏幕图标打开、锁屏就停的，先别锁屏，告诉家长。</p>`;
   return h;

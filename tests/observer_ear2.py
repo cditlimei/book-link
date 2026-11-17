@@ -12,7 +12,7 @@ if not (DRY / 'ear' / 'index.enc.json').exists():
 def free_port():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
 PORT = free_port()
-srv = subprocess.Popen(['python3', '-m', 'http.server', str(PORT), '-d', '/home/coder/book-link'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
+srv = subprocess.Popen(['python3', '-m', 'http.server', str(PORT), '-d', os.environ.get('BL_ROOT', '/home/coder/book-link')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
 R = []
 def ok(name, cond, extra=''):
     R.append((name, bool(cond))); print(('PASS ' if cond else 'FAIL ') + name, extra if not cond else '')
@@ -73,7 +73,7 @@ try:
         ev("""(() => { const i = EAR.list.findIndex(t => t.kind === 'qa'); earSeek(i); const t = EAR.list[i], a = t.items.find(x => x.k === 'a' && x.j === 0); EAR.a.currentTime = t.off + a.s + 0.3; })(); 0""")
         pg.wait_for_timeout(1200)
         main = pg.inner_text('#main')
-        ok('6 答题段显示第 1 题和答案', '第 1 题' in main and 'good at maths' in main, main[:500])
+        ans = ev("EAR.cur.qs[0][1]"); ok('6 答题段显示第 1 题和答案', '第 1 题' in main and ans in main, main[:200])
         pg.click('[data-act=earqa] >> nth=0'); pg.wait_for_timeout(200)
         rec = ev("Object.entries(DB.ting).filter(([k]) => k.startsWith('e:')).map(([k, v]) => v)[0] || null")
         ok('6b 点「答上了」记进 DB.ting e: 记录', rec and rec.get('ok') == 1, rec)
